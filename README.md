@@ -1,4 +1,6 @@
-# signer
+# Signer
+
+A collection of signer crates for various blockchain networks.
 
 ## License
 

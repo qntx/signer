@@ -1,5 +1,5 @@
 [workspace]
-members = ["signer", "signer-btc", "signer-cli", "signer-evm", "signer-svm"]
+members = ["signer", "signer-btc", "signer-cli", "signer-evm", "signer-sui", "signer-svm", "signer-xmr", "signer-zec"]
 default-members = ["signer"]
 resolver = "3"
 
