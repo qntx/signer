@@ -1,45 +1,171 @@
-# Signer
+# signer
 
-Multi-chain transaction signer built on mature cryptography libraries. **Zero hand-rolled cryptography.**
+[![CI][ci-badge]][ci-url]
+[![License][license-badge]][license-url]
+[![Rust][rust-badge]][rust-url]
+
+[ci-badge]: https://github.com/qntx/signer/actions/workflows/rust.yml/badge.svg
+[ci-url]: https://github.com/qntx/signer/actions/workflows/rust.yml
+[license-badge]: https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg
+[license-url]: LICENSE-MIT
+[rust-badge]: https://img.shields.io/badge/rust-edition%202024-orange.svg
+[rust-url]: https://doc.rust-lang.org/edition-guide/
+
+**Multi-chain transaction signer built on mature cryptography libraries — zero hand-rolled cryptography.**
+
+signer provides thin wrappers around battle-tested signing libraries ([alloy](https://docs.rs/alloy-signer-local) for EVM, [bitcoin](https://docs.rs/bitcoin) for BTC, [ed25519-dalek](https://docs.rs/ed25519-dalek) for Solana), exposing a unified API while delegating all cryptographic operations to upstream crates. Optional [kobe](https://github.com/qntx/kobe) integration enables seamless HD wallet bridging.
 
 ## Crates
 
-| Crate | Description | Upstream Library |
+| Signer Crate | | Description |
 | --- | --- | --- |
-| [`signer`](signer/) | Umbrella crate — re-exports all chain signers | — |
-| [`signer-evm`](signer-evm/) | Ethereum / EVM signing (EIP-191, EIP-712, transactions) | [alloy-signer-local](https://docs.rs/alloy-signer-local) |
-| [`signer-btc`](signer-btc/) | Bitcoin signing (ECDSA, Schnorr, PSBT, BIP-137 messages) | [bitcoin](https://docs.rs/bitcoin) |
-| [`signer-svm`](signer-svm/) | Solana / SVM signing (Ed25519) | [ed25519-dalek](https://docs.rs/ed25519-dalek) |
+| **[`signer`](signer/)** | [![crates.io][signer-crate]][signer-crate-url] [![docs.rs][signer-doc]][signer-doc-url] | Umbrella crate — re-exports all chain signers |
+| **[`signer-evm`](signer-evm/)** | [![crates.io][signer-evm-crate]][signer-evm-crate-url] [![docs.rs][signer-evm-doc]][signer-evm-doc-url] | Ethereum / EVM — EIP-191, EIP-712, transaction signing |
+| **[`signer-btc`](signer-btc/)** | [![crates.io][signer-btc-crate]][signer-btc-crate-url] [![docs.rs][signer-btc-doc]][signer-btc-doc-url] | Bitcoin — ECDSA, Schnorr, PSBT, BIP-137 message signing |
+| **[`signer-svm`](signer-svm/)** | [![crates.io][signer-svm-crate]][signer-svm-crate-url] [![docs.rs][signer-svm-doc]][signer-svm-doc-url] | Solana / SVM — Ed25519 signing |
 
-## Usage
+[signer-crate]: https://img.shields.io/crates/v/signer.svg
+[signer-crate-url]: https://crates.io/crates/signer
+[signer-evm-crate]: https://img.shields.io/crates/v/signer-evm.svg
+[signer-evm-crate-url]: https://crates.io/crates/signer-evm
+[signer-btc-crate]: https://img.shields.io/crates/v/signer-btc.svg
+[signer-btc-crate-url]: https://crates.io/crates/signer-btc
+[signer-svm-crate]: https://img.shields.io/crates/v/signer-svm.svg
+[signer-svm-crate-url]: https://crates.io/crates/signer-svm
+[signer-doc]: https://img.shields.io/docsrs/signer.svg
+[signer-doc-url]: https://docs.rs/signer
+[signer-evm-doc]: https://img.shields.io/docsrs/signer-evm.svg
+[signer-evm-doc-url]: https://docs.rs/signer-evm
+[signer-btc-doc]: https://img.shields.io/docsrs/signer-btc.svg
+[signer-btc-doc-url]: https://docs.rs/signer-btc
+[signer-svm-doc]: https://img.shields.io/docsrs/signer-svm.svg
+[signer-svm-doc-url]: https://docs.rs/signer-svm
+
+## Quick Start
+
+### Sign an Ethereum Message
 
 ```rust
-// Via umbrella crate (all chains enabled by default)
-use signer::evm;
-let s = evm::Signer::random();
+use signer_evm::{Signer, SignerSync};
 
-// Or depend on a single chain crate
-use signer_btc::Signer;
-let s = Signer::random(signer_btc::Network::Bitcoin);
+let signer = Signer::random();
+let signature = signer.sign_message_sync(b"hello")?;
+
+println!("Address:   {}", signer.address());
+println!("Signature: {}", signature);
 ```
 
-### Kobe Wallet Bridge
-
-Enable the `kobe` feature to construct signers from [kobe](https://github.com/qntx/kobe) HD wallet derived keys:
+### Sign a Bitcoin Message (BIP-137)
 
 ```rust
+use signer_btc::{Signer, Network, Address};
+
+let signer = Signer::random(Network::Bitcoin);
+let signature = signer.sign_message("Hello, Bitcoin!")?;
+
+let address = Address::p2wpkh(&signer.compressed_public_key(), Network::Bitcoin);
+let valid = Signer::verify_message("Hello, Bitcoin!", &signature, &address, Network::Bitcoin)?;
+
+println!("Address:   {}", address);
+println!("Signature: {}", signature);
+println!("Valid:     {}", valid);
+```
+
+### Sign with Solana (Ed25519)
+
+```rust
+use signer_svm::Signer;
+
+let signer = Signer::random();
+let signature = signer.sign(b"hello solana");
+
+signer.verify(b"hello solana", &signature)?;
+
+println!("Address:   {}", signer.address());
+println!("Signature: {:?}", signature);
+```
+
+### Via Umbrella Crate
+
+```rust
+use signer::{evm, btc, svm};
+
+let eth_signer = evm::Signer::random();
+let btc_signer = btc::Signer::random(btc::Network::Bitcoin);
+let sol_signer = svm::Signer::random();
+```
+
+### Kobe HD Wallet Integration
+
+Enable the `kobe` feature to construct signers from [kobe](https://github.com/qntx/kobe) derived keys:
+
+```rust
+use kobe::Wallet;
+use kobe_evm::Deriver;
 use signer_evm::Signer;
-let signer = Signer::from_derived(&derived_address).unwrap();
+
+let wallet = Wallet::from_mnemonic("abandon abandon ... about", None)?;
+let deriver = Deriver::new(&wallet);
+let derived = deriver.derive(0)?;
+
+let signer = Signer::from_derived(&derived)?;
+println!("Address: {}", signer.address());
 ```
 
-## Features
+## Design
 
-| Feature | Description |
+- **Zero hand-rolled crypto** — All signing delegated to audited upstream libraries
+- **Thin wrappers** — `Deref` to underlying types for full API access
+- **Multi-chain** — EVM, Bitcoin, Solana from one workspace
+- **Kobe integration** — Optional HD wallet bridging via feature flag
+- **Linting** — `pedantic` + `nursery` + `correctness` (deny) — strict Clippy
+- **Edition** — Rust **2024**
+
+## Signing Methods
+
+### EVM (`signer-evm`)
+
+| Method | Standard |
 | --- | --- |
-| `btc` | Enable Bitcoin signer (default) |
-| `evm` | Enable EVM signer (default) |
-| `svm` | Enable Solana signer (default) |
-| `kobe` | Enable kobe HD wallet bridging |
+| `sign_hash_sync` / `sign_hash` | Raw 32-byte hash |
+| `sign_message_sync` / `sign_message` | EIP-191 personal_sign |
+| `sign_typed_data_sync` / `sign_typed_data` | EIP-712 (feature `eip712`) |
+| `sign_transaction_sync` / `sign_transaction` | All EVM transaction types |
+
+### Bitcoin (`signer-btc`)
+
+| Method | Standard |
+| --- | --- |
+| `sign_ecdsa` | secp256k1 ECDSA |
+| `sign_schnorr` | BIP-340 Schnorr (Taproot) |
+| `sign_message` / `verify_message` | BIP-137 Bitcoin Signed Message |
+| `sign_psbt` | PSBT (Partially Signed Bitcoin Transaction) |
+
+### Solana (`signer-svm`)
+
+| Method | Standard |
+| --- | --- |
+| `sign` | Ed25519 signature |
+| `verify` | Ed25519 verification |
+| `keypair_base58` | Phantom / Backpack / Solflare format |
+
+## Feature Flags
+
+| Crate | Feature | Description |
+| --- | --- | --- |
+| `signer` | `btc` | Enable Bitcoin signer (default) |
+| `signer` | `evm` | Enable EVM signer (default) |
+| `signer` | `svm` | Enable Solana signer (default) |
+| `signer` | `kobe` | Enable kobe HD wallet bridging for all chains |
+| `signer-*` | `kobe` | Enable kobe bridging for specific chain |
+
+## Security
+
+This library has **not** been independently audited. Use at your own risk.
+
+- All cryptographic operations are delegated to upstream libraries
+- Private keys should be handled with care — consider using `Zeroizing<T>` wrappers
+- Review the security advisories of upstream dependencies
 
 ## License
 

@@ -1,5 +1,5 @@
 [workspace]
-members = ["signer", "signer-btc", "signer-evm", "signer-svm"]
+members = ["signer", "signer-btc", "signer-cli", "signer-evm", "signer-svm"]
 default-members = ["signer"]
 resolver = "3"
 
@@ -11,9 +11,9 @@ repository = "https://github.com/qntx/signer"
 description = "Multi-chain transaction signer built on mature cryptography libraries."
 
 [workspace.dependencies]
-signer-btc = { version = "0.1", path = "signer-btc" }
-signer-evm = { version = "0.1", path = "signer-evm" }
-signer-svm = { version = "0.1", path = "signer-svm" }
+signer-btc = { version = "0.2", path = "signer-btc" }
+signer-evm = { version = "0.2", path = "signer-evm" }
+signer-svm = { version = "0.2", path = "signer-svm" }
 
 # EVM (alloy ecosystem)
 alloy-signer = "1.7"
