@@ -1,6 +1,45 @@
 # Signer
 
-A collection of signer crates for various blockchain networks.
+Multi-chain transaction signer built on mature cryptography libraries. **Zero hand-rolled cryptography.**
+
+## Crates
+
+| Crate | Description | Upstream Library |
+| --- | --- | --- |
+| [`signer`](signer/) | Umbrella crate — re-exports all chain signers | — |
+| [`signer-evm`](signer-evm/) | Ethereum / EVM signing (EIP-191, EIP-712, transactions) | [alloy-signer-local](https://docs.rs/alloy-signer-local) |
+| [`signer-btc`](signer-btc/) | Bitcoin signing (ECDSA, Schnorr, PSBT, BIP-137 messages) | [bitcoin](https://docs.rs/bitcoin) |
+| [`signer-svm`](signer-svm/) | Solana / SVM signing (Ed25519) | [ed25519-dalek](https://docs.rs/ed25519-dalek) |
+
+## Usage
+
+```rust
+// Via umbrella crate (all chains enabled by default)
+use signer::evm;
+let s = evm::Signer::random();
+
+// Or depend on a single chain crate
+use signer_btc::Signer;
+let s = Signer::random(signer_btc::Network::Bitcoin);
+```
+
+### Kobe Wallet Bridge
+
+Enable the `kobe` feature to construct signers from [kobe](https://github.com/qntx/kobe) HD wallet derived keys:
+
+```rust
+use signer_evm::Signer;
+let signer = Signer::from_derived(&derived_address).unwrap();
+```
+
+## Features
+
+| Feature | Description |
+| --- | --- |
+| `btc` | Enable Bitcoin signer (default) |
+| `evm` | Enable EVM signer (default) |
+| `svm` | Enable Solana signer (default) |
+| `kobe` | Enable kobe HD wallet bridging |
 
 ## License
 

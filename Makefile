@@ -1,4 +1,4 @@
-# Makefile for Rust project using Cargo
+# Makefile for signer workspace
 
 .PHONY: all
 all: pre-commit
@@ -12,11 +12,6 @@ build:
 .PHONY: update
 update:
 	cargo update
-
-# Run the project with all features enabled in release mode
-.PHONY: run
-run:
-	cargo run --release --all-features
 
 # Run all tests with all features enabled
 .PHONY: test
@@ -33,6 +28,7 @@ bench:
 .PHONY: clippy
 clippy:
 	cargo +nightly clippy --fix \
+		-p signer -p signer-btc -p signer-evm -p signer-svm \
 		--all-targets \
 		--all-features \
 		--allow-dirty \
@@ -55,42 +51,10 @@ cliff:
 	git-cliff
 	git cliff --output CHANGELOG.md
 
-# Sync Python environment using uv
-.PHONY: uv-sync
-uv-sync:
-	uv venv
-	uv lock --upgrade
-	uv sync
-	uv run "./scripts/gen_stub.py" kand kand-py/python/kand/_kand.pyi
-
 # Check for unused dependencies using cargo-udeps with nightly toolchain
 .PHONY: udeps
 udeps:
 	cargo +nightly udeps --all-features
-
-# Update and run udeps to check for unused dependencies
-.PHONY: udeps-check
-udeps-check:
-	cargo update
-	cargo +nightly udeps --all-features
-
-
-# Build the wasm package
-.PHONY: wasm-build
-wasm-build:
-	@echo "Building WASM package..."
-	(cd kand-wasm && wasm-pack build --target web && wasm-pack pack pkg)
-
-# Publish the wasm package to npm
-# Note: You must be logged in to npm for this to work (`npm login`)
-.PHONY: wasm-publish
-wasm-publish: wasm-build
-	@echo "Publishing WASM package to npm..."
-	(cd kand-wasm/pkg && npm pkg fix && npm pkg set name="kand" && npm publish --access public)
-
-# Convenience target to build and publish wasm
-.PHONY: wasm
-wasm: wasm-publish
 
 # Run pre-commit hooks on all files
 .PHONY: pre-commit
@@ -99,7 +63,3 @@ pre-commit:
 	$(MAKE) test
 	$(MAKE) clippy
 	$(MAKE) fmt
-	$(MAKE) cliff
-	$(MAKE) udeps-check
-	$(MAKE) wasm-build
-	$(MAKE) uv-sync

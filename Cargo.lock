@@ -706,8 +706,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90dbd31c98227229239363921e60fcf5e558e43ec69094d46fc4996f08d1d5bc"
 dependencies = [
  "bitcoin_hashes",
- "rand 0.8.5",
- "rand_core 0.6.4",
  "serde",
  "unicode-normalization",
 ]
@@ -1687,19 +1685,20 @@ dependencies = [
 
 [[package]]
 name = "kobe"
-version = "0.1.0"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "31383ec181b5f7aee42c0f0c22919549c5e4b6be4d29f1ce5eecc34fafe3be83"
 dependencies = [
  "bip39",
- "hmac",
- "pbkdf2",
- "sha2",
  "thiserror",
  "zeroize",
 ]
 
 [[package]]
 name = "kobe-btc"
-version = "0.1.0"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3846043d0a6d0f3e853eec2af2957d970bc5d8cb8c528c0a6c9449dc6c97ba6"
 dependencies = [
  "bip39",
  "bitcoin",
@@ -1711,7 +1710,9 @@ dependencies = [
 
 [[package]]
 name = "kobe-evm"
-version = "0.1.0"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2eedae4f85c2c87902cf19810dcb0bb5eafbcbfc9c38053d3620f8659a9cba1d"
 dependencies = [
  "alloy-primitives",
  "bip32",
@@ -1724,14 +1725,15 @@ dependencies = [
 
 [[package]]
 name = "kobe-svm"
-version = "0.1.0"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0620aa518140160d44a260974b55174c9e4961596a9ee21da47e07db567c2ee"
 dependencies = [
  "bs58",
  "ed25519-dalek",
  "hex",
  "hmac",
  "kobe",
- "rand_core 0.6.4",
  "sha2",
  "thiserror",
  "zeroize",
@@ -1882,15 +1884,6 @@ name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
-
-[[package]]
-name = "pbkdf2"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8ed6a7761f76e3b9f92dfb0a60a6a6477c61024b775147ff0973a02653abaf2"
-dependencies = [
- "digest 0.10.7",
-]
 
 [[package]]
 name = "pest"

@@ -4,7 +4,7 @@ default-members = ["signer"]
 resolver = "3"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/qntx/signer"
@@ -46,11 +46,11 @@ sha2 = { version = "0.10", default-features = false }
 thiserror = { version = "2", default-features = false }
 zeroize = { version = "1.7", default-features = false, features = ["derive"] }
 
-# Kobe (optional, for wallet bridging)
-kobe = { path = "3rdparty/kobe/kobe", default-features = false, features = ["std"] }
-kobe-btc = { path = "3rdparty/kobe/kobe-btc", default-features = false, features = ["std"] }
-kobe-evm = { path = "3rdparty/kobe/kobe-evm", default-features = false, features = ["std"] }
-kobe-svm = { path = "3rdparty/kobe/kobe-svm", default-features = false, features = ["std"] }
+# Kobe
+kobe = { version = "0.5", default-features = false, features = ["std"] }
+kobe-btc = { version = "0.5", default-features = false, features = ["std"] }
+kobe-evm = { version = "0.5", default-features = false, features = ["std"] }
+kobe-svm = { version = "0.5", default-features = false, features = ["std"] }
 
 [profile.release]
 codegen-units = 1
