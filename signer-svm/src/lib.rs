@@ -15,11 +15,9 @@
 
 mod error;
 
-pub use error::Error;
-
 pub use ed25519_dalek::{self, Signature, VerifyingKey};
-
 use ed25519_dalek::{Signer as DalekSigner, SigningKey, Verifier};
+pub use error::Error;
 use zeroize::Zeroizing;
 
 /// Solana transaction signer.
@@ -59,11 +57,9 @@ impl Signer {
     /// Returns an error if the hex string is invalid or the key length is wrong.
     pub fn from_hex(hex_str: &str) -> Result<Self, Error> {
         let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-        let bytes: [u8; 32] = hex::decode(hex_str)?
-            .try_into()
-            .map_err(|v: Vec<u8>| {
-                Error::InvalidPrivateKey(format!("expected 32 bytes, got {}", v.len()))
-            })?;
+        let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
+            Error::InvalidPrivateKey(format!("expected 32 bytes, got {}", v.len()))
+        })?;
         Ok(Self::from_bytes(&bytes))
     }
 
@@ -154,7 +150,7 @@ impl Signer {
     /// Get a reference to the inner [`SigningKey`].
     #[inline]
     #[must_use]
-    pub fn signing_key(&self) -> &SigningKey {
+    pub const fn signing_key(&self) -> &SigningKey {
         &self.signing_key
     }
 }

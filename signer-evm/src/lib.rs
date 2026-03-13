@@ -20,20 +20,18 @@
 
 mod error;
 
-pub use error::Error;
+use core::ops::{Deref, DerefMut};
 
 pub use alloy_consensus;
 pub use alloy_network;
+pub use alloy_network::{TxSigner, TxSignerSync};
 pub use alloy_primitives;
+pub use alloy_primitives::{Address, B256, ChainId, U256};
 pub use alloy_signer;
 pub use alloy_signer::{Signature, Signer as AlloySigner, SignerSync};
 pub use alloy_signer_local;
-pub use alloy_network::{TxSigner, TxSignerSync};
-pub use alloy_primitives::{Address, B256, ChainId, U256};
-
 use alloy_signer_local::PrivateKeySigner;
-
-use core::ops::{Deref, DerefMut};
+pub use error::Error;
 
 /// EVM transaction signer.
 ///
@@ -106,11 +104,9 @@ impl Signer {
     /// secp256k1 private key.
     pub fn from_hex(hex_str: &str) -> Result<Self, Error> {
         let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-        let bytes: [u8; 32] = hex::decode(hex_str)?
-            .try_into()
-            .map_err(|v: Vec<u8>| {
-                Error::InvalidPrivateKey(format!("expected 32 bytes, got {}", v.len()))
-            })?;
+        let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
+            Error::InvalidPrivateKey(format!("expected 32 bytes, got {}", v.len()))
+        })?;
         Self::from_bytes(&B256::from(bytes))
     }
 

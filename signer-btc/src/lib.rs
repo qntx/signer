@@ -18,14 +18,16 @@
 
 mod error;
 
-pub use error::Error;
-
 pub use bitcoin;
-pub use bitcoin::secp256k1;
-pub use bitcoin::{Address, CompressedPublicKey, Network, NetworkKind, PrivateKey, PublicKey, Transaction};
+use bitcoin::base64::{Engine, engine::general_purpose::STANDARD};
+use bitcoin::hashes::{Hash, HashEngine, sha256d};
 pub use bitcoin::psbt::Psbt;
-
+pub use bitcoin::secp256k1;
 use bitcoin::secp256k1::{All, Message, Secp256k1, Signing};
+pub use bitcoin::{
+    Address, CompressedPublicKey, Network, NetworkKind, PrivateKey, PublicKey, Transaction,
+};
+pub use error::Error;
 
 /// Bitcoin transaction signer.
 ///
@@ -62,11 +64,9 @@ impl Signer {
     /// secp256k1 secret key.
     pub fn from_hex(hex_str: &str, network: Network) -> Result<Self, Error> {
         let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-        let bytes: [u8; 32] = hex::decode(hex_str)?
-            .try_into()
-            .map_err(|v: Vec<u8>| {
-                Error::InvalidPrivateKey(format!("expected 32 bytes, got {}", v.len()))
-            })?;
+        let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
+            Error::InvalidPrivateKey(format!("expected 32 bytes, got {}", v.len()))
+        })?;
         Self::from_bytes(&bytes, network)
     }
 
@@ -87,8 +87,7 @@ impl Signer {
     /// Generate a random signer for the given network.
     #[must_use]
     pub fn random(network: Network) -> Self {
-        let (secret_key, _) =
-            Secp256k1::new().generate_keypair(&mut secp256k1::rand::thread_rng());
+        let (secret_key, _) = Secp256k1::new().generate_keypair(&mut secp256k1::rand::thread_rng());
         let private_key = PrivateKey::new(secret_key, network);
         Self {
             private_key,
@@ -122,17 +121,20 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the message signing fails.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn sign_message(&self, msg: &str) -> Result<String, Error> {
-        let msg_hash = self.signed_msg_hash(msg);
+        let msg_hash = Self::signed_msg_hash(msg);
         let secp_msg = Message::from_digest(msg_hash);
-        let sig = self.secp.sign_ecdsa_recoverable(&secp_msg, &self.private_key.inner);
+        let sig = self
+            .secp
+            .sign_ecdsa_recoverable(&secp_msg, &self.private_key.inner);
         let (recovery_id, sig_bytes) = sig.serialize_compact();
 
         let mut serialized = [0u8; 65];
-        serialized[0] = 27 + recovery_id.to_i32() as u8 + if self.private_key.compressed { 4 } else { 0 };
+        serialized[0] =
+            27 + recovery_id.to_i32() as u8 + if self.private_key.compressed { 4 } else { 0 };
         serialized[1..].copy_from_slice(&sig_bytes);
 
-        use bitcoin::base64::{Engine, engine::general_purpose::STANDARD};
         Ok(STANDARD.encode(serialized))
     }
 
@@ -147,9 +149,8 @@ impl Signer {
         expected_address: &Address,
         network: Network,
     ) -> Result<bool, Error> {
-        use bitcoin::base64::{Engine, engine::general_purpose::STANDARD};
-
-        let sig_bytes = STANDARD.decode(signature_base64)
+        let sig_bytes = STANDARD
+            .decode(signature_base64)
             .map_err(|e| Error::InvalidPrivateKey(format!("invalid base64: {e}")))?;
 
         if sig_bytes.len() != 65 {
@@ -169,16 +170,7 @@ impl Signer {
         let recoverable_sig =
             secp256k1::ecdsa::RecoverableSignature::from_compact(&sig_bytes[1..], recovery_id)?;
 
-        let msg_hash = {
-            use bitcoin::hashes::{Hash, HashEngine, sha256d};
-            let mut engine = sha256d::Hash::engine();
-            let prefix = b"\x18Bitcoin Signed Message:\n";
-            engine.input(prefix);
-            let msg_bytes = msg.as_bytes();
-            Self::write_compact_size(&mut engine, msg_bytes.len());
-            engine.input(msg_bytes);
-            sha256d::Hash::from_engine(engine).to_byte_array()
-        };
+        let msg_hash = Self::signed_msg_hash(msg);
 
         let secp_msg = Message::from_digest(msg_hash);
         let recovered_pubkey = secp.recover_ecdsa(&secp_msg, &recoverable_sig)?;
@@ -244,21 +236,19 @@ impl Signer {
     /// Get the network this signer is configured for.
     #[inline]
     #[must_use]
-    pub fn network_kind(&self) -> NetworkKind {
+    pub const fn network_kind(&self) -> NetworkKind {
         self.private_key.network
     }
 
     /// Get a reference to the secp256k1 context.
     #[inline]
     #[must_use]
-    pub fn secp(&self) -> &Secp256k1<All> {
+    pub const fn secp(&self) -> &Secp256k1<All> {
         &self.secp
     }
 
     /// Compute the Bitcoin Signed Message hash for the given message.
-    fn signed_msg_hash(&self, msg: &str) -> [u8; 32] {
-        use bitcoin::hashes::{Hash, HashEngine, sha256d};
-
+    fn signed_msg_hash(msg: &str) -> [u8; 32] {
         let mut engine = sha256d::Hash::engine();
         let prefix = b"\x18Bitcoin Signed Message:\n";
         engine.input(prefix);
@@ -269,7 +259,8 @@ impl Signer {
     }
 
     /// Write a Bitcoin compact-size integer to a hash engine.
-    fn write_compact_size<E: bitcoin::hashes::HashEngine>(engine: &mut E, size: usize) {
+    #[allow(clippy::cast_possible_truncation)]
+    fn write_compact_size<E: HashEngine>(engine: &mut E, size: usize) {
         if size < 253 {
             engine.input(&[size as u8]);
         } else if size <= 0xFFFF {
@@ -307,7 +298,6 @@ impl bitcoin::psbt::GetKey for SignPsbtKey {
                     Ok(None)
                 }
             }
-            bitcoin::psbt::KeyRequest::Bip32(_) => Ok(None),
             _ => Ok(None),
         }
     }
@@ -377,10 +367,7 @@ mod tests {
         let msg = Message::from_digest([1u8; 32]);
         let sig = signer.sign_ecdsa(&msg);
         let pk = signer.public_key();
-        signer
-            .secp()
-            .verify_ecdsa(&msg, &sig, &pk.inner)
-            .unwrap();
+        signer.secp().verify_ecdsa(&msg, &sig, &pk.inner).unwrap();
     }
 
     #[test]
@@ -391,10 +378,7 @@ mod tests {
         let keypair =
             secp256k1::Keypair::from_secret_key(signer.secp(), &signer.private_key().inner);
         let (xonly, _) = keypair.x_only_public_key();
-        signer
-            .secp()
-            .verify_schnorr(&sig, &msg, &xonly)
-            .unwrap();
+        signer.secp().verify_schnorr(&sig, &msg, &xonly).unwrap();
     }
 
     #[test]
