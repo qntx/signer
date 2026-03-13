@@ -4,9 +4,18 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description.workspace = true
+description = "Bitcoin transaction signer wrapping the bitcoin crate."
 
 [dependencies]
+bitcoin.workspace = true
+hex.workspace = true
+thiserror.workspace = true
+
+kobe-btc = { workspace = true, optional = true }
+
+[features]
+default = []
+kobe = ["dep:kobe-btc"]
 
 [lints]
 workspace = true

@@ -4,9 +4,19 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description.workspace = true
+description = "Multi-chain transaction signer — umbrella crate re-exporting chain-specific signers."
 
 [dependencies]
+signer-btc = { workspace = true, optional = true }
+signer-evm = { workspace = true, optional = true }
+signer-svm = { workspace = true, optional = true }
+
+[features]
+default = ["btc", "evm", "svm"]
+btc = ["dep:signer-btc"]
+evm = ["dep:signer-evm"]
+svm = ["dep:signer-svm"]
+kobe = ["signer-btc?/kobe", "signer-evm?/kobe", "signer-svm?/kobe"]
 
 [lints]
 workspace = true

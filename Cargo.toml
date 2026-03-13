@@ -1,5 +1,5 @@
 [workspace]
-members = ["signer", "signer-btc", "signer-cli", "signer-evm", "signer-sui", "signer-svm", "signer-xmr", "signer-zec"]
+members = ["signer", "signer-btc", "signer-evm", "signer-svm"]
 default-members = ["signer"]
 resolver = "3"
 
@@ -8,9 +8,49 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/qntx/signer"
-description = "Signer."
+description = "Multi-chain transaction signer built on mature cryptography libraries."
 
 [workspace.dependencies]
+signer-btc = { version = "0.1", path = "signer-btc" }
+signer-evm = { version = "0.1", path = "signer-evm" }
+signer-svm = { version = "0.1", path = "signer-svm" }
+
+# EVM (alloy ecosystem)
+alloy-signer = "1.7"
+alloy-signer-local = "1.7"
+alloy-network = "1.7"
+alloy-primitives = { version = "1", default-features = false, features = ["k256"] }
+alloy-consensus = "1.7"
+
+# BTC
+bitcoin = { version = "0.32", features = ["rand-std", "base64"] }
+
+# SVM
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+bs58 = { version = "0.5", default-features = false, features = ["alloc"] }
+rand_core = { version = "0.6", default-features = false, features = ["getrandom"] }
+
+# Shared
+bip32 = { version = "0.5", default-features = false, features = ["secp256k1", "alloc"] }
+bip39 = { version = "2.1", default-features = false }
+clap = { version = "4.5", features = ["derive"] }
+colored = "3.0"
+hex = { version = "0.4", default-features = false }
+hmac = { version = "0.12", default-features = false }
+k256 = { version = "0.13", default-features = false, features = ["ecdsa"] }
+pbkdf2 = { version = "0.12", default-features = false }
+qrcode = "0.14"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = { version = "0.10", default-features = false }
+thiserror = { version = "2", default-features = false }
+zeroize = { version = "1.7", default-features = false, features = ["derive"] }
+
+# Kobe (optional, for wallet bridging)
+kobe = { path = "3rdparty/kobe/kobe", default-features = false, features = ["std"] }
+kobe-btc = { path = "3rdparty/kobe/kobe-btc", default-features = false, features = ["std"] }
+kobe-evm = { path = "3rdparty/kobe/kobe-evm", default-features = false, features = ["std"] }
+kobe-svm = { path = "3rdparty/kobe/kobe-svm", default-features = false, features = ["std"] }
 
 [profile.release]
 codegen-units = 1
