@@ -1710,9 +1710,9 @@ dependencies = [
 
 [[package]]
 name = "kobe-evm"
-version = "0.5.3"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2eedae4f85c2c87902cf19810dcb0bb5eafbcbfc9c38053d3620f8659a9cba1d"
+checksum = "5d507378e6a165a03ec70c86b341c137718017b39a1f836349a1356f7466beb9"
 dependencies = [
  "alloy-primitives",
  "bip32",
