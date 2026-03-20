@@ -1696,9 +1696,9 @@ dependencies = [
 
 [[package]]
 name = "kobe-btc"
-version = "0.5.3"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3846043d0a6d0f3e853eec2af2957d970bc5d8cb8c528c0a6c9449dc6c97ba6"
+checksum = "0abd68462e5d84b7dec00af9ed7b794fa8b1ad4e424c0d8468dd27fcb5db4033"
 dependencies = [
  "bip39",
  "bitcoin",
