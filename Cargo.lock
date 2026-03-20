@@ -1725,9 +1725,9 @@ dependencies = [
 
 [[package]]
 name = "kobe-svm"
-version = "0.5.3"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0620aa518140160d44a260974b55174c9e4961596a9ee21da47e07db567c2ee"
+checksum = "2d10d890ee46fcbeeeacdfac8cd5237c021d31bc7ef70ecd6fdbf1514b9859d9"
 dependencies = [
  "bs58",
  "ed25519-dalek",
