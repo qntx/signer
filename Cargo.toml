@@ -1,5 +1,5 @@
 [workspace]
-members = ["signer", "signer-btc", "signer-evm", "signer-svm"]
+members = ["signer", "signer-btc", "signer-cli", "signer-evm", "signer-svm"]
 default-members = ["signer"]
 resolver = "3"
 
@@ -31,7 +31,11 @@ bs58 = { version = "0.5", default-features = false, features = ["alloc"] }
 getrandom = { version = "0.2", default-features = false, features = ["std"] }
 
 # Shared
+clap = { version = "4", features = ["derive"] }
+colored = "3"
 hex = { version = "0.4", default-features = false, features = ["alloc", "std"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 thiserror = { version = "2", default-features = false }
 zeroize = { version = "1.7", default-features = false }
 

@@ -4,9 +4,24 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description.workspace = true
+description = "Multi-chain transaction signing CLI tool."
+keywords = ["crypto", "signer", "bitcoin", "ethereum", "cli"]
+categories = ["command-line-utilities", "cryptography"]
+
+[[bin]]
+name = "signer"
+path = "src/main.rs"
 
 [dependencies]
+signer-btc = { workspace = true, features = ["kobe"] }
+signer-evm = { workspace = true, features = ["kobe"] }
+signer-svm = { workspace = true, features = ["kobe"] }
+bs58.workspace = true
+clap.workspace = true
+colored.workspace = true
+hex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true
