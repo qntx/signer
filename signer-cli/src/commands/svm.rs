@@ -103,8 +103,8 @@ impl SvmCommand {
                 let pk_bytes = parse_pubkey(&pubkey)?;
                 let vk = signer_svm::VerifyingKey::from_bytes(&pk_bytes)
                     .map_err(|e| format!("invalid public key: {e}"))?;
-                use signer_svm::ed25519_dalek::Verifier;
-                let valid = vk.verify(&msg_bytes, &sig).is_ok();
+                let valid =
+                    signer_svm::ed25519_dalek::Verifier::verify(&vk, &msg_bytes, &sig).is_ok();
 
                 let out = VerifyOutput {
                     chain: "solana",

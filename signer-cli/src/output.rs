@@ -76,6 +76,10 @@ pub struct ErrorOutput {
 }
 
 /// Render a signing result as JSON or colored text.
+///
+/// # Errors
+///
+/// Returns an error if JSON serialization fails.
 #[rustfmt::skip]
 pub fn render_sign(out: &SignOutput, json: bool) -> Result<(), Box<dyn std::error::Error>> {
     if json { return Ok(print_json(out)?); }
@@ -94,6 +98,10 @@ pub fn render_sign(out: &SignOutput, json: bool) -> Result<(), Box<dyn std::erro
 }
 
 /// Render a verification result as JSON or colored text.
+///
+/// # Errors
+///
+/// Returns an error if JSON serialization fails.
 #[rustfmt::skip]
 pub fn render_verify(out: &VerifyOutput, json: bool) -> Result<(), Box<dyn std::error::Error>> {
     if json { return Ok(print_json(out)?); }
@@ -116,6 +124,10 @@ pub fn render_verify(out: &VerifyOutput, json: bool) -> Result<(), Box<dyn std::
 }
 
 /// Render an address/key-info result as JSON or colored text.
+///
+/// # Errors
+///
+/// Returns an error if JSON serialization fails.
 #[rustfmt::skip]
 pub fn render_address(out: &AddressOutput, json: bool) -> Result<(), Box<dyn std::error::Error>> {
     if json { return Ok(print_json(out)?); }
@@ -134,6 +146,10 @@ pub fn render_address(out: &AddressOutput, json: bool) -> Result<(), Box<dyn std
 }
 
 /// Serialize a value as pretty-printed JSON to stdout.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails.
 pub fn print_json<T: Serialize>(value: &T) -> Result<(), serde_json::Error> {
     let json = serde_json::to_string_pretty(value)?;
     println!("{json}");
