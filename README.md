@@ -166,6 +166,9 @@ signer btc verify-message --signature "H..." --message "Hello" --address "bc1q..
 signer btc sign-ecdsa   --key "L1a..." --hash "abcdef..."
 signer btc sign-schnorr --key "L1a..." --hash "abcdef..."
 
+# Sign a PSBT (base64 in → base64 out)
+signer btc sign-psbt --key "L1a..." --psbt "cHNidP8B..."
+
 # Show all address types for a key
 signer btc address --key "L1a..."
 ```
@@ -178,6 +181,9 @@ signer evm sign-message --key "0xabc..." --message "Hello, Ethereum!"
 
 # Raw hash signing
 signer evm sign-hash --key "0xabc..." --hash "0xdef..."
+
+# Sign a raw unsigned transaction (hex-encoded EIP-2718 bytes)
+signer evm sign-transaction --key "0xabc..." --tx "0x02f8..."
 
 # Verify a signed message
 signer evm verify-message --signature "0x..." --message "Hello" --address "0x..."

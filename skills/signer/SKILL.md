@@ -37,16 +37,18 @@ The `--json` flag is **global** and must appear **before** the chain subcommand.
 | `verify-message` | BIP-137 message verification                |
 | `sign-ecdsa`     | Raw ECDSA signature on a 32-byte hash       |
 | `sign-schnorr`   | BIP-340 Schnorr signature on a 32-byte hash |
+| `sign-psbt`      | Sign all applicable inputs in a PSBT        |
 | `address`        | Show all address types for a private key    |
 
 #### Ethereum (`evm`)
 
-| Subcommand       | Description                          |
-| ---------------- | ------------------------------------ |
-| `sign-message`   | EIP-191 personal_sign                |
-| `sign-hash`      | Raw hash signing                     |
-| `verify-message` | Verify EIP-191 signed message        |
-| `address`        | Show address for a private key       |
+| Subcommand         | Description                                    |
+| ------------------ | ---------------------------------------------- |
+| `sign-message`     | EIP-191 personal_sign                          |
+| `sign-hash`        | Raw hash signing                               |
+| `sign-transaction` | Sign unsigned transaction (hex EIP-2718 bytes) |
+| `verify-message`   | Verify EIP-191 signed message                  |
+| `address`          | Show address for a private key                 |
 
 #### Solana (`svm`)
 
@@ -65,6 +67,8 @@ The `--json` flag is **global** and must appear **before** the chain subcommand.
 | `--message`   | `-m`  | sign/verify  | Message to sign or verify                                          |
 | `--signature` | `-s`  | verify       | Signature to verify                                                |
 | `--hash`      | `-x`  | sign-hash    | 32-byte hash in hex                                                |
+| `--tx`        | `-t`  | sign-tx      | Hex-encoded unsigned transaction bytes (EIP-2718)                  |
+| `--psbt`      | `-p`  | sign-psbt    | Base64-encoded PSBT                                                |
 | `--address`   | `-a`  | verify       | Expected address for verification                                  |
 
 ### Bitcoin-specific flags
@@ -100,6 +104,9 @@ signer btc sign-ecdsa --key "L1a..." --hash "abcdef..."
 # Sign a raw hash with Schnorr (Taproot)
 signer btc sign-schnorr --key "L1a..." --hash "abcdef..."
 
+# Sign a PSBT (base64 in → base64 out)
+signer btc sign-psbt --key "L1a..." --psbt "cHNidP8B..."
+
 # Show all address types
 signer btc address --key "L1a..."
 
@@ -115,6 +122,9 @@ signer evm sign-message --key "0xabc..." --message "Hello, Ethereum!"
 
 # Sign a raw hash
 signer evm sign-hash --key "0xabc..." --hash "0xdef..."
+
+# Sign an unsigned transaction (hex EIP-2718 bytes → signed tx hex)
+signer evm sign-transaction --key "0xabc..." --tx "0x02f8..."
 
 # Verify a signed message
 signer evm verify-message --signature "0x..." --message "Hello" --address "0x..."
@@ -186,6 +196,29 @@ Always use `--json` for programmatic consumption.
     { "kind": "P2SH-P2WPKH", "address": "3..." },
     { "kind": "P2PKH", "address": "1..." }
   ]
+}
+```
+
+### PSBT Output
+
+```json
+{
+  "chain": "bitcoin",
+  "operation": "PSBT",
+  "psbt": "cHNidP8B..."
+}
+```
+
+### Transaction Output
+
+```json
+{
+  "chain": "ethereum",
+  "operation": "transaction",
+  "address": "0x...",
+  "signature": "0x...",
+  "signed_tx": "0x02f8...",
+  "tx_hash": "0x..."
 }
 ```
 

@@ -3,7 +3,7 @@
 use clap::{Args, Subcommand, ValueEnum};
 use signer_btc::{Address, AddressType, Network, NetworkKind, Signer};
 
-use crate::output::{self, AddressOutput, NamedAddress, SignOutput, VerifyOutput};
+use crate::output::{self, AddressOutput, NamedAddress, PsbtOutput, SignOutput, VerifyOutput};
 
 /// Bitcoin signing operations.
 #[derive(Args)]
@@ -76,6 +76,21 @@ enum BtcSubcommand {
         /// 32-byte hash in hex.
         #[arg(short = 'x', long)]
         hash: String,
+
+        /// Use testnet.
+        #[arg(short, long)]
+        testnet: bool,
+    },
+
+    /// Sign all applicable inputs in a PSBT.
+    SignPsbt {
+        /// Private key in WIF or hex format.
+        #[arg(short, long)]
+        key: String,
+
+        /// Base64-encoded PSBT.
+        #[arg(short, long)]
+        psbt: String,
 
         /// Use testnet.
         #[arg(short, long)]
@@ -212,6 +227,18 @@ impl BtcCommand {
                     message: Some(hash),
                 };
                 output::render_sign(&out, json)?;
+            }
+            BtcSubcommand::SignPsbt { key, psbt, testnet } => {
+                let signer = load_signer(&key, testnet)?;
+                let mut psbt: signer_btc::Psbt =
+                    psbt.parse().map_err(|e| format!("invalid PSBT: {e}"))?;
+                signer.sign_psbt(&mut psbt)?;
+                let out = PsbtOutput {
+                    chain: "bitcoin",
+                    operation: "PSBT",
+                    psbt: psbt.to_string(),
+                };
+                output::render_psbt(&out, json)?;
             }
             BtcSubcommand::Address { key, testnet } => {
                 let signer = load_signer(&key, testnet)?;

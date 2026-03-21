@@ -1,9 +1,9 @@
 //! EVM signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_evm::{Address, B256, Signer, SignerSync};
+use signer_evm::{Address, B256, Signer, SignerSync, TxSignerSync};
 
-use crate::output::{self, AddressOutput, SignOutput, VerifyOutput};
+use crate::output::{self, AddressOutput, SignOutput, TransactionOutput, VerifyOutput};
 
 /// EVM signing operations.
 #[derive(Args)]
@@ -49,6 +49,17 @@ enum EvmSubcommand {
         /// Expected Ethereum address.
         #[arg(short, long)]
         address: String,
+    },
+
+    /// Sign a raw unsigned transaction (hex-encoded EIP-2718 bytes).
+    SignTransaction {
+        /// Private key in hex format.
+        #[arg(short, long)]
+        key: String,
+
+        /// Hex-encoded unsigned transaction bytes (EIP-2718 typed envelope).
+        #[arg(short, long)]
+        tx: String,
     },
 
     /// Show address and public key for a private key.
@@ -111,6 +122,9 @@ impl EvmCommand {
                 };
                 output::render_verify(&out, json)?;
             }
+            EvmSubcommand::SignTransaction { key, tx } => {
+                sign_transaction(&key, &tx, json)?;
+            }
             EvmSubcommand::Address { key } => {
                 let signer = Signer::from_hex(&key)?;
                 let addr = signer.address();
@@ -127,6 +141,56 @@ impl EvmCommand {
         }
         Ok(())
     }
+}
+
+fn sign_transaction(key: &str, tx_hex: &str, json: bool) -> Result<(), Box<dyn std::error::Error>> {
+    use signer_evm::alloy_consensus::{Signed, TxEnvelope, TypedTransaction};
+    use signer_evm::alloy_network::eip2718::Encodable2718;
+
+    let signer = Signer::from_hex(key)?;
+    let tx_hex = tx_hex.strip_prefix("0x").unwrap_or(tx_hex);
+    let tx_bytes = hex::decode(tx_hex)?;
+
+    // Decode unsigned transaction from EIP-2718 bytes
+    let mut typed_tx = TypedTransaction::decode_unsigned(&mut &tx_bytes[..])
+        .map_err(|e| format!("failed to decode transaction: {e}"))?;
+
+    // Sign
+    let sig = signer
+        .sign_transaction_sync(&mut typed_tx)
+        .map_err(|e| format!("signing failed: {e}"))?;
+
+    // Build signed envelope
+    let tx_hash = typed_tx.tx_hash(&sig);
+    let envelope = match typed_tx {
+        TypedTransaction::Legacy(tx) => TxEnvelope::Legacy(Signed::new_unchecked(tx, sig, tx_hash)),
+        TypedTransaction::Eip2930(tx) => {
+            TxEnvelope::Eip2930(Signed::new_unchecked(tx, sig, tx_hash))
+        }
+        TypedTransaction::Eip1559(tx) => {
+            TxEnvelope::Eip1559(Signed::new_unchecked(tx, sig, tx_hash))
+        }
+        TypedTransaction::Eip4844(tx) => {
+            TxEnvelope::Eip4844(Signed::new_unchecked(tx, sig, tx_hash))
+        }
+        TypedTransaction::Eip7702(tx) => {
+            TxEnvelope::Eip7702(Signed::new_unchecked(tx, sig, tx_hash))
+        }
+    };
+
+    // Encode signed transaction
+    let signed_bytes = envelope.encoded_2718();
+
+    let out = TransactionOutput {
+        chain: "ethereum",
+        operation: "transaction",
+        address: format!("{}", signer.address()),
+        signature: format!("0x{sig}"),
+        signed_tx: format!("0x{}", hex::encode(&signed_bytes)),
+        tx_hash: format!("{tx_hash}"),
+    };
+    output::render_transaction(&out, json)?;
+    Ok(())
 }
 
 fn parse_b256(hex_str: &str) -> Result<B256, Box<dyn std::error::Error>> {

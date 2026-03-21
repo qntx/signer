@@ -68,6 +68,36 @@ pub struct NamedAddress {
     pub address: String,
 }
 
+/// Output for PSBT signing operations.
+#[derive(Debug, Serialize)]
+#[non_exhaustive]
+pub struct PsbtOutput {
+    /// Blockchain identifier.
+    pub chain: &'static str,
+    /// Signing operation type.
+    pub operation: &'static str,
+    /// The signed PSBT in base64 format.
+    pub psbt: String,
+}
+
+/// Output for transaction signing operations.
+#[derive(Debug, Serialize)]
+#[non_exhaustive]
+pub struct TransactionOutput {
+    /// Blockchain identifier.
+    pub chain: &'static str,
+    /// Signing operation type.
+    pub operation: &'static str,
+    /// Signer's address.
+    pub address: String,
+    /// The produced signature.
+    pub signature: String,
+    /// The signed transaction in hex format (ready to broadcast).
+    pub signed_tx: String,
+    /// The transaction hash.
+    pub tx_hash: String,
+}
+
 /// Structured error output for JSON mode.
 #[derive(Debug, Serialize)]
 pub struct ErrorOutput {
@@ -141,6 +171,41 @@ pub fn render_address(out: &AddressOutput, json: bool) -> Result<(), Box<dyn std
     for named in &out.addresses {
         println!("  {}   {}", format!("{:>10}", named.kind).cyan().bold(), named.address);
     }
+    println!();
+    Ok(())
+}
+
+/// Render a PSBT signing result as JSON or colored text.
+///
+/// # Errors
+///
+/// Returns an error if JSON serialization fails.
+#[rustfmt::skip]
+pub fn render_psbt(out: &PsbtOutput, json: bool) -> Result<(), Box<dyn std::error::Error>> {
+    if json { return Ok(print_json(out)?); }
+
+    println!();
+    println!("    {} {}", "Operation".cyan().bold(), out.operation);
+    println!("         {} {}", "PSBT".cyan().bold(), out.psbt);
+    println!();
+    Ok(())
+}
+
+/// Render a transaction signing result as JSON or colored text.
+///
+/// # Errors
+///
+/// Returns an error if JSON serialization fails.
+#[rustfmt::skip]
+pub fn render_transaction(out: &TransactionOutput, json: bool) -> Result<(), Box<dyn std::error::Error>> {
+    if json { return Ok(print_json(out)?); }
+
+    println!();
+    println!("    {} {}", "Operation".cyan().bold(), out.operation);
+    println!("      {} {}", "Address".cyan().bold(), out.address.green());
+    println!("    {} {}", "Signature".cyan().bold(), out.signature);
+    println!("      {} {}", "Tx Hash".cyan().bold(), out.tx_hash.green());
+    println!("    {} {}", "Signed Tx".cyan().bold(), out.signed_tx);
     println!();
     Ok(())
 }
