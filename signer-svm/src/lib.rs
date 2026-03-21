@@ -113,7 +113,7 @@ impl Signer {
     #[must_use]
     pub fn random() -> Self {
         let mut bytes = [0u8; 32];
-        getrandom::getrandom(&mut bytes).expect("system CSPRNG unavailable");
+        getrandom::fill(&mut bytes).expect("system CSPRNG unavailable");
         let signer = Self::from_bytes(&bytes);
         bytes.fill(0);
         signer

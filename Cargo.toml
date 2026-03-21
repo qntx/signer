@@ -4,7 +4,7 @@ default-members = ["signer"]
 resolver = "3"
 
 [workspace.package]
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/qntx/signer"
@@ -28,7 +28,7 @@ bitcoin = { version = "0.32", features = ["rand-std", "base64"] }
 # SVM
 ed25519-dalek = "2"
 bs58 = { version = "0.5", default-features = false, features = ["alloc"] }
-getrandom = { version = "0.2", default-features = false, features = ["std"] }
+getrandom = { version = "0.4", default-features = false, features = ["std"] }
 
 # Shared
 clap = { version = "4", features = ["derive"] }
