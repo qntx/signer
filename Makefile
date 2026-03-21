@@ -1,34 +1,45 @@
-# Makefile for signer workspace
+# Makefile for Rust project using Cargo
 
-.PHONY: all
-all: pre-commit
+.PHONY: all build check run test bench clippy clippy-fix fmt doc update
+
+all: fmt clippy-fix
 
 # Build the project with all features enabled in release mode
-.PHONY: build
 build:
-	cargo build --release --all-features
+	cargo build --workspace --release --all-features
+
+# Check the project for compilation errors without producing binaries
+check:
+	cargo check --workspace --all-features
 
 # Update dependencies to their latest compatible versions
-.PHONY: update
 update:
 	cargo update
 
+# Run the project with all features enabled in release mode
+run:
+	cargo run --release --all-features
+
 # Run all tests with all features enabled
-.PHONY: test
 test:
-	cargo test --all-features
+	cargo test --workspace --all-features
 
 # Run benchmarks with all features enabled
-.PHONY: bench
 bench:
 	cargo bench --all-features
 
-# Run Clippy linter with nightly toolchain, fixing issues automatically
-# and applying strict linting rules (uses workspace lints from Cargo.toml)
-.PHONY: clippy
+# Run Clippy linter with nightly toolchain (check only, for CI)
+# Uses workspace lints from Cargo.toml
 clippy:
-	cargo +nightly clippy --fix \
-		-p signer -p signer-btc -p signer-evm -p signer-svm \
+	cargo +nightly clippy --workspace \
+		--all-targets \
+		--all-features \
+		-- -D warnings
+
+# Run Clippy linter with auto-fix (for development)
+clippy-fix:
+	cargo +nightly clippy --workspace \
+		--fix \
 		--all-targets \
 		--all-features \
 		--allow-dirty \
@@ -36,30 +47,9 @@ clippy:
 		-- -D warnings
 
 # Format the code using rustfmt with nightly toolchain
-.PHONY: fmt
 fmt:
 	cargo +nightly fmt
 
 # Generate documentation for all crates and open it in the browser
-.PHONY: doc
 doc:
 	cargo +nightly doc --all-features --no-deps --open
-
-# Generate CHANGELOG.md using git-cliff
-.PHONY: cliff
-cliff:
-	git-cliff
-	git cliff --output CHANGELOG.md
-
-# Check for unused dependencies using cargo-udeps with nightly toolchain
-.PHONY: udeps
-udeps:
-	cargo +nightly udeps --all-features
-
-# Run pre-commit hooks on all files
-.PHONY: pre-commit
-pre-commit:
-	$(MAKE) build
-	$(MAKE) test
-	$(MAKE) clippy
-	$(MAKE) fmt

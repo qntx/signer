@@ -1,4 +1,6 @@
-# signer
+<!-- markdownlint-disable MD033 MD041 MD036 -->
+
+# Signer
 
 [![CI][ci-badge]][ci-url]
 [![License][license-badge]][license-url]
@@ -58,31 +60,31 @@ println!("Signature: {}", signature);
 ### Sign a Bitcoin Message (BIP-137)
 
 ```rust
-use signer_btc::{Signer, Network, Address};
+use signer_btc::{Signer, Network};
 
 let signer = Signer::random(Network::Bitcoin);
 let signature = signer.sign_message("Hello, Bitcoin!")?;
-
-let address = Address::p2wpkh(&signer.compressed_public_key(), Network::Bitcoin);
+let address = signer.p2wpkh_address(Network::Bitcoin);
 let valid = Signer::verify_message("Hello, Bitcoin!", &signature, &address, Network::Bitcoin)?;
 
-println!("Address:   {}", address);
-println!("Signature: {}", signature);
-println!("Valid:     {}", valid);
+println!("Address:   {address}");
+println!("Valid:     {valid}");
 ```
 
 ### Sign with Solana (Ed25519)
 
 ```rust
 use signer_svm::Signer;
+use ed25519_dalek::Signer as _;
 
 let signer = Signer::random();
-let signature = signer.sign(b"hello solana");
+let sig = signer.sign(b"hello solana");
+signer.verify(b"hello solana", &sig)?;
 
-signer.verify(b"hello solana", &signature)?;
+// Or sign serialized transaction message bytes:
+let tx_sig = signer.sign_transaction_message(&serialized_message);
 
-println!("Address:   {}", signer.address());
-println!("Signature: {:?}", signature);
+println!("Address: {}", signer.address());
 ```
 
 ### Via Umbrella Crate
@@ -115,7 +117,8 @@ println!("Address: {}", signer.address());
 ## Design
 
 - **Zero hand-rolled crypto** — All signing delegated to audited upstream libraries
-- **Thin wrappers** — `Deref` to underlying types for full API access
+- **Thin wrappers** — `Deref` to underlying types (`PrivateKey`, `PrivateKeySigner`, `SigningKey`) for full API access
+- **Memory safety** — Private keys zeroed on drop (`ZeroizeOnDrop` / `non_secure_erase`)
 - **Multi-chain** — EVM, Bitcoin, Solana from one workspace
 - **Kobe integration** — Optional HD wallet bridging via feature flag
 - **Linting** — `pedantic` + `nursery` + `correctness` (deny) — strict Clippy
@@ -138,15 +141,18 @@ println!("Address: {}", signer.address());
 | --- | --- |
 | `sign_ecdsa` | secp256k1 ECDSA |
 | `sign_schnorr` | BIP-340 Schnorr (Taproot) |
-| `sign_message` / `verify_message` | BIP-137 Bitcoin Signed Message |
-| `sign_psbt` | PSBT (Partially Signed Bitcoin Transaction) |
+| `sign_message` / `sign_message_with_type` | BIP-137 (P2PKH, P2SH-P2WPKH, P2WPKH) |
+| `verify_message` | BIP-137 verification |
+| `sign_psbt` | PSBT (with Bip32Derivation support) |
+| `p2wpkh_address` / `p2tr_address` / ... | Address generation |
 
 ### Solana (`signer-svm`)
 
 | Method | Standard |
 | --- | --- |
-| `sign` | Ed25519 signature |
+| `sign` (via Deref) | Ed25519 signature |
 | `verify` | Ed25519 verification |
+| `sign_transaction_message` | Solana transaction signing |
 | `keypair_base58` | Phantom / Backpack / Solflare format |
 
 ## Feature Flags
@@ -164,7 +170,7 @@ println!("Address: {}", signer.address());
 This library has **not** been independently audited. Use at your own risk.
 
 - All cryptographic operations are delegated to upstream libraries
-- Private keys should be handled with care — consider using `Zeroizing<T>` wrappers
+- Private keys are zeroed from memory on drop (EVM/SVM via `ZeroizeOnDrop`, BTC via `non_secure_erase`)
 - Review the security advisories of upstream dependencies
 
 ## License

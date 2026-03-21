@@ -1,19 +1,17 @@
 //! EVM transaction signer built on [`alloy-signer-local`].
 //!
-//! This crate provides a thin [`Signer`] wrapper around
-//! [`alloy_signer_local::PrivateKeySigner`], adding convenient constructors
-//! and optional [`kobe`](https://github.com/qntx/kobe) wallet bridging.
+//! [`Signer`] wraps a [`PrivateKeySigner`] with [`Deref`](core::ops::Deref)
+//! for full alloy API access. The inner key is `ZeroizeOnDrop`.
 //!
-//! All cryptographic operations are delegated to the alloy ecosystem —
-//! **zero hand-rolled cryptography**.
+//! **Zero hand-rolled cryptography.**
 //!
-//! # Exposed signing methods (via `Deref` to `PrivateKeySigner`)
+//! # Signing methods (via `Deref` to `PrivateKeySigner`)
 //!
 //! | Method | Standard |
 //! |---|---|
 //! | `sign_hash_sync` / `sign_hash` | Raw 32-byte hash |
 //! | `sign_message_sync` / `sign_message` | EIP-191 personal_sign |
-//! | `sign_typed_data_sync` / `sign_typed_data` | EIP-712 (feature `eip712`) |
+//! | `sign_typed_data_sync` / `sign_typed_data` | EIP-712 |
 //! | `sign_transaction_sync` / `sign_transaction` | All EVM tx types |
 //! | `address` | Signer's Ethereum address |
 //! | `chain_id` / `set_chain_id` | EIP-155 chain ID |
@@ -35,8 +33,8 @@ pub use error::Error;
 
 /// EVM transaction signer.
 ///
-/// A thin wrapper around [`PrivateKeySigner`] that delegates all signing
-/// to the alloy ecosystem. Use [`Deref`] to access the full alloy API.
+/// Wraps a [`PrivateKeySigner`] with [`Deref`] for full alloy API access.
+/// The inner `k256::SigningKey` implements `ZeroizeOnDrop`.
 ///
 /// # Examples
 ///
@@ -46,7 +44,7 @@ pub use error::Error;
 /// let signer = Signer::random();
 /// let sig = signer.sign_message_sync(b"hello").unwrap();
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Signer {
     inner: PrivateKeySigner,
 }
@@ -88,8 +86,8 @@ impl Signer {
     ///
     /// Returns an error if the bytes do not represent a valid secp256k1 private key.
     pub fn from_bytes(bytes: &B256) -> Result<Self, Error> {
-        let inner = PrivateKeySigner::from_bytes(bytes)
-            .map_err(|e| Error::InvalidPrivateKey(e.to_string()))?;
+        let inner =
+            PrivateKeySigner::from_bytes(bytes).map_err(|e| Error::InvalidKey(e.to_string()))?;
         Ok(Self { inner })
     }
 
@@ -105,7 +103,7 @@ impl Signer {
     pub fn from_hex(hex_str: &str) -> Result<Self, Error> {
         let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
         let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
-            Error::InvalidPrivateKey(format!("expected 32 bytes, got {}", v.len()))
+            Error::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
         })?;
         Self::from_bytes(&B256::from(bytes))
     }
@@ -151,58 +149,70 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_random_signer() {
-        let signer = Signer::random();
-        let addr = signer.address();
-        assert_ne!(addr, Address::ZERO);
+    fn assert_send_sync() {
+        fn assert<T: Send + Sync>() {}
+        assert::<Signer>();
     }
 
     #[test]
-    fn test_from_hex() {
-        let signer = Signer::random();
-        let hex_key = hex::encode(signer.inner.credential().to_bytes());
+    fn assert_clone() {
+        let s = Signer::random();
+        let s2 = s.clone();
+        assert_eq!(s.address(), s2.address());
+    }
+
+    #[test]
+    fn random_signer() {
+        let s = Signer::random();
+        assert_ne!(s.address(), Address::ZERO);
+    }
+
+    #[test]
+    fn hex_roundtrip() {
+        let s = Signer::random();
+        let hex_key = hex::encode(s.inner.credential().to_bytes());
         let restored = Signer::from_hex(&hex_key).unwrap();
-        assert_eq!(signer.address(), restored.address());
+        assert_eq!(s.address(), restored.address());
     }
 
     #[test]
-    fn test_from_hex_with_prefix() {
-        let signer = Signer::random();
-        let hex_key = format!("0x{}", hex::encode(signer.inner.credential().to_bytes()));
+    fn hex_with_prefix() {
+        let s = Signer::random();
+        let hex_key = format!("0x{}", hex::encode(s.inner.credential().to_bytes()));
         let restored = Signer::from_hex(&hex_key).unwrap();
-        assert_eq!(signer.address(), restored.address());
+        assert_eq!(s.address(), restored.address());
     }
 
     #[test]
-    fn test_sign_message_sync() {
-        let signer = Signer::random();
-        let sig = signer.sign_message_sync(b"hello").unwrap();
+    fn sign_message_sync() {
+        let s = Signer::random();
+        let sig = s.sign_message_sync(b"hello").unwrap();
         let recovered = sig.recover_address_from_msg("hello").unwrap();
-        assert_eq!(recovered, signer.address());
+        assert_eq!(recovered, s.address());
     }
 
     #[test]
-    fn test_sign_hash_sync() {
-        let signer = Signer::random();
+    fn sign_hash_sync() {
+        let s = Signer::random();
         let hash = B256::from([0xab; 32]);
-        let sig = signer.sign_hash_sync(&hash).unwrap();
+        let sig = s.sign_hash_sync(&hash).unwrap();
         let recovered = sig.recover_address_from_prehash(&hash).unwrap();
-        assert_eq!(recovered, signer.address());
+        assert_eq!(recovered, s.address());
     }
 
     #[test]
-    fn test_into_inner() {
-        let signer = Signer::random();
-        let addr = signer.address();
-        let inner = signer.into_inner();
+    fn into_inner() {
+        let s = Signer::random();
+        let addr = s.address();
+        let inner = s.into_inner();
         assert_eq!(inner.address(), addr);
     }
 
     #[test]
-    fn test_from_private_key_signer() {
+    fn from_private_key_signer() {
         let pks = PrivateKeySigner::random();
         let addr = pks.address();
-        let signer = Signer::from(pks);
-        assert_eq!(signer.address(), addr);
+        let s = Signer::from(pks);
+        assert_eq!(s.address(), addr);
     }
 }
