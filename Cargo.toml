@@ -20,7 +20,7 @@ alloy-signer = "1.7"
 alloy-signer-local = "1.8"
 alloy-network = "1.7"
 alloy-primitives = { version = "1", default-features = false, features = ["k256"] }
-alloy-consensus = "1.7"
+alloy-consensus = "1.8"
 
 # BTC
 bitcoin = { version = "0.32", features = ["rand-std", "base64"] }
