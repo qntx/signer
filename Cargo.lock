@@ -113,7 +113,7 @@ dependencies = [
  "either",
  "serde",
  "serde_with",
- "sha2",
+ "sha2 0.10.9",
  "thiserror",
 ]
 
@@ -739,12 +739,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db40d3dfbeab4e031d78c844642fa0caa0b0db11ce1607ac9d2986dff1405c69"
 dependencies = [
  "bs58",
- "hmac",
+ "hmac 0.12.1",
  "k256",
  "rand_core 0.6.4",
- "ripemd",
+ "ripemd 0.1.3",
  "secp256k1 0.27.0",
- "sha2",
+ "sha2 0.10.9",
  "subtle",
  "zeroize",
 ]
@@ -843,12 +843,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "blake2"
+version = "0.10.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46502ad458c9a52b69d4d4d32775c788b7a1b85e8bc9d482d92250fc0e3f8efe"
+dependencies = [
+ "digest 0.10.7",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
 dependencies = [
  "generic-array",
+]
+
+[[package]]
+name = "block-buffer"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cdd35008169921d80bc60d3d0ab416eecb028c4cd653352907921d95084790be"
+dependencies = [
+ "hybrid-array",
 ]
 
 [[package]]
@@ -893,7 +911,7 @@ version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf88ba1141d185c399bee5288d850d63b8369520c1eafc32a0430b5b6c287bf4"
 dependencies = [
- "sha2",
+ "sha2 0.10.9",
  "tinyvec",
 ]
 
@@ -1014,6 +1032,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
+name = "cmov"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de0758edba32d61d1fd9f4d69491b47604b91ee2f7e6b33de7e54ca4ebe55dc3"
+
+[[package]]
 name = "colorchoice"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1035,7 +1059,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "531185e432bb31db1ecda541e9e7ab21468d4d844ad7505e0546a49b4945d49b"
 dependencies = [
  "cfg-if",
- "cpufeatures",
+ "cpufeatures 0.2.17",
  "proptest",
  "serde_core",
 ]
@@ -1091,6 +1115,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cpufeatures"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b2a41393f66f16b0823bb79094d54ac5fbd34ab292ddafb9a0456ac9f87d201"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "crc"
 version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1134,13 +1167,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "crypto-common"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77727bb15fa921304124b128af125e7e3b968275d1b108b379190264f4423710"
+dependencies = [
+ "hybrid-array",
+]
+
+[[package]]
+name = "ctutils"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1005a6d4446f5120ef475ad3d2af2b30c49c2c9c6904258e3bb30219bebed5e4"
+dependencies = [
+ "cmov",
+]
+
+[[package]]
 name = "curve25519-dalek"
 version = "4.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fb8b7c4503de7d6ae7b42ab72a5a59857b4c937ec27a3d4539dba95b5ab2be"
 dependencies = [
  "cfg-if",
- "cpufeatures",
+ "cpufeatures 0.2.17",
  "curve25519-dalek-derive",
  "digest 0.10.7",
  "fiat-crypto",
@@ -1299,10 +1350,21 @@ version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
- "block-buffer",
+ "block-buffer 0.10.4",
  "const-oid",
- "crypto-common",
+ "crypto-common 0.1.6",
  "subtle",
+]
+
+[[package]]
+name = "digest"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4850db49bf08e663084f7fb5c87d202ef91a3907271aff24a94eb97ff039153c"
+dependencies = [
+ "block-buffer 0.12.0",
+ "crypto-common 0.2.1",
+ "ctutils",
 ]
 
 [[package]]
@@ -1351,7 +1413,7 @@ dependencies = [
  "curve25519-dalek",
  "ed25519",
  "serde",
- "sha2",
+ "sha2 0.10.9",
  "subtle",
  "zeroize",
 ]
@@ -1658,6 +1720,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hmac"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6303bc9732ae41b04cb554b844a762b4115a61bfaa81e3e83050991eeb56863f"
+dependencies = [
+ "digest 0.11.2",
+]
+
+[[package]]
 name = "http"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1665,6 +1736,15 @@ checksum = "e3ba2a386d7f85a81f119ad7498ebe444d2e22c2af0b86b069416ace48b3311a"
 dependencies = [
  "bytes",
  "itoa",
+]
+
+[[package]]
+name = "hybrid-array"
+version = "0.4.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8655f91cd07f2b9d0c24137bd650fe69617773435ee5ec83022377777ce65ef1"
+dependencies = [
+ "typenum",
 ]
 
 [[package]]
@@ -1806,7 +1886,8 @@ dependencies = [
  "elliptic-curve",
  "once_cell",
  "serdect",
- "sha2",
+ "sha2 0.10.9",
+ "signature",
 ]
 
 [[package]]
@@ -1815,7 +1896,7 @@ version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb26cec98cce3a3d96cbb7bced3c4b16e3d13f27ec56dbd62cbc8f39cfb9d653"
 dependencies = [
- "cpufeatures",
+ "cpufeatures 0.2.17",
 ]
 
 [[package]]
@@ -1826,6 +1907,15 @@ checksum = "b646a74e746cd25045aa0fd42f4f7f78aa6d119380182c7e63a5593c4ab8df6f"
 dependencies = [
  "digest 0.10.7",
  "sha3-asm",
+]
+
+[[package]]
+name = "kobe"
+version = "0.5.4"
+dependencies = [
+ "bip39",
+ "thiserror",
+ "zeroize",
 ]
 
 [[package]]
@@ -1848,7 +1938,22 @@ dependencies = [
  "bip39",
  "bitcoin",
  "hex",
- "kobe",
+ "kobe 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "thiserror",
+ "zeroize",
+]
+
+[[package]]
+name = "kobe-cosmos"
+version = "0.5.4"
+dependencies = [
+ "bech32",
+ "bip32",
+ "hex",
+ "k256",
+ "kobe 0.5.4",
+ "ripemd 0.2.0",
+ "sha2 0.11.0",
  "thiserror",
  "zeroize",
 ]
@@ -1863,7 +1968,46 @@ dependencies = [
  "bip32",
  "hex",
  "k256",
- "kobe",
+ "kobe 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "thiserror",
+ "zeroize",
+]
+
+[[package]]
+name = "kobe-fil"
+version = "0.5.4"
+dependencies = [
+ "bip32",
+ "blake2",
+ "hex",
+ "k256",
+ "kobe 0.5.4",
+ "thiserror",
+ "zeroize",
+]
+
+[[package]]
+name = "kobe-spark"
+version = "0.5.4"
+dependencies = [
+ "bip32",
+ "hex",
+ "k256",
+ "kobe 0.5.4",
+ "thiserror",
+ "zeroize",
+]
+
+[[package]]
+name = "kobe-sui"
+version = "0.5.4"
+dependencies = [
+ "blake2",
+ "ed25519-dalek",
+ "hex",
+ "hmac 0.13.0",
+ "kobe 0.5.4",
+ "sha2 0.11.0",
  "thiserror",
  "zeroize",
 ]
@@ -1877,9 +2021,37 @@ dependencies = [
  "bs58",
  "ed25519-dalek",
  "hex",
- "hmac",
- "kobe",
- "sha2",
+ "hmac 0.12.1",
+ "kobe 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sha2 0.10.9",
+ "thiserror",
+ "zeroize",
+]
+
+[[package]]
+name = "kobe-ton"
+version = "0.5.4"
+dependencies = [
+ "base64 0.22.1",
+ "ed25519-dalek",
+ "hex",
+ "hmac 0.13.0",
+ "kobe 0.5.4",
+ "sha2 0.11.0",
+ "thiserror",
+ "zeroize",
+]
+
+[[package]]
+name = "kobe-tron"
+version = "0.5.4"
+dependencies = [
+ "bip32",
+ "bs58",
+ "hex",
+ "k256",
+ "kobe 0.5.4",
+ "sha3",
  "thiserror",
  "zeroize",
 ]
@@ -2302,7 +2474,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dd2a808d456c4a54e300a23e9f5a67e122c3024119acbfd73e3bf664491cb2"
 dependencies = [
- "hmac",
+ "hmac 0.12.1",
  "subtle",
 ]
 
@@ -2313,6 +2485,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd124222d17ad93a644ed9d011a40f4fb64aa54275c08cc216524a9ea82fb09f"
 dependencies = [
  "digest 0.10.7",
+]
+
+[[package]]
+name = "ripemd"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4dd4211456b4172d7e44261920c25acf07367c4f04bb5f5d54fc21b090d9b159"
+dependencies = [
+ "digest 0.11.2",
 ]
 
 [[package]]
@@ -2624,8 +2805,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
 dependencies = [
  "cfg-if",
- "cpufeatures",
+ "cpufeatures 0.2.17",
  "digest 0.10.7",
+]
+
+[[package]]
+name = "sha2"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "446ba717509524cb3f22f17ecc096f10f4822d76ab5c0b9822c5f9c284e825f4"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.3.0",
+ "digest 0.11.2",
 ]
 
 [[package]]
@@ -2669,8 +2861,14 @@ name = "signer"
 version = "0.3.2"
 dependencies = [
  "signer-btc",
+ "signer-cosmos",
  "signer-evm",
+ "signer-fil",
+ "signer-spark",
+ "signer-sui",
  "signer-svm",
+ "signer-ton",
+ "signer-tron",
 ]
 
 [[package]]
@@ -2699,6 +2897,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "signer-cosmos"
+version = "0.3.2"
+dependencies = [
+ "bech32",
+ "hex",
+ "k256",
+ "kobe-cosmos",
+ "ripemd 0.1.3",
+ "sha2 0.10.9",
+ "thiserror",
+]
+
+[[package]]
 name = "signer-evm"
 version = "0.3.2"
 dependencies = [
@@ -2713,6 +2924,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "signer-fil"
+version = "0.3.2"
+dependencies = [
+ "blake2",
+ "hex",
+ "k256",
+ "kobe-fil",
+ "thiserror",
+]
+
+[[package]]
+name = "signer-spark"
+version = "0.3.2"
+dependencies = [
+ "hex",
+ "k256",
+ "kobe-spark",
+ "sha2 0.10.9",
+ "thiserror",
+]
+
+[[package]]
+name = "signer-sui"
+version = "0.3.2"
+dependencies = [
+ "blake2",
+ "ed25519-dalek",
+ "hex",
+ "kobe-sui",
+ "thiserror",
+]
+
+[[package]]
 name = "signer-svm"
 version = "0.3.2"
 dependencies = [
@@ -2723,6 +2967,31 @@ dependencies = [
  "kobe-svm",
  "thiserror",
  "zeroize",
+]
+
+[[package]]
+name = "signer-ton"
+version = "0.3.2"
+dependencies = [
+ "base64 0.22.1",
+ "ed25519-dalek",
+ "hex",
+ "kobe-ton",
+ "sha2 0.10.9",
+ "thiserror",
+]
+
+[[package]]
+name = "signer-tron"
+version = "0.3.2"
+dependencies = [
+ "bs58",
+ "hex",
+ "k256",
+ "kobe-tron",
+ "sha2 0.10.9",
+ "sha3",
+ "thiserror",
 ]
 
 [[package]]

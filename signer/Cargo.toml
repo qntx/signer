@@ -10,13 +10,29 @@ description = "Multi-chain transaction signer — umbrella crate re-exporting ch
 signer-btc = { workspace = true, optional = true }
 signer-evm = { workspace = true, optional = true }
 signer-svm = { workspace = true, optional = true }
+signer-cosmos = { workspace = true, optional = true }
+signer-tron = { workspace = true, optional = true }
+signer-spark = { workspace = true, optional = true }
+signer-fil = { workspace = true, optional = true }
+signer-ton = { workspace = true, optional = true }
+signer-sui = { workspace = true, optional = true }
 
 [features]
-default = ["btc", "evm", "svm"]
+default = ["btc", "evm", "svm", "cosmos", "tron", "spark", "fil", "ton", "sui"]
 btc = ["dep:signer-btc"]
 evm = ["dep:signer-evm"]
 svm = ["dep:signer-svm"]
-kobe = ["signer-btc?/kobe", "signer-evm?/kobe", "signer-svm?/kobe"]
+cosmos = ["dep:signer-cosmos"]
+tron = ["dep:signer-tron"]
+spark = ["dep:signer-spark"]
+fil = ["dep:signer-fil"]
+ton = ["dep:signer-ton"]
+sui = ["dep:signer-sui"]
+kobe = [
+    "signer-btc?/kobe", "signer-evm?/kobe", "signer-svm?/kobe",
+    "signer-cosmos?/kobe", "signer-tron?/kobe", "signer-spark?/kobe",
+    "signer-fil?/kobe", "signer-ton?/kobe", "signer-sui?/kobe",
+]
 
 [lints]
 workspace = true

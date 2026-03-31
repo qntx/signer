@@ -1,0 +1,22 @@
+[package]
+name = "signer-sui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Sui transaction signer using Ed25519 with Blake2b intent-based signing."
+
+[dependencies]
+ed25519-dalek.workspace = true
+blake2 = "0.10"
+hex.workspace = true
+thiserror.workspace = true
+
+kobe-sui = { version = "0.5", path = "../../kobe/kobe-sui", default-features = false, features = ["std"], optional = true }
+
+[features]
+default = []
+kobe = ["dep:kobe-sui"]
+
+[lints]
+workspace = true

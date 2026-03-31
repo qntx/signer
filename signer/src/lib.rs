@@ -27,3 +27,15 @@ pub use signer_btc as btc;
 pub use signer_evm as evm;
 #[cfg(feature = "svm")]
 pub use signer_svm as svm;
+#[cfg(feature = "cosmos")]
+pub use signer_cosmos as cosmos;
+#[cfg(feature = "tron")]
+pub use signer_tron as tron;
+#[cfg(feature = "spark")]
+pub use signer_spark as spark;
+#[cfg(feature = "fil")]
+pub use signer_fil as fil;
+#[cfg(feature = "ton")]
+pub use signer_ton as ton;
+#[cfg(feature = "sui")]
+pub use signer_sui as sui;

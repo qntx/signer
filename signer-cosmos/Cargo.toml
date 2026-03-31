@@ -1,0 +1,24 @@
+[package]
+name = "signer-cosmos"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Cosmos transaction signer using secp256k1 (k256)."
+
+[dependencies]
+k256 = { version = "0.13", features = ["ecdsa"] }
+bech32 = "0.11"
+ripemd = "0.1"
+sha2 = "0.10"
+hex.workspace = true
+thiserror.workspace = true
+
+kobe-cosmos = { version = "0.5", path = "../../kobe/kobe-cosmos", default-features = false, features = ["std"], optional = true }
+
+[features]
+default = []
+kobe = ["dep:kobe-cosmos"]
+
+[lints]
+workspace = true

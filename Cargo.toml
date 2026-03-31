@@ -1,5 +1,8 @@
 [workspace]
-members = ["signer", "signer-btc", "signer-cli", "signer-evm", "signer-svm"]
+members = [
+    "signer", "signer-btc", "signer-cli", "signer-evm", "signer-svm",
+    "signer-cosmos", "signer-tron", "signer-spark", "signer-fil", "signer-ton", "signer-sui",
+]
 default-members = ["signer"]
 resolver = "3"
 
@@ -14,6 +17,12 @@ description = "Multi-chain transaction signer built on mature cryptography libra
 signer-btc = { version = "0.3", path = "signer-btc" }
 signer-evm = { version = "0.3", path = "signer-evm" }
 signer-svm = { version = "0.3", path = "signer-svm" }
+signer-cosmos = { version = "0.3", path = "signer-cosmos" }
+signer-tron = { version = "0.3", path = "signer-tron" }
+signer-spark = { version = "0.3", path = "signer-spark" }
+signer-fil = { version = "0.3", path = "signer-fil" }
+signer-ton = { version = "0.3", path = "signer-ton" }
+signer-sui = { version = "0.3", path = "signer-sui" }
 
 # EVM (alloy ecosystem)
 alloy-signer = "1.7"

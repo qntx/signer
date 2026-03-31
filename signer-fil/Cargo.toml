@@ -1,0 +1,22 @@
+[package]
+name = "signer-fil"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Filecoin transaction signer using secp256k1 (k256) with Blake2b hashing."
+
+[dependencies]
+k256 = { version = "0.13", features = ["ecdsa"] }
+blake2 = "0.10"
+hex.workspace = true
+thiserror.workspace = true
+
+kobe-fil = { version = "0.5", path = "../../kobe/kobe-fil", default-features = false, features = ["std"], optional = true }
+
+[features]
+default = []
+kobe = ["dep:kobe-fil"]
+
+[lints]
+workspace = true

@@ -1,0 +1,23 @@
+[package]
+name = "signer-ton"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "TON transaction signer using Ed25519."
+
+[dependencies]
+ed25519-dalek.workspace = true
+sha2 = "0.10"
+base64 = "0.22"
+hex.workspace = true
+thiserror.workspace = true
+
+kobe-ton = { version = "0.5", path = "../../kobe/kobe-ton", default-features = false, features = ["std"], optional = true }
+
+[features]
+default = []
+kobe = ["dep:kobe-ton"]
+
+[lints]
+workspace = true
