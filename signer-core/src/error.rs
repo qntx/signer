@@ -1,32 +1,21 @@
 //! Core error type shared across all signer crates.
 
-use std::fmt;
-
 /// Errors from signing operations.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// Private key is invalid or out of range.
+    #[error("invalid key: {0}")]
     InvalidKey(String),
     /// Message has wrong length or format.
+    #[error("invalid message: {0}")]
     InvalidMessage(String),
     /// The cryptographic signing primitive failed.
+    #[error("signing failed: {0}")]
     SigningFailed(String),
     /// Signature bytes are malformed.
+    #[error("invalid signature: {0}")]
     InvalidSignature(String),
     /// Transaction bytes are malformed.
+    #[error("invalid transaction: {0}")]
     InvalidTransaction(String),
 }
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::InvalidKey(m) => write!(f, "invalid key: {m}"),
-            Self::InvalidMessage(m) => write!(f, "invalid message: {m}"),
-            Self::SigningFailed(m) => write!(f, "signing failed: {m}"),
-            Self::InvalidSignature(m) => write!(f, "invalid signature: {m}"),
-            Self::InvalidTransaction(m) => write!(f, "invalid transaction: {m}"),
-        }
-    }
-}
-
-impl std::error::Error for Error {}

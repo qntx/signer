@@ -8,8 +8,8 @@
 //!
 //! # Design
 //!
-//! - **Stateful signers** — each `Signer` holds its private key. No passing
-//!   raw key bytes on every call.
+//! - **Stateful signers** — each `Signer` holds its private key internally.
+//! - **`Send + Sync`** — signers are safe to share across threads and async runtimes.
 //! - **No address derivation** — that's [`kobe`]'s responsibility.
 //! - **Associated error type** — matches kobe's `Derive` trait pattern.
 //! - **[`SignExt`]** — blanket extension trait (like kobe's `DeriveExt`).
@@ -70,6 +70,9 @@ impl SignOutput {
 /// Each chain crate (`signer-evm`, `signer-btc`, etc.) implements this
 /// trait on its `Signer` type. The signer holds the private key internally.
 ///
+/// **Thread-safety**: all signers must be `Send + Sync` for use in async
+/// runtimes and multi-threaded applications.
+///
 /// Extension methods are provided by the blanket [`SignExt`] trait.
 ///
 /// # Example
@@ -81,9 +84,9 @@ impl SignOutput {
 ///     s.sign_message(msg).unwrap()
 /// }
 /// ```
-pub trait Sign {
+pub trait Sign: Send + Sync {
     /// The error type returned by signing operations.
-    type Error: core::fmt::Debug + core::fmt::Display + From<Error>;
+    type Error: core::fmt::Debug + core::fmt::Display + From<Error> + Send + Sync;
 
     /// Sign a pre-hashed digest.
     ///
@@ -100,7 +103,8 @@ pub trait Sign {
     /// - EVM: EIP-191 `personal_sign`
     /// - Bitcoin: `\x18Bitcoin Signed Message:\n` prefix
     /// - TRON: `\x19TRON Signed Message:\n` prefix
-    /// - Solana/TON/Sui: raw Ed25519 sign
+    /// - Solana/TON: raw Ed25519 sign
+    /// - Sui: intent prefix + BCS + BLAKE2b-256
     ///
     /// # Errors
     ///
@@ -116,6 +120,38 @@ pub trait Sign {
     ///
     /// Returns an error if the transaction is malformed or signing fails.
     fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Self::Error>;
+
+    /// Extract the signable portion from a full serialized transaction.
+    ///
+    /// Some wire formats include non-signed metadata (e.g. Solana prepends
+    /// signature-slot placeholders). This method strips that metadata and
+    /// returns only the bytes that must be signed.
+    ///
+    /// The default implementation returns the input unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction is malformed.
+    fn extract_signable_bytes<'a>(&self, tx_bytes: &'a [u8]) -> Result<&'a [u8], Self::Error> {
+        Ok(tx_bytes)
+    }
+
+    /// Encode a signed transaction from unsigned bytes + signature output.
+    ///
+    /// Returns bytes suitable for broadcasting to the network.
+    ///
+    /// The default returns `Err` — chains that support encoding must override.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if encoding is not supported or inputs are malformed.
+    fn encode_signed_transaction(
+        &self,
+        _tx_bytes: &[u8],
+        _signature: &SignOutput,
+    ) -> Result<Vec<u8>, Self::Error> {
+        Err(Error::InvalidTransaction("encode_signed_transaction not implemented".into()).into())
+    }
 }
 
 /// Extension trait providing additional operations for all [`Sign`] implementors.
@@ -129,6 +165,15 @@ pub trait SignExt: Sign {
     /// Returns an error if signing fails.
     fn sign_hash_bytes(&self, hash: &[u8]) -> Result<Vec<u8>, Self::Error> {
         self.sign_hash(hash).map(|out| out.signature)
+    }
+
+    /// Sign a transaction and return only the raw signature bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if signing fails.
+    fn sign_transaction_bytes(&self, tx_bytes: &[u8]) -> Result<Vec<u8>, Self::Error> {
+        self.sign_transaction(tx_bytes).map(|out| out.signature)
     }
 }
 
