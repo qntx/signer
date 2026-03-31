@@ -41,6 +41,10 @@ The umbrella `signer` crate provides fine-grained feature control:
 
 | Feature | Default | Description |
 | --- | --- | --- |
+| `std` | ✅ | Enable standard library (implies `alloc`) |
+| `alloc` | | Enable `alloc` crate for `no_std` environments |
+| `getrandom` | | Enable `Signer::random()` via OS-provided CSPRNG |
+| `all-chains` | | Enable all 9 chain signers |
 | `btc` | ✅ | Bitcoin signer |
 | `evm` | ✅ | Ethereum signer |
 | `svm` | ✅ | Solana signer |
@@ -51,8 +55,6 @@ The umbrella `signer` crate provides fine-grained feature control:
 | `ton` | ✅ | TON signer |
 | `sui` | ✅ | Sui signer |
 | `kobe` | | Enable [kobe](https://github.com/qntx/kobe) HD wallet bridging for all chains |
-
-Each chain crate also exposes a `kobe` feature for individual HD wallet bridging.
 
 ## Cryptography Libraries
 
