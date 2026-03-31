@@ -1,6 +1,8 @@
 //! Error types for the TON signer.
 
 use alloc::string::String;
+#[cfg(not(feature = "std"))]
+use alloc::string::ToString;
 
 /// Errors from TON signing operations.
 #[derive(Debug, thiserror::Error)]

@@ -1,4 +1,4 @@
-﻿//! TRON transaction signer built on [`k256`] and [`sha3`].
+//! TRON transaction signer built on [`k256`] and [`sha3`].
 //!
 //! Provides secp256k1 ECDSA signing for TRON transactions and messages.
 //! Address derivation is handled by [`kobe-tron`].
@@ -7,6 +7,8 @@
 
 extern crate alloc;
 
+#[cfg(not(feature = "std"))]
+use alloc::string::ToString;
 use alloc::{format, vec::Vec};
 
 mod error;

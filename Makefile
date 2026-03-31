@@ -1,6 +1,6 @@
 # Makefile for Rust project using Cargo
 
-.PHONY: all build check run test bench clippy clippy-fix fmt doc update
+.PHONY: all build check check-no-std run test bench clippy clippy-fix fmt doc update
 
 all: fmt clippy-fix
 
@@ -11,6 +11,21 @@ build:
 # Check the project for compilation errors without producing binaries
 check:
 	cargo check --workspace --all-features
+
+# Verify no_std compilation (all crates use #![cfg_attr(not(feature = "std"), no_std)])
+# CI uses thumbv7m-none-eabi for strict bare-metal verification
+check-no-std:
+	cargo check -p signer-core --no-default-features
+	cargo check -p signer-btc --no-default-features --features alloc
+	cargo check -p signer-evm --no-default-features --features alloc
+	cargo check -p signer-svm --no-default-features --features alloc
+	cargo check -p signer-cosmos --no-default-features --features alloc
+	cargo check -p signer-tron --no-default-features --features alloc
+	cargo check -p signer-spark --no-default-features --features alloc
+	cargo check -p signer-fil --no-default-features --features alloc
+	cargo check -p signer-ton --no-default-features --features alloc
+	cargo check -p signer-sui --no-default-features --features alloc
+	cargo check -p signer --no-default-features --features alloc
 
 # Update dependencies to their latest compatible versions
 update:

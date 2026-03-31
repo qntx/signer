@@ -1,4 +1,4 @@
-﻿//! Filecoin transaction signer built on [`k256`] and [`blake2`].
+//! Filecoin transaction signer built on [`k256`] and [`blake2`].
 //!
 //! Provides secp256k1 ECDSA signing with Blake2b-256 hashing for Filecoin.
 //! Address derivation is handled by [`kobe-fil`].
@@ -7,6 +7,8 @@
 
 extern crate alloc;
 
+#[cfg(not(feature = "std"))]
+use alloc::string::ToString;
 use alloc::{format, vec::Vec};
 
 mod error;

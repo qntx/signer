@@ -1,6 +1,8 @@
 //! Error types for the Cosmos signer.
 
 use alloc::string::String;
+#[cfg(not(feature = "std"))]
+use alloc::string::ToString;
 
 /// Errors from Cosmos signing operations.
 #[derive(Debug, thiserror::Error)]

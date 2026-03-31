@@ -1,6 +1,8 @@
 //! Error types for the TRON signer.
 
 use alloc::string::String;
+#[cfg(not(feature = "std"))]
+use alloc::string::ToString;
 
 /// Errors from TRON signing operations.
 #[derive(Debug, thiserror::Error)]

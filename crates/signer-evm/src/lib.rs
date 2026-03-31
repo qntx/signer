@@ -19,6 +19,8 @@
 
 extern crate alloc;
 
+#[cfg(not(feature = "std"))]
+use alloc::string::ToString;
 use alloc::{format, string::String, vec::Vec};
 
 mod eip712;
@@ -180,7 +182,7 @@ impl Signer {
             .try_into()
             .map_err(|_| Error::InvalidSignature("bad s component".into()))?;
         rlp::encode_signed_typed_tx(unsigned_tx, v, &r, &s)
-            .map_err(|e| Error::InvalidTransaction(e.into()))
+            .map_err(|e| Error::InvalidTransaction(String::from(e)))
     }
 
     /// Expose the inner [`SigningKey`] reference.

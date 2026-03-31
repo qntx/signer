@@ -2,15 +2,74 @@ name: Rust
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  call-ci:
-    uses: qntx/workflows/.github/workflows/rust.yml@main
-    with:
-      submodules: true
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --workspace --all-features --verbose
+      - name: Test
+        run: cargo test --workspace --all-features --verbose
+
+  no-std:
+    name: no_std
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv7m-none-eabi
+      - uses: Swatinem/rust-cache@v2
+      - name: Install ARM cross-compiler
+        run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi
+      - name: signer-core (pure no_std)
+        run: cargo check -p signer-core --target thumbv7m-none-eabi --no-default-features
+      - name: signer-core (alloc)
+        run: cargo check -p signer-core --target thumbv7m-none-eabi --no-default-features --features alloc
+      - name: signer-btc (no_std)
+        run: cargo check -p signer-btc --target thumbv7m-none-eabi --no-default-features --features alloc
+      - name: signer-evm (no_std)
+        run: cargo check -p signer-evm --target thumbv7m-none-eabi --no-default-features --features alloc
+      - name: signer-svm (no_std)
+        run: cargo check -p signer-svm --target thumbv7m-none-eabi --no-default-features --features alloc
+      - name: signer-cosmos (no_std)
+        run: cargo check -p signer-cosmos --target thumbv7m-none-eabi --no-default-features --features alloc
+      - name: signer-tron (no_std)
+        run: cargo check -p signer-tron --target thumbv7m-none-eabi --no-default-features --features alloc
+      - name: signer-spark (no_std)
+        run: cargo check -p signer-spark --target thumbv7m-none-eabi --no-default-features --features alloc
+      - name: signer-fil (no_std)
+        run: cargo check -p signer-fil --target thumbv7m-none-eabi --no-default-features --features alloc
+      - name: signer-ton (no_std)
+        run: cargo check -p signer-ton --target thumbv7m-none-eabi --no-default-features --features alloc
+      - name: signer-sui (no_std)
+        run: cargo check -p signer-sui --target thumbv7m-none-eabi --no-default-features --features alloc
+      - name: signer (no_std)
+        run: cargo check -p signer --target thumbv7m-none-eabi --no-default-features --features alloc
+      - name: signer (no_std + all chains)
+        run: cargo check -p signer --target thumbv7m-none-eabi --no-default-features --features "alloc,all-chains"

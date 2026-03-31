@@ -1,6 +1,8 @@
 //! Error types for the Bitcoin signer.
 
 use alloc::string::String;
+#[cfg(not(feature = "std"))]
+use alloc::string::ToString;
 
 /// Errors from Bitcoin signing operations.
 #[derive(Debug, thiserror::Error)]

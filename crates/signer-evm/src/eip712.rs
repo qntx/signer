@@ -1,6 +1,9 @@
 //! EIP-712 typed structured data hashing.
 
 use alloc::collections::{BTreeMap, BTreeSet};
+#[cfg(not(feature = "std"))]
+use alloc::string::ToString;
+use alloc::{format, string::String, vec::Vec};
 
 use sha3::{Digest, Keccak256};
 

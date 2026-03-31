@@ -7,6 +7,8 @@
 
 extern crate alloc;
 
+#[cfg(not(feature = "std"))]
+use alloc::string::ToString;
 use alloc::{format, vec::Vec};
 
 mod error;

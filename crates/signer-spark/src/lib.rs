@@ -1,4 +1,4 @@
-﻿//! Spark (Bitcoin L2) transaction signer built on [`k256`] and [`sha2`].
+//! Spark (Bitcoin L2) transaction signer built on [`k256`] and [`sha2`].
 //!
 //! Provides secp256k1 ECDSA signing for Spark transactions.
 //! Address derivation is handled by [`kobe-spark`].
@@ -7,6 +7,8 @@
 
 extern crate alloc;
 
+#[cfg(not(feature = "std"))]
+use alloc::string::ToString;
 use alloc::{format, vec::Vec};
 
 mod error;
