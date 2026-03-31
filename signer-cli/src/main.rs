@@ -1,5 +1,10 @@
-#![allow(clippy::print_stdout, clippy::print_stderr)]
-//! Signer — Multi-chain transaction signing CLI tool.
+#![allow(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::missing_docs_in_private_items,
+    missing_docs
+)]
+//! Signer — multi-chain transaction signing CLI.
 
 mod commands;
 pub mod output;
@@ -13,10 +18,9 @@ fn main() {
 
     if let Err(e) = run(cli) {
         if json {
-            let err = output::ErrorOutput {
+            let _ = output::print_json(&output::ErrorOutput {
                 error: e.to_string(),
-            };
-            let _ = output::print_json(&err);
+            });
         } else {
             eprintln!("Error: {e}");
         }
@@ -27,9 +31,15 @@ fn main() {
 fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     let json = cli.json;
     match cli.command {
-        Commands::Btc(cmd) => cmd.execute(json)?,
         Commands::Evm(cmd) => cmd.execute(json)?,
+        Commands::Btc(cmd) => cmd.execute(json)?,
         Commands::Svm(cmd) => cmd.execute(json)?,
+        Commands::Cosmos(cmd) => cmd.execute(json)?,
+        Commands::Tron(cmd) => cmd.execute(json)?,
+        Commands::Sui(cmd) => cmd.execute(json)?,
+        Commands::Ton(cmd) => cmd.execute(json)?,
+        Commands::Fil(cmd) => cmd.execute(json)?,
+        Commands::Spark(cmd) => cmd.execute(json)?,
     }
     Ok(())
 }

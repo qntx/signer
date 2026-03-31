@@ -4,6 +4,7 @@ members = [
     "signer-btc", "signer-evm", "signer-svm",
     "signer-cosmos", "signer-tron", "signer-spark",
     "signer-fil", "signer-ton", "signer-sui",
+    "signer-cli",
 ]
 default-members = ["signer"]
 resolver = "3"
@@ -38,6 +39,11 @@ blake2 = { version = "0.10", default-features = false }
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
 bs58 = { version = "0.5.1", default-features = false, features = ["alloc"] }
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+colored = "2"
+serde = { version = "1", features = ["derive"] }
 
 # Random
 rand_core = { version = "0.6", features = ["getrandom"] }
