@@ -4,51 +4,35 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description.workspace = true
+description = "Multi-chain transaction signer — umbrella crate re-exporting chain-specific signers."
 
 [dependencies]
-# Cryptography
-k256 = { workspace = true }
-ed25519-dalek = { workspace = true }
-sha2 = { workspace = true }
-sha3 = { workspace = true }
-blake2 = { workspace = true }
-ripemd = { workspace = true }
-hmac = { workspace = true }
-hkdf = { workspace = true }
-digest = { workspace = true }
-
-# Encoding
-hex = { workspace = true }
-bs58 = { workspace = true }
-bech32 = { workspace = true }
-base64 = { workspace = true }
-
-# Utilities
-zeroize = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-thiserror = { workspace = true }
-rand = { workspace = true }
-
-# std-only (optional)
-aes-gcm = { workspace = true, optional = true }
-scrypt = { workspace = true, optional = true }
-libc = { workspace = true, optional = true }
-signal-hook = { workspace = true, optional = true }
+signer-btc = { workspace = true, optional = true }
+signer-evm = { workspace = true, optional = true }
+signer-svm = { workspace = true, optional = true }
+signer-cosmos = { workspace = true, optional = true }
+signer-tron = { workspace = true, optional = true }
+signer-spark = { workspace = true, optional = true }
+signer-fil = { workspace = true, optional = true }
+signer-ton = { workspace = true, optional = true }
+signer-sui = { workspace = true, optional = true }
 
 [features]
-default = ["std", "evm", "bitcoin", "solana", "cosmos", "tron", "ton", "filecoin", "sui", "spark"]
-std = ["dep:aes-gcm", "dep:scrypt", "dep:libc", "dep:signal-hook", "rand/std", "rand/std_rng", "k256/std", "ed25519-dalek/std", "sha2/std", "sha3/std", "hex/std", "serde_json/std"]
-evm = []
-bitcoin = []
-solana = []
-cosmos = []
-tron = []
-ton = []
-filecoin = []
-sui = []
-spark = []
+default = ["btc", "evm", "svm", "cosmos", "tron", "spark", "fil", "ton", "sui"]
+btc = ["dep:signer-btc"]
+evm = ["dep:signer-evm"]
+svm = ["dep:signer-svm"]
+cosmos = ["dep:signer-cosmos"]
+tron = ["dep:signer-tron"]
+spark = ["dep:signer-spark"]
+fil = ["dep:signer-fil"]
+ton = ["dep:signer-ton"]
+sui = ["dep:signer-sui"]
+kobe = [
+    "signer-btc?/kobe", "signer-evm?/kobe", "signer-svm?/kobe",
+    "signer-cosmos?/kobe", "signer-tron?/kobe", "signer-spark?/kobe",
+    "signer-fil?/kobe", "signer-ton?/kobe", "signer-sui?/kobe",
+]
 
 [lints]
 workspace = true

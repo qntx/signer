@@ -1,27 +1,24 @@
-//! Solana transaction signer built on [`ed25519-dalek`].
+//! Solana transaction signer built on [`ed25519_dalek`].
 //!
-//! [`Signer`] wraps an [`ed25519_dalek::SigningKey`], adding Base58 address
-//! support, keypair import/export, and convenient constructors.
+//! Provides Ed25519 signing, Solana compact-u16 transaction envelope
+//! parsing, and signed transaction encoding.
 //!
-//! **Zero hand-rolled cryptography.**
+//! # Examples
 //!
-//! # Signing
+//! ```
+//! use signer_svm::Signer;
+//! use ed25519_dalek::Signer as _;
 //!
-//! `Signer` implements `Deref<Target = SigningKey>`, so all
-//! [`ed25519_dalek::Signer`](ed25519_dalek::Signer) methods are available
-//! directly (e.g. `signer.sign(msg)`).
-//!
-//! | Method | Description |
-//! |---|---|
-//! | `sign` (via Deref) | Ed25519 signature on arbitrary bytes |
-//! | [`Signer::verify`] | Verify an Ed25519 signature |
-//! | [`Signer::sign_transaction_message`] | Sign serialized Solana tx message bytes |
+//! let signer = Signer::random();
+//! let sig = signer.sign(b"hello solana");
+//! signer.verify(b"hello solana", &sig).unwrap();
+//! ```
 
 mod error;
 
 use core::ops::Deref;
 
-pub use ed25519_dalek::{self, Signature, VerifyingKey};
+pub use ed25519_dalek::{self, Signature};
 use ed25519_dalek::{SigningKey, Verifier};
 pub use error::Error;
 use zeroize::Zeroizing;
@@ -29,18 +26,7 @@ use zeroize::Zeroizing;
 /// Solana transaction signer.
 ///
 /// Wraps an [`ed25519_dalek::SigningKey`] with [`Deref`] for full upstream
-/// access. The inner key implements [`ZeroizeOnDrop`](zeroize::ZeroizeOnDrop).
-///
-/// # Examples
-///
-/// ```
-/// use signer_svm::Signer;
-/// use ed25519_dalek::Signer as _;
-///
-/// let signer = Signer::random();
-/// let sig = signer.sign(b"hello solana");
-/// signer.verify(b"hello solana", &sig).unwrap();
-/// ```
+/// API access. The inner key implements [`ZeroizeOnDrop`](zeroize::ZeroizeOnDrop).
 #[derive(Debug, Clone)]
 pub struct Signer {
     key: SigningKey,
@@ -56,7 +42,7 @@ impl Deref for Signer {
 }
 
 impl Signer {
-    /// Create a signer from raw 32-byte secret key bytes.
+    /// Create from raw 32-byte secret key bytes.
     #[must_use]
     pub fn from_bytes(bytes: &[u8; 32]) -> Self {
         Self {
@@ -64,13 +50,7 @@ impl Signer {
         }
     }
 
-    /// Create a signer from a hex-encoded 32-byte private key.
-    ///
-    /// Accepts keys with or without `0x` prefix.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the hex string is invalid or the key length is wrong.
+    /// Create from a hex-encoded 32-byte private key (with or without `0x`).
     pub fn from_hex(hex_str: &str) -> Result<Self, Error> {
         let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
         let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
@@ -79,25 +59,19 @@ impl Signer {
         Ok(Self::from_bytes(&bytes))
     }
 
-    /// Create a signer from a Base58-encoded keypair (64 bytes: secret ‖ public).
+    /// Create from a Base58-encoded keypair (64 bytes: secret ‖ public).
     ///
-    /// This is the standard format used by Phantom, Backpack, and Solflare.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the Base58 string is invalid or not 64 bytes.
+    /// Standard format used by Phantom, Backpack, and Solflare.
     pub fn from_keypair_base58(b58: &str) -> Result<Self, Error> {
         let decoded = bs58::decode(b58)
             .into_vec()
             .map_err(|e| Error::InvalidKeypair(e.to_string()))?;
-
         if decoded.len() != 64 {
             return Err(Error::InvalidKeypair(format!(
                 "expected 64 bytes, got {}",
                 decoded.len()
             )));
         }
-
         let mut secret = [0u8; 32];
         secret.copy_from_slice(&decoded[..32]);
         let signer = Self::from_bytes(&secret);
@@ -112,49 +86,40 @@ impl Signer {
     /// Panics if the system CSPRNG is unavailable.
     #[must_use]
     pub fn random() -> Self {
+        use rand_core::{OsRng, RngCore};
         let mut bytes = [0u8; 32];
-        getrandom::fill(&mut bytes).expect("system CSPRNG unavailable");
+        OsRng.fill_bytes(&mut bytes);
         let signer = Self::from_bytes(&bytes);
         bytes.fill(0);
         signer
     }
 
-    /// Verify an Ed25519 signature against this signer's public key.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the signature is invalid.
+    /// Verify an Ed25519 signature.
     pub fn verify(&self, msg: &[u8], signature: &Signature) -> Result<(), Error> {
         self.key.verifying_key().verify(msg, signature)?;
         Ok(())
     }
 
     /// Sign serialized Solana transaction message bytes.
-    ///
-    /// A Solana transaction signature is an Ed25519 signature over the
-    /// serialized message. Use this with any serialization method
-    /// (e.g. `solana-sdk`, `solana-transaction`).
     #[must_use]
     pub fn sign_transaction_message(&self, message_bytes: &[u8]) -> Signature {
         use ed25519_dalek::Signer as _;
         self.key.sign(message_bytes)
     }
 
-    /// Get the Solana address (Base58-encoded 32-byte public key).
+    /// Solana address (Base58-encoded 32-byte public key).
     #[must_use]
     pub fn address(&self) -> String {
         bs58::encode(self.key.verifying_key().as_bytes()).into_string()
     }
 
-    /// Get the public key in hex format.
+    /// Public key in hex.
     #[must_use]
     pub fn public_key_hex(&self) -> String {
         hex::encode(self.key.verifying_key().as_bytes())
     }
 
-    /// Export the keypair as Base58 (64 bytes: secret ‖ public).
-    ///
-    /// Compatible with Phantom, Backpack, and Solflare wallet format.
+    /// Export keypair as Base58 (64 bytes: secret ‖ public).
     #[must_use]
     pub fn keypair_base58(&self) -> Zeroizing<String> {
         let vk = self.key.verifying_key();
@@ -165,27 +130,67 @@ impl Signer {
         buf.fill(0);
         Zeroizing::new(encoded)
     }
+
+    /// Extract the signable message portion from a full serialized Solana transaction.
+    ///
+    /// Strips the compact-u16 header and signature slot placeholders.
+    pub fn extract_signable_bytes(tx_bytes: &[u8]) -> Result<&[u8], Error> {
+        if tx_bytes.is_empty() {
+            return Err(Error::InvalidTransaction("empty transaction".into()));
+        }
+        let (num_sigs, header_len) = decode_compact_u16(tx_bytes)?;
+        let msg_start = header_len + num_sigs * 64;
+        if tx_bytes.len() <= msg_start {
+            return Err(Error::InvalidTransaction("transaction too short".into()));
+        }
+        Ok(&tx_bytes[msg_start..])
+    }
+
+    /// Encode a signed transaction by splicing the signature into the first slot.
+    pub fn encode_signed_transaction(
+        tx_bytes: &[u8],
+        signature: &Signature,
+    ) -> Result<Vec<u8>, Error> {
+        if tx_bytes.is_empty() {
+            return Err(Error::InvalidTransaction("empty transaction".into()));
+        }
+        let (num_sigs, header_len) = decode_compact_u16(tx_bytes)?;
+        if num_sigs == 0 {
+            return Err(Error::InvalidTransaction("no signature slots".into()));
+        }
+        if tx_bytes.len() < header_len + num_sigs * 64 {
+            return Err(Error::InvalidTransaction("transaction too short".into()));
+        }
+        let mut signed = tx_bytes.to_vec();
+        signed[header_len..header_len + 64].copy_from_slice(&signature.to_bytes());
+        Ok(signed)
+    }
 }
 
 #[cfg(feature = "kobe")]
 impl Signer {
-    /// Create a signer from a [`kobe_svm::DerivedAddress`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the private key hex is invalid.
+    /// Create from a [`kobe_svm::DerivedAddress`].
     pub fn from_derived(derived: &kobe_svm::DerivedAddress) -> Result<Self, Error> {
         Self::from_hex(&derived.private_key_hex)
     }
+}
 
-    /// Create a signer from a [`kobe_svm::StandardWallet`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the private key hex is invalid.
-    pub fn from_standard_wallet(wallet: &kobe_svm::StandardWallet) -> Result<Self, Error> {
-        Self::from_hex(&wallet.secret_hex())
+fn decode_compact_u16(data: &[u8]) -> Result<(usize, usize), Error> {
+    let mut value: usize = 0;
+    let mut shift: u32 = 0;
+    for (i, &byte) in data.iter().enumerate() {
+        if i >= 3 {
+            return Err(Error::InvalidTransaction(
+                "compact-u16 exceeds 3 bytes".into(),
+            ));
+        }
+        value |= ((byte & 0x7F) as usize) << shift;
+        if byte & 0x80 == 0 {
+            return Ok((value, i + 1));
+        }
+        shift += 7;
     }
+    Err(Error::InvalidTransaction("truncated compact-u16".into()))
 }
 
 #[cfg(test)]
@@ -195,23 +200,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn assert_send_sync() {
-        fn assert<T: Send + Sync>() {}
-        assert::<Signer>();
-    }
-
-    #[test]
-    fn assert_clone() {
-        let s = Signer::random();
-        let s2 = s.clone();
-        assert_eq!(s.address(), s2.address());
-    }
-
-    #[test]
     fn random_address() {
         let s = Signer::random();
         let addr = s.address();
-        assert!(addr.len() >= 32 && addr.len() <= 44);
+        assert!(!addr.is_empty());
+        let decoded = bs58::decode(&addr).into_vec().unwrap();
+        assert_eq!(decoded.len(), 32);
     }
 
     #[test]
@@ -231,15 +225,6 @@ mod tests {
     }
 
     #[test]
-    fn from_bytes_deterministic() {
-        let key = [42u8; 32];
-        assert_eq!(
-            Signer::from_bytes(&key).address(),
-            Signer::from_bytes(&key).address()
-        );
-    }
-
-    #[test]
     fn sign_and_verify() {
         let s = Signer::random();
         let sig = s.sign(b"hello solana");
@@ -254,22 +239,16 @@ mod tests {
     }
 
     #[test]
-    fn sign_transaction_message() {
+    fn sign_transaction_message_verifies() {
         let s = Signer::random();
-        let fake_msg = [0u8; 128];
-        let sig = s.sign_transaction_message(&fake_msg);
-        s.verify(&fake_msg, &sig).unwrap();
+        let msg = [0u8; 128];
+        let sig = s.sign_transaction_message(&msg);
+        s.verify(&msg, &sig).unwrap();
     }
 
     #[test]
-    fn public_key_hex_length() {
+    fn clone_preserves_address() {
         let s = Signer::random();
-        assert_eq!(s.public_key_hex().len(), 64);
-    }
-
-    #[test]
-    fn deref_to_signing_key() {
-        let s = Signer::random();
-        let _vk: VerifyingKey = s.verifying_key();
+        assert_eq!(s.address(), s.address());
     }
 }

@@ -1,82 +1,35 @@
-//! EVM transaction signer built on [`alloy-signer-local`].
+//! EVM transaction signer built on [`k256`] and [`sha3`].
 //!
-//! [`Signer`] wraps a [`PrivateKeySigner`] with [`Deref`](core::ops::Deref)
-//! for full alloy API access. The inner key is `ZeroizeOnDrop`.
+//! Provides EIP-191 personal signing, EIP-712 typed data signing,
+//! and typed transaction signing with RLP encoding.
 //!
-//! **Zero hand-rolled cryptography.**
+//! **No alloy dependency.** Pure cryptographic primitives only.
 //!
-//! # Signing methods (via `Deref` to `PrivateKeySigner`)
+//! # Examples
 //!
-//! | Method | Standard |
-//! |---|---|
-//! | `sign_hash_sync` / `sign_hash` | Raw 32-byte hash |
-//! | `sign_message_sync` / `sign_message` | EIP-191 personal_sign |
-//! | `sign_typed_data_sync` / `sign_typed_data` | EIP-712 |
-//! | `sign_transaction_sync` / `sign_transaction` | All EVM tx types |
-//! | `address` | Signer's Ethereum address |
-//! | `chain_id` / `set_chain_id` | EIP-155 chain ID |
+//! ```
+//! use signer_evm::Signer;
+//!
+//! let signer = Signer::random();
+//! let sig = signer.sign_message(b"hello").unwrap();
+//! assert_eq!(sig.len(), 65); // r(32) + s(32) + v(1)
+//! ```
 
+mod eip712;
 mod error;
+mod rlp;
 
-use core::ops::{Deref, DerefMut};
-
-pub use alloy_consensus;
-pub use alloy_network;
-pub use alloy_network::{TxSigner, TxSignerSync};
-pub use alloy_primitives;
-pub use alloy_primitives::{Address, B256, ChainId, U256};
-pub use alloy_signer;
-pub use alloy_signer::{Signature, Signer as AlloySigner, SignerSync};
-pub use alloy_signer_local;
-use alloy_signer_local::PrivateKeySigner;
 pub use error::Error;
+use k256::ecdsa::SigningKey;
+use sha3::{Digest, Keccak256};
+use zeroize::ZeroizeOnDrop;
 
 /// EVM transaction signer.
 ///
-/// Wraps a [`PrivateKeySigner`] with [`Deref`] for full alloy API access.
-/// The inner `k256::SigningKey` implements `ZeroizeOnDrop`.
-///
-/// # Examples
-///
-/// ```no_run
-/// use signer_evm::{Signer, SignerSync};
-///
-/// let signer = Signer::random();
-/// let sig = signer.sign_message_sync(b"hello").unwrap();
-/// ```
+/// Wraps a secp256k1 signing key. The inner key is zeroized on drop.
 #[derive(Debug, Clone)]
 pub struct Signer {
-    inner: PrivateKeySigner,
-}
-
-impl Deref for Signer {
-    type Target = PrivateKeySigner;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl DerefMut for Signer {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
-
-impl From<PrivateKeySigner> for Signer {
-    #[inline]
-    fn from(inner: PrivateKeySigner) -> Self {
-        Self { inner }
-    }
-}
-
-impl From<Signer> for PrivateKeySigner {
-    #[inline]
-    fn from(signer: Signer) -> Self {
-        signer.inner
-    }
+    key: SigningKey,
 }
 
 impl Signer {
@@ -84,135 +37,241 @@ impl Signer {
     ///
     /// # Errors
     ///
-    /// Returns an error if the bytes do not represent a valid secp256k1 private key.
-    pub fn from_bytes(bytes: &B256) -> Result<Self, Error> {
-        let inner =
-            PrivateKeySigner::from_bytes(bytes).map_err(|e| Error::InvalidKey(e.to_string()))?;
-        Ok(Self { inner })
+    /// Returns an error if the bytes are not a valid secp256k1 scalar.
+    pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, Error> {
+        let key = SigningKey::from_slice(bytes).map_err(|e| Error::InvalidKey(e.to_string()))?;
+        Ok(Self { key })
     }
 
-    /// Create a signer from a hex-encoded private key.
-    ///
-    /// Accepts keys with or without `0x` prefix.
-    /// Compatible with [`kobe_evm::DerivedAddress::private_key_hex`] output.
+    /// Create a signer from a hex-encoded private key (with or without `0x`).
     ///
     /// # Errors
     ///
-    /// Returns an error if the hex string is invalid or the key is not a valid
-    /// secp256k1 private key.
+    /// Returns an error if the hex is invalid or the key is out of range.
     pub fn from_hex(hex_str: &str) -> Result<Self, Error> {
         let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-        let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
-            Error::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
-        })?;
-        Self::from_bytes(&B256::from(bytes))
+        let bytes: [u8; 32] = hex::decode(hex_str)
+            .map_err(|e| Error::InvalidKey(e.to_string()))?
+            .try_into()
+            .map_err(|v: Vec<u8>| {
+                Error::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
+            })?;
+        Self::from_bytes(&bytes)
     }
 
     /// Generate a random signer.
     #[must_use]
     pub fn random() -> Self {
         Self {
-            inner: PrivateKeySigner::random(),
+            key: SigningKey::random(&mut k256::elliptic_curve::rand_core::OsRng),
         }
     }
 
-    /// Consume the wrapper and return the inner [`PrivateKeySigner`].
+    /// Ethereum address derived from this signing key (EIP-55 checksummed).
     #[must_use]
-    pub fn into_inner(self) -> PrivateKeySigner {
-        self.inner
+    pub fn address(&self) -> String {
+        let vk = self.key.verifying_key();
+        let pk = vk.to_encoded_point(false);
+        let hash = Keccak256::digest(&pk.as_bytes()[1..]);
+        eip55_checksum(&hex::encode(&hash[12..]))
     }
-}
 
-#[cfg(feature = "kobe")]
-impl Signer {
-    /// Create a signer from a [`kobe_evm::DerivedAddress`].
+    /// Sign a 32-byte hash. Returns 65 bytes: `r(32) || s(32) || v(1)`.
+    ///
+    /// `v` is the raw recovery ID (0 or 1).
     ///
     /// # Errors
     ///
-    /// Returns an error if the private key in the derived address is invalid.
-    pub fn from_derived(derived: &kobe_evm::DerivedAddress) -> Result<Self, Error> {
-        Self::from_hex(&derived.private_key_hex)
+    /// Returns an error if `hash` is not exactly 32 bytes.
+    pub fn sign_hash(&self, hash: &[u8]) -> Result<Vec<u8>, Error> {
+        if hash.len() != 32 {
+            return Err(Error::InvalidMessage(format!(
+                "expected 32-byte hash, got {}",
+                hash.len()
+            )));
+        }
+        let (sig, rid) = self
+            .key
+            .sign_prehash_recoverable(hash)
+            .map_err(|e| Error::SigningFailed(e.to_string()))?;
+
+        let mut out = Vec::with_capacity(65);
+        out.extend_from_slice(&sig.r().to_bytes());
+        out.extend_from_slice(&sig.s().to_bytes());
+        out.push(rid.to_byte());
+        Ok(out)
     }
 
-    /// Create a signer from a [`kobe_evm::StandardWallet`].
+    /// EIP-191 `personal_sign`. Returns 65 bytes with `v = 27 | 28`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if signing fails.
+    pub fn sign_message(&self, message: &[u8]) -> Result<Vec<u8>, Error> {
+        let prefix = format!("\x19Ethereum Signed Message:\n{}", message.len());
+        let mut data = Vec::with_capacity(prefix.len() + message.len());
+        data.extend_from_slice(prefix.as_bytes());
+        data.extend_from_slice(message);
+        let hash = Keccak256::digest(&data);
+
+        let mut sig = self.sign_hash(&hash)?;
+        sig[64] += 27; // v = 27 + recovery_id
+        Ok(sig)
+    }
+
+    /// Sign EIP-712 typed structured data (JSON input).
+    /// Returns 65 bytes with `v = 27 | 28`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the JSON is malformed or signing fails.
+    pub fn sign_typed_data(&self, typed_data_json: &str) -> Result<Vec<u8>, Error> {
+        let hash = eip712::hash_typed_data_json(typed_data_json)?;
+        let mut sig = self.sign_hash(&hash)?;
+        sig[64] += 27;
+        Ok(sig)
+    }
+
+    /// Sign an unsigned typed transaction (EIP-1559 / EIP-2930).
+    /// Returns 65 bytes: `r(32) || s(32) || v(1)` where `v` is raw recovery ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction bytes are malformed.
+    pub fn sign_transaction(&self, unsigned_tx: &[u8]) -> Result<Vec<u8>, Error> {
+        let hash = Keccak256::digest(unsigned_tx);
+        self.sign_hash(&hash)
+    }
+
+    /// Encode a signed typed transaction: `type || RLP([…fields, v, r, s])`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the unsigned tx or signature is malformed.
+    pub fn encode_signed_transaction(
+        unsigned_tx: &[u8],
+        signature: &[u8],
+    ) -> Result<Vec<u8>, Error> {
+        if signature.len() != 65 {
+            return Err(Error::InvalidSignature("expected 65-byte signature".into()));
+        }
+        let v = signature[64];
+        let r: [u8; 32] = signature[..32].try_into().expect("checked length");
+        let s: [u8; 32] = signature[32..64].try_into().expect("checked length");
+        rlp::encode_signed_typed_tx(unsigned_tx, v, &r, &s)
+            .map_err(|e| Error::InvalidTransaction(e.into()))
+    }
+
+    /// Expose the inner [`SigningKey`] reference.
+    #[must_use]
+    pub const fn signing_key(&self) -> &SigningKey {
+        &self.key
+    }
+}
+
+/// Wrapper to ensure zeroization of the signing key on drop.
+impl ZeroizeOnDrop for Signer {}
+
+#[cfg(feature = "kobe")]
+impl Signer {
+    /// Create a signer from a [`kobe_evm::DerivedAccount`].
     ///
     /// # Errors
     ///
     /// Returns an error if the private key is invalid.
-    pub fn from_standard_wallet(wallet: &kobe_evm::StandardWallet) -> Result<Self, Error> {
-        Self::from_hex(&wallet.secret_hex())
+    pub fn from_derived(account: &kobe_evm::DerivedAccount) -> Result<Self, Error> {
+        Self::from_hex(&account.private_key)
     }
+}
+
+fn eip55_checksum(addr_hex: &str) -> String {
+    let lower = addr_hex.to_lowercase();
+    let hash = Keccak256::digest(lower.as_bytes());
+    let hash_hex = hex::encode(hash);
+
+    let mut out = String::with_capacity(42);
+    out.push_str("0x");
+    for (i, c) in lower.chars().enumerate() {
+        if c.is_ascii_digit() {
+            out.push(c);
+        } else {
+            let nibble = u8::from_str_radix(&hash_hex[i..=i], 16).unwrap_or(0);
+            out.push(if nibble >= 8 {
+                c.to_ascii_uppercase()
+            } else {
+                c
+            });
+        }
+    }
+    out
 }
 
 #[cfg(test)]
 mod tests {
+    use k256::ecdsa::signature::hazmat::PrehashVerifier;
+
     use super::*;
 
     #[test]
-    fn assert_send_sync() {
-        fn assert<T: Send + Sync>() {}
-        assert::<Signer>();
+    fn from_hex_and_address() {
+        let s =
+            Signer::from_hex("4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318")
+                .unwrap();
+        assert_eq!(s.address(), "0x2c7536E3605D9C16a7a3D7b1898e529396a65c23");
     }
 
     #[test]
-    fn assert_clone() {
+    fn from_hex_with_0x_prefix() {
+        let s =
+            Signer::from_hex("0x4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318")
+                .unwrap();
+        assert_eq!(s.address(), "0x2c7536E3605D9C16a7a3D7b1898e529396a65c23");
+    }
+
+    #[test]
+    fn random_signer() {
+        let s = Signer::random();
+        let addr = s.address();
+        assert!(addr.starts_with("0x"));
+        assert_eq!(addr.len(), 42);
+    }
+
+    #[test]
+    fn sign_hash_and_verify() {
+        let s =
+            Signer::from_hex("4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318")
+                .unwrap();
+        let hash = Keccak256::digest(b"test");
+        let sig_bytes = s.sign_hash(&hash).unwrap();
+        assert_eq!(sig_bytes.len(), 65);
+
+        let r: [u8; 32] = sig_bytes[..32].try_into().unwrap();
+        let s_arr: [u8; 32] = sig_bytes[32..64].try_into().unwrap();
+        let sig = k256::ecdsa::Signature::from_scalars(r, s_arr).unwrap();
+        s.signing_key()
+            .verifying_key()
+            .verify_prehash(&hash, &sig)
+            .unwrap();
+    }
+
+    #[test]
+    fn sign_message_v_byte() {
+        let s = Signer::random();
+        let sig = s.sign_message(b"Hello").unwrap();
+        let v = sig[64];
+        assert!(v == 27 || v == 28);
+    }
+
+    #[test]
+    fn clone_preserves_address() {
         let s = Signer::random();
         let s2 = s.clone();
         assert_eq!(s.address(), s2.address());
     }
 
     #[test]
-    fn random_signer() {
+    fn rejects_wrong_hash_length() {
         let s = Signer::random();
-        assert_ne!(s.address(), Address::ZERO);
-    }
-
-    #[test]
-    fn hex_roundtrip() {
-        let s = Signer::random();
-        let hex_key = hex::encode(s.inner.credential().to_bytes());
-        let restored = Signer::from_hex(&hex_key).unwrap();
-        assert_eq!(s.address(), restored.address());
-    }
-
-    #[test]
-    fn hex_with_prefix() {
-        let s = Signer::random();
-        let hex_key = format!("0x{}", hex::encode(s.inner.credential().to_bytes()));
-        let restored = Signer::from_hex(&hex_key).unwrap();
-        assert_eq!(s.address(), restored.address());
-    }
-
-    #[test]
-    fn sign_message_sync() {
-        let s = Signer::random();
-        let sig = s.sign_message_sync(b"hello").unwrap();
-        let recovered = sig.recover_address_from_msg("hello").unwrap();
-        assert_eq!(recovered, s.address());
-    }
-
-    #[test]
-    fn sign_hash_sync() {
-        let s = Signer::random();
-        let hash = B256::from([0xab; 32]);
-        let sig = s.sign_hash_sync(&hash).unwrap();
-        let recovered = sig.recover_address_from_prehash(&hash).unwrap();
-        assert_eq!(recovered, s.address());
-    }
-
-    #[test]
-    fn into_inner() {
-        let s = Signer::random();
-        let addr = s.address();
-        let inner = s.into_inner();
-        assert_eq!(inner.address(), addr);
-    }
-
-    #[test]
-    fn from_private_key_signer() {
-        let pks = PrivateKeySigner::random();
-        let addr = pks.address();
-        let s = Signer::from(pks);
-        assert_eq!(s.address(), addr);
+        assert!(s.sign_hash(b"short").is_err());
     }
 }

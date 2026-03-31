@@ -4,15 +4,16 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Spark (Bitcoin L2) transaction signer using secp256k1 (k256)."
+description = "Spark (Bitcoin L2) transaction signer — secp256k1 ECDSA."
 
 [dependencies]
-k256 = { version = "0.13", features = ["ecdsa"] }
-sha2 = "0.10"
+k256.workspace = true
+sha2.workspace = true
 hex.workspace = true
+zeroize.workspace = true
 thiserror.workspace = true
 
-kobe-spark = { version = "0.5", path = "../../kobe/kobe-spark", default-features = false, features = ["std"], optional = true }
+kobe-spark = { workspace = true, optional = true }
 
 [features]
 default = []

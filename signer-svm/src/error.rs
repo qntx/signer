@@ -1,21 +1,44 @@
-//! Error types for Solana signer operations.
+//! Error types for the Solana signer.
 
-/// Errors that can occur during Solana signing operations.
-#[derive(Debug, thiserror::Error)]
+use std::fmt;
+
+/// Errors from Solana signing operations.
+#[derive(Debug)]
 pub enum Error {
-    /// Invalid hex string.
-    #[error("invalid hex: {0}")]
-    Hex(#[from] hex::FromHexError),
-
-    /// Invalid private key.
-    #[error("invalid private key: {0}")]
+    /// Private key is invalid.
     InvalidKey(String),
-
-    /// Invalid keypair base58.
-    #[error("invalid keypair base58: {0}")]
+    /// Keypair bytes are malformed.
     InvalidKeypair(String),
+    /// Transaction bytes are malformed.
+    InvalidTransaction(String),
+    /// Signature verification failed.
+    VerifyFailed(ed25519_dalek::SignatureError),
+    /// Hex decoding failed.
+    Hex(hex::FromHexError),
+}
 
-    /// Ed25519 signature error.
-    #[error("ed25519: {0}")]
-    Ed25519(#[from] ed25519_dalek::SignatureError),
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidKey(m) => write!(f, "invalid key: {m}"),
+            Self::InvalidKeypair(m) => write!(f, "invalid keypair: {m}"),
+            Self::InvalidTransaction(m) => write!(f, "invalid transaction: {m}"),
+            Self::VerifyFailed(e) => write!(f, "verification failed: {e}"),
+            Self::Hex(e) => write!(f, "hex error: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl From<hex::FromHexError> for Error {
+    fn from(e: hex::FromHexError) -> Self {
+        Self::Hex(e)
+    }
+}
+
+impl From<ed25519_dalek::SignatureError> for Error {
+    fn from(e: ed25519_dalek::SignatureError) -> Self {
+        Self::VerifyFailed(e)
+    }
 }

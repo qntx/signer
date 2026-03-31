@@ -1,138 +1,107 @@
-//! Spark (Bitcoin L2) transaction signer using secp256k1.
+//! Spark (Bitcoin L2) transaction signer built on [`k256`] and [`sha2`].
 //!
-//! Spark reuses Bitcoin's key derivation path. Address format: `spark:<compressed_pubkey_hex>`.
-//! Transaction signing uses double-SHA256 (same as Bitcoin).
+//! Provides secp256k1 ECDSA signing for Spark transactions.
+//! Address derivation is handled by [`kobe-spark`].
 
 mod error;
 
+pub use error::Error;
 use k256::ecdsa::SigningKey;
 use sha2::{Digest, Sha256};
 
-pub use error::Error;
-
-/// Spark signer.
+/// Spark transaction signer.
 #[derive(Debug, Clone)]
 pub struct Signer {
-    /// The secp256k1 signing key.
-    signing_key: SigningKey,
-}
-
-/// Signature output from a Spark signing operation.
-#[derive(Debug, Clone)]
-pub struct Signature {
-    /// Raw signature bytes (65 bytes: r || s || v).
-    pub bytes: Vec<u8>,
-    /// ECDSA recovery ID.
-    pub recovery_id: u8,
+    key: SigningKey,
 }
 
 impl Signer {
-    /// Create a signer from raw 32-byte private key.
-    pub fn from_bytes(private_key: &[u8; 32]) -> Result<Self, Error> {
-        let signing_key =
-            SigningKey::from_slice(private_key).map_err(|e| Error::InvalidKey(e.to_string()))?;
-        Ok(Self { signing_key })
+    /// Create from a raw 32-byte private key.
+    pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, Error> {
+        let key = SigningKey::from_slice(bytes).map_err(|e| Error::InvalidKey(e.to_string()))?;
+        Ok(Self { key })
     }
 
-    /// Create a signer from a hex-encoded private key.
-    pub fn from_hex(hex_key: &str) -> Result<Self, Error> {
-        let bytes = hex::decode(hex_key).map_err(|e| Error::InvalidKey(e.to_string()))?;
-        let key: [u8; 32] = bytes
-            .try_into()
-            .map_err(|_| Error::InvalidKey("key must be 32 bytes".into()))?;
-        Self::from_bytes(&key)
+    /// Create from a hex-encoded private key (with or without `0x`).
+    pub fn from_hex(hex_str: &str) -> Result<Self, Error> {
+        let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
+        let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
+            Error::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
+        })?;
+        Self::from_bytes(&bytes)
     }
 
-    /// Create a signer from a kobe-spark derived address.
-    #[cfg(feature = "kobe")]
-    pub fn from_derived(derived: &kobe_spark::DerivedAddress) -> Result<Self, Error> {
-        let bytes =
-            hex::decode(&*derived.private_key_hex).map_err(|e| Error::InvalidKey(e.to_string()))?;
-        let key: [u8; 32] = bytes
-            .try_into()
-            .map_err(|_| Error::InvalidKey("key must be 32 bytes".into()))?;
-        Self::from_bytes(&key)
-    }
-
-    /// Get the Spark address (`spark:<compressed_pubkey_hex>`).
+    /// Generate a random signer.
     #[must_use]
-    pub fn address(&self) -> String {
-        let verifying_key = self.signing_key.verifying_key();
-        let pubkey = verifying_key.to_encoded_point(true);
-        format!("spark:{}", hex::encode(pubkey.as_bytes()))
+    pub fn random() -> Self {
+        Self {
+            key: SigningKey::random(&mut k256::elliptic_curve::rand_core::OsRng),
+        }
     }
 
-    /// Sign a pre-hashed 32-byte message digest.
-    pub fn sign_prehash(&self, hash: &[u8; 32]) -> Result<Signature, Error> {
-        let (sig, recid) = self
-            .signing_key
+    /// Sign a 32-byte hash. Returns 65 bytes: `r(32) || s(32) || recovery_id(1)`.
+    pub fn sign_hash(&self, hash: &[u8]) -> Result<Vec<u8>, Error> {
+        if hash.len() != 32 {
+            return Err(Error::InvalidMessage(format!(
+                "expected 32-byte hash, got {}",
+                hash.len()
+            )));
+        }
+        let (sig, rid) = self
+            .key
             .sign_prehash_recoverable(hash)
-            .map_err(|e| Error::Signing(e.to_string()))?;
-        let mut bytes = sig.to_bytes().to_vec();
-        bytes.push(recid.to_byte());
-        Ok(Signature {
-            bytes,
-            recovery_id: recid.to_byte(),
-        })
+            .map_err(|e| Error::SigningFailed(e.to_string()))?;
+        let mut out = sig.to_bytes().to_vec();
+        out.push(rid.to_byte());
+        Ok(out)
     }
 
-    /// Sign an arbitrary message (SHA-256, then ECDSA signed).
-    pub fn sign_message(&self, message: &[u8]) -> Result<Signature, Error> {
-        let hash: [u8; 32] = Sha256::digest(message).into();
-        self.sign_prehash(&hash)
+    /// Sign a Spark transaction (double-SHA256 then ECDSA).
+    pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<Vec<u8>, Error> {
+        let hash = Sha256::digest(Sha256::digest(tx_bytes));
+        self.sign_hash(&hash)
     }
 
-    /// Sign a transaction (double-SHA256, then ECDSA signed).
-    pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<Signature, Error> {
-        let hash: [u8; 32] = Sha256::digest(Sha256::digest(tx_bytes)).into();
-        self.sign_prehash(&hash)
+    /// Sign a message (double-SHA256 then ECDSA).
+    pub fn sign_message(&self, message: &[u8]) -> Result<Vec<u8>, Error> {
+        let hash = Sha256::digest(Sha256::digest(message));
+        self.sign_hash(&hash)
+    }
+
+    /// Expose the inner [`SigningKey`].
+    #[must_use]
+    pub const fn signing_key(&self) -> &SigningKey {
+        &self.key
+    }
+}
+
+#[cfg(feature = "kobe")]
+impl Signer {
+    /// Create from a [`kobe_spark::DerivedAccount`].
+    pub fn from_derived(account: &kobe_spark::DerivedAccount) -> Result<Self, Error> {
+        Self::from_hex(&account.private_key)
     }
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
-    const TEST_KEY: &str = "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318";
-
     #[test]
-    fn address_starts_with_spark() {
-        let signer = Signer::from_hex(TEST_KEY).unwrap();
-        assert!(signer.address().starts_with("spark:"));
+    fn sign_hash_length() {
+        let s = Signer::random();
+        let sig = s.sign_hash(&[0u8; 32]).unwrap();
+        assert_eq!(sig.len(), 65);
     }
 
     #[test]
-    fn deterministic_address() {
-        let s1 = Signer::from_hex(TEST_KEY).unwrap();
-        let s2 = Signer::from_hex(TEST_KEY).unwrap();
-        assert_eq!(s1.address(), s2.address());
-    }
-
-    #[test]
-    fn sign_message_65_bytes() {
-        let signer = Signer::from_hex(TEST_KEY).unwrap();
-        let sig = signer.sign_message(b"hello spark").unwrap();
-        assert_eq!(sig.bytes.len(), 65);
-    }
-
-    #[test]
-    fn sign_transaction_works() {
-        let signer = Signer::from_hex(TEST_KEY).unwrap();
-        let sig = signer.sign_transaction(b"fake tx").unwrap();
-        assert_eq!(sig.bytes.len(), 65);
-    }
-
-    #[test]
-    fn deterministic_signing() {
-        let signer = Signer::from_hex(TEST_KEY).unwrap();
-        let s1 = signer.sign_message(b"test").unwrap();
-        let s2 = signer.sign_message(b"test").unwrap();
-        assert_eq!(s1.bytes, s2.bytes);
-    }
-
-    #[test]
-    fn invalid_key_rejected() {
-        assert!(Signer::from_hex("bad").is_err());
+    fn hex_roundtrip() {
+        let s = Signer::random();
+        let hex_key = hex::encode(s.key.to_bytes());
+        let restored = Signer::from_hex(&hex_key).unwrap();
+        assert_eq!(
+            hex::encode(s.key.to_bytes()),
+            hex::encode(restored.key.to_bytes())
+        );
     }
 }

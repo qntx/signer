@@ -1,29 +1,35 @@
-//! Error types for Bitcoin signer operations.
+//! Error types for the Bitcoin signer.
 
-/// Errors that can occur during Bitcoin signing operations.
-#[derive(Debug, thiserror::Error)]
+use std::fmt;
+
+/// Errors from Bitcoin signing operations.
+#[derive(Debug)]
 pub enum Error {
-    /// Invalid hex string.
-    #[error("invalid hex: {0}")]
-    Hex(#[from] hex::FromHexError),
-
-    /// Invalid private key.
-    #[error("invalid private key: {0}")]
+    /// Private key is invalid.
     InvalidKey(String),
+    /// Message format is wrong.
+    InvalidMessage(String),
+    /// Signing primitive failed.
+    SigningFailed(String),
+    /// Hex decoding failed.
+    Hex(hex::FromHexError),
+}
 
-    /// Invalid WIF key.
-    #[error("invalid WIF: {0}")]
-    Wif(#[from] bitcoin::key::FromWifError),
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidKey(m) => write!(f, "invalid key: {m}"),
+            Self::InvalidMessage(m) => write!(f, "invalid message: {m}"),
+            Self::SigningFailed(m) => write!(f, "signing failed: {m}"),
+            Self::Hex(e) => write!(f, "hex error: {e}"),
+        }
+    }
+}
 
-    /// Invalid signature or verification failure.
-    #[error("invalid signature: {0}")]
-    Signature(String),
+impl std::error::Error for Error {}
 
-    /// PSBT signing error.
-    #[error("PSBT signing failed: {0}")]
-    Psbt(String),
-
-    /// secp256k1 error.
-    #[error("secp256k1: {0}")]
-    Secp256k1(#[from] bitcoin::secp256k1::Error),
+impl From<hex::FromHexError> for Error {
+    fn from(e: hex::FromHexError) -> Self {
+        Self::Hex(e)
+    }
 }

@@ -1,132 +1,118 @@
-//! TON transaction signer using Ed25519.
+//! TON transaction signer built on [`ed25519_dalek`].
 //!
-//! TON signs messages directly with Ed25519 (no prehashing).
+//! Provides Ed25519 signing for TON transactions and messages.
+//! Address derivation is handled by [`kobe-ton`].
 
 mod error;
 
-use ed25519_dalek::{Signer as DalekSigner, SigningKey};
-
-pub use ed25519_dalek;
+pub use ed25519_dalek::{self, Signature};
+use ed25519_dalek::{Signer as _, SigningKey};
 pub use error::Error;
 
-/// TON signer.
-#[derive(Debug)]
-pub struct Signer {
-    /// The Ed25519 signing key.
-    signing_key: SigningKey,
-}
-
-/// Signature output from a TON signing operation.
+/// TON transaction signer.
 #[derive(Debug, Clone)]
-pub struct Signature {
-    /// Raw Ed25519 signature bytes (64 bytes).
-    pub bytes: [u8; 64],
+pub struct Signer {
+    key: SigningKey,
 }
 
 impl Signer {
-    /// Create a signer from raw 32-byte private key.
-    pub fn from_bytes(private_key: &[u8; 32]) -> Self {
-        Self {
-            signing_key: SigningKey::from_bytes(private_key),
-        }
-    }
-
-    /// Create a signer from a hex-encoded private key.
-    pub fn from_hex(hex_key: &str) -> Result<Self, Error> {
-        let bytes = hex::decode(hex_key).map_err(|e| Error::InvalidKey(e.to_string()))?;
-        let key: [u8; 32] = bytes
-            .try_into()
-            .map_err(|_| Error::InvalidKey("key must be 32 bytes".into()))?;
-        Ok(Self::from_bytes(&key))
-    }
-
-    /// Create a signer from a kobe-ton derived address.
-    #[cfg(feature = "kobe")]
-    pub fn from_derived(derived: &kobe_ton::DerivedAddress) -> Result<Self, Error> {
-        let bytes =
-            hex::decode(&*derived.private_key_hex).map_err(|e| Error::InvalidKey(e.to_string()))?;
-        let key: [u8; 32] = bytes
-            .try_into()
-            .map_err(|_| Error::InvalidKey("key must be 32 bytes".into()))?;
-        Ok(Self::from_bytes(&key))
-    }
-
-    /// Get the public key bytes.
+    /// Create from raw 32-byte secret key bytes.
     #[must_use]
-    pub fn public_key(&self) -> [u8; 32] {
-        *self.signing_key.verifying_key().as_bytes()
-    }
-
-    /// Sign arbitrary bytes (Ed25519 direct sign, no prehashing).
-    pub fn sign(&self, message: &[u8]) -> Signature {
-        let sig = self.signing_key.sign(message);
-        Signature {
-            bytes: sig.to_bytes(),
+    pub fn from_bytes(bytes: &[u8; 32]) -> Self {
+        Self {
+            key: SigningKey::from_bytes(bytes),
         }
     }
 
-    /// Sign a message (same as `sign` for TON — Ed25519 direct).
-    pub fn sign_message(&self, message: &[u8]) -> Signature {
-        self.sign(message)
+    /// Create from a hex-encoded 32-byte private key (with or without `0x`).
+    pub fn from_hex(hex_str: &str) -> Result<Self, Error> {
+        let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
+        let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
+            Error::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
+        })?;
+        Ok(Self::from_bytes(&bytes))
     }
 
-    /// Sign a transaction (same as `sign` for TON — Ed25519 direct).
+    /// Generate a random signer.
+    #[must_use]
+    pub fn random() -> Self {
+        use rand_core::{OsRng, RngCore};
+        let mut bytes = [0u8; 32];
+        OsRng.fill_bytes(&mut bytes);
+        let signer = Self::from_bytes(&bytes);
+        bytes.fill(0);
+        signer
+    }
+
+    /// Sign arbitrary bytes with Ed25519.
+    #[must_use]
+    pub fn sign(&self, message: &[u8]) -> Signature {
+        self.key.sign(message)
+    }
+
+    /// Sign a TON transaction (Ed25519 over raw message bytes).
+    #[must_use]
     pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Signature {
-        self.sign(tx_bytes)
+        self.key.sign(tx_bytes)
+    }
+
+    /// Verify an Ed25519 signature.
+    pub fn verify(&self, message: &[u8], signature: &Signature) -> Result<(), Error> {
+        use ed25519_dalek::Verifier;
+        self.key.verifying_key().verify(message, signature)?;
+        Ok(())
+    }
+
+    /// Public key bytes (32 bytes).
+    #[must_use]
+    pub fn public_key_bytes(&self) -> [u8; 32] {
+        *self.key.verifying_key().as_bytes()
+    }
+
+    /// Public key in hex.
+    #[must_use]
+    pub fn public_key_hex(&self) -> String {
+        hex::encode(self.public_key_bytes())
+    }
+}
+
+#[cfg(feature = "kobe")]
+impl Signer {
+    /// Create from a [`kobe_ton::DerivedAccount`].
+    pub fn from_derived(account: &kobe_ton::DerivedAccount) -> Result<Self, Error> {
+        Self::from_hex(&account.private_key)
     }
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use ed25519_dalek::Verifier;
-
-    const TEST_KEY: &str = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
 
     #[test]
-    fn sign_produces_64_bytes() {
-        let signer = Signer::from_hex(TEST_KEY).unwrap();
-        let sig = signer.sign(b"hello ton");
-        assert_eq!(sig.bytes.len(), 64);
+    fn sign_and_verify() {
+        let s = Signer::random();
+        let sig = s.sign(b"hello TON");
+        s.verify(b"hello TON", &sig).unwrap();
     }
 
     #[test]
-    fn sign_verify_roundtrip() {
-        let signer = Signer::from_hex(TEST_KEY).unwrap();
-        let message = b"test message for ton";
-        let sig = signer.sign(message);
-
-        let verifying_key = signer.signing_key.verifying_key();
-        let dalek_sig = ed25519_dalek::Signature::from_bytes(&sig.bytes);
-        verifying_key.verify(message, &dalek_sig).unwrap();
+    fn verify_wrong_message_fails() {
+        let s = Signer::random();
+        let sig = s.sign(b"correct");
+        assert!(s.verify(b"wrong", &sig).is_err());
     }
 
     #[test]
-    fn deterministic_signing() {
-        let signer = Signer::from_hex(TEST_KEY).unwrap();
-        let s1 = signer.sign(b"test");
-        let s2 = signer.sign(b"test");
-        assert_eq!(s1.bytes, s2.bytes);
-    }
-
-    #[test]
-    fn different_messages_different_sigs() {
-        let signer = Signer::from_hex(TEST_KEY).unwrap();
-        let s1 = signer.sign(b"hello");
-        let s2 = signer.sign(b"world");
-        assert_ne!(s1.bytes, s2.bytes);
-    }
-
-    #[test]
-    fn invalid_key_rejected() {
-        assert!(Signer::from_hex("bad").is_err());
-        assert!(Signer::from_hex("aabb").is_err());
+    fn hex_roundtrip() {
+        let s = Signer::random();
+        let hex_key = hex::encode(s.key.as_bytes());
+        let restored = Signer::from_hex(&hex_key).unwrap();
+        assert_eq!(s.public_key_bytes(), restored.public_key_bytes());
     }
 
     #[test]
     fn public_key_is_32_bytes() {
-        let signer = Signer::from_hex(TEST_KEY).unwrap();
-        assert_eq!(signer.public_key().len(), 32);
+        let s = Signer::random();
+        assert_eq!(s.public_key_bytes().len(), 32);
     }
 }

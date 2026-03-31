@@ -4,15 +4,14 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "EVM transaction signer wrapping alloy-signer-local."
+description = "EVM transaction signer — EIP-191, EIP-712, typed transaction signing."
 
 [dependencies]
-alloy-signer.workspace = true
-alloy-signer-local.workspace = true
-alloy-network.workspace = true
-alloy-primitives.workspace = true
-alloy-consensus.workspace = true
+k256.workspace = true
+sha3.workspace = true
 hex.workspace = true
+serde_json.workspace = true
+zeroize.workspace = true
 thiserror.workspace = true
 
 kobe-evm = { workspace = true, optional = true }

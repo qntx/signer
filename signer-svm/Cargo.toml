@@ -4,15 +4,15 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Solana transaction signer wrapping ed25519-dalek."
+description = "Solana transaction signer — Ed25519 signing, compact-u16 tx encoding."
 
 [dependencies]
 ed25519-dalek.workspace = true
+rand_core.workspace = true
 bs58.workspace = true
-getrandom.workspace = true
 hex.workspace = true
-thiserror.workspace = true
 zeroize.workspace = true
+thiserror.workspace = true
 
 kobe-svm = { workspace = true, optional = true }
 

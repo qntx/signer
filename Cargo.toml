@@ -1,5 +1,10 @@
 [workspace]
-members = ["signer"]
+members = [
+    "signer",
+    "signer-btc", "signer-evm", "signer-svm",
+    "signer-cosmos", "signer-tron", "signer-spark",
+    "signer-fil", "signer-ton", "signer-sui",
+]
 default-members = ["signer"]
 resolver = "3"
 
@@ -8,44 +13,48 @@ version = "0.4.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/qntx/signer"
-description = "Lightweight multi-chain cryptographic signer."
+description = "Lightweight multi-chain transaction signer."
 
 [workspace.dependencies]
-signer = { version = "0.4", path = "signer" }
+signer-btc = { version = "0.4", path = "signer-btc" }
+signer-evm = { version = "0.4", path = "signer-evm" }
+signer-svm = { version = "0.4", path = "signer-svm" }
+signer-cosmos = { version = "0.4", path = "signer-cosmos" }
+signer-tron = { version = "0.4", path = "signer-tron" }
+signer-spark = { version = "0.4", path = "signer-spark" }
+signer-fil = { version = "0.4", path = "signer-fil" }
+signer-ton = { version = "0.4", path = "signer-ton" }
+signer-sui = { version = "0.4", path = "signer-sui" }
 
-# Cryptography
+# Cryptography (versions aligned with kobe)
 k256 = { version = "0.13.4", default-features = false, features = ["ecdsa", "arithmetic"] }
-ed25519-dalek = { version = "2.2.0", default-features = false, features = ["hazmat"] }
-sha2 = { version = ">=0.10, <0.11", default-features = false }
-sha3 = { version = ">=0.10, <0.11", default-features = false }
-blake2 = { version = ">=0.10, <0.11", default-features = false }
-ripemd = { version = ">=0.1, <0.2", default-features = false }
-hmac = { version = ">=0.12, <0.13", default-features = false }
-hkdf = { version = ">=0.12, <0.13", default-features = false }
-digest = { version = ">=0.10, <0.11", default-features = false }
-aes-gcm = { version = ">=0.10, <0.11", default-features = false, features = ["aes"] }
-scrypt = { version = ">=0.11, <0.12", default-features = false }
+ed25519-dalek = { version = "2.2.0", default-features = false, features = ["rand_core"] }
+sha2 = { version = "0.10", default-features = false }
+sha3 = { version = "0.10", default-features = false }
+blake2 = { version = "0.10", default-features = false }
 
 # Encoding
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
-bs58 = { version = "0.5.1", default-features = false, features = ["alloc", "check"] }
-bech32 = { version = "0.11.1", default-features = false, features = ["alloc"] }
-base64 = { version = "0.22.1", default-features = false, features = ["alloc"] }
+bs58 = { version = "0.5.1", default-features = false, features = ["alloc"] }
+serde_json = { version = "1", default-features = false, features = ["alloc"] }
+
+# Random
+rand_core = { version = "0.6", features = ["getrandom"] }
 
 # Utilities
-zeroize = { version = "1.8.2", default-features = false, features = ["derive"] }
-serde = { version = "1.0.228", default-features = false, features = ["derive", "alloc"] }
-serde_json = { version = "1.0.149", default-features = false, features = ["alloc"] }
+zeroize = { version = "1.8.2", default-features = false, features = ["derive", "alloc"] }
 thiserror = { version = "2.0.18", default-features = false }
-rand = { version = ">=0.8, <0.9", default-features = false }
 
-# CLI
-clap = { version = "4.6.0", features = ["derive"] }
-colored = "3.1.1"
-
-# System (std-only)
-libc = "0.2.183"
-signal-hook = "0.4.3"
+# Kobe (optional bridge)
+kobe-btc = { version = "0.7", default-features = false, features = ["std"] }
+kobe-evm = { version = "0.7", default-features = false, features = ["std"] }
+kobe-svm = { version = "0.7", default-features = false, features = ["std"] }
+kobe-cosmos = { version = "0.7", default-features = false, features = ["std"] }
+kobe-tron = { version = "0.7", default-features = false, features = ["std"] }
+kobe-spark = { version = "0.7", default-features = false, features = ["std"] }
+kobe-fil = { version = "0.7", default-features = false, features = ["std"] }
+kobe-ton = { version = "0.7", default-features = false, features = ["std"] }
+kobe-sui = { version = "0.7", default-features = false, features = ["std"] }
 
 [profile.release]
 codegen-units = 1

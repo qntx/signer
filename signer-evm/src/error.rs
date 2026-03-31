@@ -1,17 +1,41 @@
-//! Error types for EVM signer operations.
+//! Error types for the EVM signer.
 
-/// Errors that can occur during EVM signing operations.
-#[derive(Debug, thiserror::Error)]
+use std::fmt;
+
+/// Errors from EVM signing operations.
+#[derive(Debug)]
 pub enum Error {
-    /// Invalid hex string.
-    #[error("invalid hex: {0}")]
-    Hex(#[from] hex::FromHexError),
-
-    /// Invalid private key.
-    #[error("invalid private key: {0}")]
+    /// Private key is invalid.
     InvalidKey(String),
+    /// Message format is wrong.
+    InvalidMessage(String),
+    /// Signing primitive failed.
+    SigningFailed(String),
+    /// Signature bytes are malformed.
+    InvalidSignature(String),
+    /// Transaction bytes are malformed.
+    InvalidTransaction(String),
+    /// Hex decoding failed.
+    Hex(hex::FromHexError),
+}
 
-    /// Signing error from alloy.
-    #[error("signing: {0}")]
-    Signing(#[from] alloy_signer::Error),
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidKey(m) => write!(f, "invalid key: {m}"),
+            Self::InvalidMessage(m) => write!(f, "invalid message: {m}"),
+            Self::SigningFailed(m) => write!(f, "signing failed: {m}"),
+            Self::InvalidSignature(m) => write!(f, "invalid signature: {m}"),
+            Self::InvalidTransaction(m) => write!(f, "invalid transaction: {m}"),
+            Self::Hex(e) => write!(f, "hex error: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl From<hex::FromHexError> for Error {
+    fn from(e: hex::FromHexError) -> Self {
+        Self::Hex(e)
+    }
 }
