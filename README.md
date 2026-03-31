@@ -2,10 +2,16 @@
 
 # Signer
 
+[![Crates.io][crates-badge]][crates-url]
+[![Docs.rs][docs-badge]][docs-url]
 [![CI][ci-badge]][ci-url]
 [![License][license-badge]][license-url]
 [![Rust][rust-badge]][rust-url]
 
+[crates-badge]: https://img.shields.io/crates/v/signer.svg
+[crates-url]: https://crates.io/crates/signer
+[docs-badge]: https://img.shields.io/docsrs/signer.svg
+[docs-url]: https://docs.rs/signer
 [ci-badge]: https://github.com/qntx/signer/actions/workflows/rust.yml/badge.svg
 [ci-url]: https://github.com/qntx/signer/actions/workflows/rust.yml
 [license-badge]: https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg
@@ -13,38 +19,13 @@
 [rust-badge]: https://img.shields.io/badge/rust-edition%202024-orange.svg
 [rust-url]: https://doc.rust-lang.org/edition-guide/
 
-**Multi-chain transaction signer built on mature cryptography libraries — zero hand-rolled crypto, and a batteries-included CLI.**
+**Lightweight multi-chain transaction signer — 9 chains, zero hand-rolled crypto, and a batteries-included CLI.**
 
-signer provides thin wrappers around battle-tested signing libraries ([alloy](https://docs.rs/alloy-signer-local) for EVM, [bitcoin](https://docs.rs/bitcoin) for BTC, [ed25519-dalek](https://docs.rs/ed25519-dalek) for Solana), exposing a unified API while delegating all cryptographic operations to upstream crates. All signers `Deref` to their underlying types for full API access, and private keys are zeroed on drop. Optional [kobe](https://github.com/qntx/kobe) integration enables seamless HD wallet bridging.
+Signer provides thin, secure wrappers around battle-tested cryptographic libraries ([k256](https://docs.rs/k256) for secp256k1, [ed25519-dalek](https://docs.rs/ed25519-dalek) for Ed25519), exposing a unified `Sign` trait across Bitcoin, Ethereum, Solana, Cosmos, Tron, Sui, TON, Filecoin, and Spark. Private keys are zeroed on drop, `Debug` output is redacted, and `Clone` is intentionally omitted. Optional [kobe](https://github.com/qntx/kobe) integration enables seamless HD wallet bridging.
 
-## Crates
-
-| Crate                             |                                                                                                           | Description                                                           |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| **[`signer`](signer/)**           | [![crates.io][signer-crate]][signer-crate-url] [![docs.rs][signer-doc]][signer-doc-url]                   | Umbrella crate — re-exports all chain signers                         |
-| **[`signer-btc`](signer-btc/)**   | [![crates.io][signer-btc-crate]][signer-btc-crate-url] [![docs.rs][signer-btc-doc]][signer-btc-doc-url]   | Bitcoin — ECDSA, Schnorr, PSBT, BIP-137 message signing               |
-| **[`signer-evm`](signer-evm/)**   | [![crates.io][signer-evm-crate]][signer-evm-crate-url] [![docs.rs][signer-evm-doc]][signer-evm-doc-url]   | Ethereum / EVM — EIP-191, EIP-712, transaction signing                |
-| **[`signer-svm`](signer-svm/)**   | [![crates.io][signer-svm-crate]][signer-svm-crate-url] [![docs.rs][signer-svm-doc]][signer-svm-doc-url]   | Solana / SVM — Ed25519 signing                                        |
-| **[`signer-cli`](signer-cli/)**   | [![crates.io][signer-cli-crate]][signer-cli-crate-url]                                                    | CLI tool — sign, verify, and inspect keys across all supported chains |
-
-[signer-crate]: https://img.shields.io/crates/v/signer.svg
-[signer-crate-url]: https://crates.io/crates/signer
-[signer-btc-crate]: https://img.shields.io/crates/v/signer-btc.svg
-[signer-btc-crate-url]: https://crates.io/crates/signer-btc
-[signer-evm-crate]: https://img.shields.io/crates/v/signer-evm.svg
-[signer-evm-crate-url]: https://crates.io/crates/signer-evm
-[signer-svm-crate]: https://img.shields.io/crates/v/signer-svm.svg
-[signer-svm-crate-url]: https://crates.io/crates/signer-svm
-[signer-cli-crate]: https://img.shields.io/crates/v/signer-cli.svg
-[signer-cli-crate-url]: https://crates.io/crates/signer-cli
-[signer-doc]: https://img.shields.io/docsrs/signer.svg
-[signer-doc-url]: https://docs.rs/signer
-[signer-btc-doc]: https://img.shields.io/docsrs/signer-btc.svg
-[signer-btc-doc-url]: https://docs.rs/signer-btc
-[signer-evm-doc]: https://img.shields.io/docsrs/signer-evm.svg
-[signer-evm-doc-url]: https://docs.rs/signer-evm
-[signer-svm-doc]: https://img.shields.io/docsrs/signer-svm.svg
-[signer-svm-doc-url]: https://docs.rs/signer-svm
+<p align="center">
+  <img src="demo.gif" alt="Signer CLI Demo"/>
+</p>
 
 ## Quick Start
 
@@ -68,33 +49,39 @@ Or via Cargo:
 cargo install signer-cli
 ```
 
-### Sign an Ethereum Message (Library)
+### CLI Usage
+
+```bash
+# Ethereum — EIP-191 personal_sign
+signer evm sign-message -k "0x4c0883a6..." -m "Hello, Ethereum!"
+
+# Bitcoin — message signing
+signer btc sign-message -k "4c0883a6..." -m "Hello, Bitcoin!"
+
+# Solana — Ed25519
+signer svm sign -k "9d61b19d..." -m "Hello, Solana!"
+
+# Sui — BLAKE2b intent signing
+signer sui sign-tx -k "9d61b19d..." -t "0000..."
+
+# Show address / public key
+signer evm address -k "0x4c0883a6..."
+
+# JSON output (for scripts / agents)
+signer --json evm sign-message -k "0x4c0883a6..." -m "test"
+```
+
+### Library Usage
 
 ```rust
-use signer_evm::{Signer, SignerSync};
+use signer_evm::Signer;
 
-let signer = Signer::random();
-let signature = signer.sign_message_sync(b"hello")?;
+let signer = Signer::from_hex("4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318")?;
+let out = signer.sign_message(b"hello")?;
 
 println!("Address:   {}", signer.address());
-println!("Signature: {signature}");
+println!("Signature: {}", hex::encode(&out.signature));
 ```
-
-### Sign a Bitcoin Message (Library)
-
-```rust
-use signer_btc::{Signer, Network};
-
-let signer = Signer::random(Network::Bitcoin);
-let signature = signer.sign_message("Hello, Bitcoin!")?;
-let address = signer.p2wpkh_address(Network::Bitcoin);
-let valid = Signer::verify_message("Hello, Bitcoin!", &signature, &address, Network::Bitcoin)?;
-
-println!("Address: {address}");
-println!("Valid:   {valid}");
-```
-
-### Sign with Solana (Library)
 
 ```rust
 use signer_svm::Signer;
@@ -107,16 +94,6 @@ signer.verify(b"hello solana", &sig)?;
 println!("Address: {}", signer.address());
 ```
 
-### Via Umbrella Crate
-
-```rust
-use signer::{evm, btc, svm};
-
-let eth_signer = evm::Signer::random();
-let btc_signer = btc::Signer::random(btc::Network::Bitcoin);
-let sol_signer = svm::Signer::random();
-```
-
 ### Kobe HD Wallet Integration
 
 Enable the `kobe` feature to construct signers from [kobe](https://github.com/qntx/kobe) derived keys:
@@ -127,166 +104,52 @@ use kobe_evm::Deriver;
 use signer_evm::Signer;
 
 let wallet = Wallet::from_mnemonic("abandon abandon ... about", None)?;
-let deriver = Deriver::new(&wallet);
-let derived = deriver.derive(0)?;
-
+let derived = Deriver::new(&wallet).derive(0)?;
 let signer = Signer::from_derived(&derived)?;
 println!("Address: {}", signer.address());
 ```
 
-## CLI Usage
-
-The CLI uses `--json` for machine-readable output — ideal for agent and script consumption.
-
-```text
-signer [--json] <chain> <subcommand> [options]
-```
-
-### Chain subcommands and aliases
-
-| Chain    | Primary | Aliases           |
-| -------- | ------- | ----------------- |
-| Bitcoin  | `btc`   | `bitcoin`         |
-| Ethereum | `evm`   | `eth`, `ethereum` |
-| Solana   | `svm`   | `sol`, `solana`   |
-
-### Bitcoin
-
-```bash
-# BIP-137 message signing (default: Native SegWit)
-signer btc sign-message --key "L1a..." --message "Hello, Bitcoin!"
-
-# Sign with specific address type
-signer btc sign-message --key "L1a..." --message "test" --address-type legacy
-
-# Verify a signed message
-signer btc verify-message --signature "H..." --message "Hello" --address "bc1q..."
-
-# Raw ECDSA / Schnorr hash signing
-signer btc sign-ecdsa   --key "L1a..." --hash "abcdef..."
-signer btc sign-schnorr --key "L1a..." --hash "abcdef..."
-
-# Sign a PSBT (base64 in → base64 out)
-signer btc sign-psbt --key "L1a..." --psbt "cHNidP8B..."
-
-# Show all address types for a key
-signer btc address --key "L1a..."
-```
-
-### Ethereum
-
-```bash
-# EIP-191 personal_sign
-signer evm sign-message --key "0xabc..." --message "Hello, Ethereum!"
-
-# Raw hash signing
-signer evm sign-hash --key "0xabc..." --hash "0xdef..."
-
-# Sign a raw unsigned transaction (hex-encoded EIP-2718 bytes)
-signer evm sign-transaction --key "0xabc..." --tx "0x02f8..."
-
-# Verify a signed message
-signer evm verify-message --signature "0x..." --message "Hello" --address "0x..."
-
-# Show address and public key
-signer evm address --key "0xabc..."
-```
-
-### Solana
-
-```bash
-# Ed25519 signing
-signer svm sign --key "deadbeef..." --message "Hello, Solana!"
-
-# Sign hex-encoded bytes (e.g., serialized transaction)
-signer svm sign --key "deadbeef..." --message "0a0b0c..." --hex
-
-# Verify a signature
-signer svm verify --signature "abcdef..." --message "Hello" --pubkey "Base58Address..."
-
-# Show address and public key
-signer svm address --key "deadbeef..."
-```
-
-### JSON output
-
-Pass `--json` **before** the chain subcommand. All output (including errors) becomes a single JSON object on stdout with no ANSI colors.
-
-```bash
-signer --json btc sign-message --key "L1a..." --message "test"
-```
-
-```json
-{
-  "chain": "bitcoin",
-  "operation": "BIP-137 message",
-  "address": "bc1q...",
-  "signature": "H...",
-  "message": "test"
-}
-```
-
-Errors in JSON mode return exit code 1 with `{"error": "..."}`.
-
 ## Design
 
-- **Zero hand-rolled crypto** — All signing delegated to audited upstream libraries
-- **Thin wrappers** — `Deref` to underlying types (`PrivateKey`, `PrivateKeySigner`, `SigningKey`) for full API access
-- **Memory safety** — Private keys zeroed on drop (`ZeroizeOnDrop` / `non_secure_erase`)
-- **Multi-chain** — EVM, Bitcoin, Solana from one workspace
-- **Kobe integration** — Optional HD wallet bridging via feature flag
+- **9 chains** — Ethereum, Bitcoin, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark
+- **Zero hand-rolled crypto** — secp256k1 via [k256](https://docs.rs/k256), Ed25519 via [ed25519-dalek](https://docs.rs/ed25519-dalek)
+- **Unified trait** — `Sign` trait with `sign_hash`, `sign_message`, `sign_transaction` across all chains
+- **Security hardened** — `ZeroizeOnDrop`, `Debug` redacted (`[REDACTED]`), `Clone` removed, `Send + Sync`
+- **Kobe integration** — Optional HD wallet bridging via `kobe` feature flag
 - **CSPRNG** — Random generation via OS-provided entropy ([`getrandom`](https://docs.rs/getrandom))
-- **Linting** — `pedantic` + `nursery` + `correctness` (deny) — strict Clippy across workspace
+- **KAT-verified** — Deterministic test vectors (RFC 8032, known secp256k1 keys) for all chains
+- **Strict linting** — Clippy `pedantic` + `nursery` + `correctness` (deny), zero warnings
 - **Edition** — Rust **2024**
 
-## Signing Methods
+## Crates
 
-### EVM (`signer-evm`)
+See **[`crates/README.md`](crates/README.md)** for the full crate table, dependency graph, and feature flag reference.
 
-| Method                                       | Standard                  |
-| -------------------------------------------- | ------------------------- |
-| `sign_hash_sync` / `sign_hash`               | Raw 32-byte hash          |
-| `sign_message_sync` / `sign_message`         | EIP-191 personal_sign     |
-| `sign_typed_data_sync` / `sign_typed_data`   | EIP-712 (via alloy)       |
-| `sign_transaction_sync` / `sign_transaction` | All EVM transaction types |
-
-### Bitcoin (`signer-btc`)
-
-| Method                                    | Standard                                             |
-| ----------------------------------------- | ---------------------------------------------------- |
-| `sign_ecdsa`                              | secp256k1 ECDSA                                      |
-| `sign_schnorr`                            | BIP-340 Schnorr (Taproot)                            |
-| `sign_message` / `sign_message_with_type` | BIP-137 (P2PKH, P2SH-P2WPKH, P2WPKH)                 |
-| `verify_message`                          | BIP-137 verification                                 |
-| `sign_psbt`                               | PSBT (with Bip32Derivation support)                  |
-| `p2wpkh_address` / `p2tr_address` / ...   | All address types (P2WPKH, P2TR, P2SH-P2WPKH, P2PKH) |
-
-### Solana (`signer-svm`)
-
-| Method                     | Standard                             |
-| -------------------------- | ------------------------------------ |
-| `sign` (via Deref)         | Ed25519 signature                    |
-| `verify`                   | Ed25519 verification                 |
-| `sign_transaction_message` | Solana transaction signing           |
-| `keypair_base58`           | Phantom / Backpack / Solflare format |
-
-## Feature Flags
-
-| Crate       | Feature | Description                                    |
-| ----------- | ------- | ---------------------------------------------- |
-| `signer`    | `btc`   | Enable Bitcoin signer (default)                |
-| `signer`    | `evm`   | Enable EVM signer (default)                    |
-| `signer`    | `svm`   | Enable Solana signer (default)                 |
-| `signer`    | `kobe`  | Enable kobe HD wallet bridging for all chains  |
-| `signer-*`  | `kobe`  | Enable kobe bridging for a specific chain      |
+| Crate | Description |
+| --- | --- |
+| **[`signer`](crates/signer/)** | Umbrella crate — re-exports all chain signers |
+| **[`signer-core`](crates/signer-core/)** | `Sign` trait, `SignOutput`, error types |
+| **[`signer-evm`](crates/signer-evm/)** | Ethereum — EIP-191, EIP-712, Keccak-256 |
+| **[`signer-btc`](crates/signer-btc/)** | Bitcoin — message signing, double-SHA256 |
+| **[`signer-svm`](crates/signer-svm/)** | Solana — Ed25519, compact-u16, tx encoding |
+| **[`signer-cosmos`](crates/signer-cosmos/)** | Cosmos — secp256k1 + SHA-256 |
+| **[`signer-tron`](crates/signer-tron/)** | Tron — TRON message prefix + Keccak-256 |
+| **[`signer-sui`](crates/signer-sui/)** | Sui — BLAKE2b-256 intent-based signing |
+| **[`signer-ton`](crates/signer-ton/)** | TON — Ed25519 |
+| **[`signer-fil`](crates/signer-fil/)** | Filecoin — secp256k1 + Blake2b-256 |
+| **[`signer-spark`](crates/signer-spark/)** | Spark — secp256k1 + double-SHA256 |
+| **[`signer-cli`](crates/signer-cli/)** | CLI — sign and inspect keys across all 9 chains |
 
 ## Security
 
 This library has **not** been independently audited. Use at your own risk.
 
-- All cryptographic operations are delegated to upstream libraries
-- Private keys are zeroed from memory on drop (EVM/SVM via `ZeroizeOnDrop`, BTC via `non_secure_erase`)
-- Review the security advisories of upstream dependencies
+- Private keys wrapped in [`ZeroizeOnDrop`](https://docs.rs/zeroize) — zeroed from memory on drop
+- `Debug` impl outputs `[REDACTED]` — no key material leaked to logs
+- `Clone` intentionally removed — prevents uncontrolled key copies
+- Random generation uses OS-provided CSPRNG via [`getrandom`](https://docs.rs/getrandom)
+- `Sign` trait requires `Send + Sync` — safe for concurrent use
+- No key material is logged or persisted
 
 ## License
 

@@ -12,6 +12,34 @@ description: >-
 
 `signer` is a single binary CLI for cryptographic signing operations across **9 chains**: Ethereum, Bitcoin, Solana, Cosmos, Tron, Sui, TON, Filecoin, and Spark. It uses lightweight, battle-tested cryptographic libraries (k256, ed25519-dalek, sha2, sha3, blake2).
 
+## Installation
+
+### One-line install (recommended)
+
+**macOS / Linux:**
+
+```sh
+curl -fsSL https://sh.qntx.fun/signer | sh
+```
+
+**Windows (PowerShell):**
+
+```powershell
+irm https://sh.qntx.fun/signer/ps | iex
+```
+
+### Via Cargo
+
+```bash
+cargo install signer-cli
+```
+
+### Verify installation
+
+```sh
+signer --version
+```
+
 ## CLI Structure
 
 ```text

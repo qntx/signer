@@ -1,0 +1,115 @@
+# Crates
+
+| Crate | | Description |
+| --- | --- | --- |
+| **[`signer`](signer/)** | [![crates.io][signer-crate]][signer-crate-url] [![docs.rs][signer-doc]][signer-doc-url] | Umbrella crate — re-exports all chain signers via feature flags |
+| **[`signer-core`](signer-core/)** | [![crates.io][signer-core-crate]][signer-core-crate-url] [![docs.rs][signer-core-doc]][signer-core-doc-url] | Core library — `Sign` trait, `SignOutput`, error types |
+| **[`signer-evm`](signer-evm/)** | [![crates.io][signer-evm-crate]][signer-evm-crate-url] [![docs.rs][signer-evm-doc]][signer-evm-doc-url] | Ethereum — EIP-191, EIP-712, RLP transaction encoding |
+| **[`signer-btc`](signer-btc/)** | [![crates.io][signer-btc-crate]][signer-btc-crate-url] [![docs.rs][signer-btc-doc]][signer-btc-doc-url] | Bitcoin — message signing, CompactSize varint, double-SHA256 |
+| **[`signer-svm`](signer-svm/)** | [![crates.io][signer-svm-crate]][signer-svm-crate-url] [![docs.rs][signer-svm-doc]][signer-svm-doc-url] | Solana — Ed25519, compact-u16, transaction encoding |
+| **[`signer-cosmos`](signer-cosmos/)** | [![crates.io][signer-cosmos-crate]][signer-cosmos-crate-url] [![docs.rs][signer-cosmos-doc]][signer-cosmos-doc-url] | Cosmos — secp256k1 + SHA-256 |
+| **[`signer-tron`](signer-tron/)** | [![crates.io][signer-tron-crate]][signer-tron-crate-url] [![docs.rs][signer-tron-doc]][signer-tron-doc-url] | Tron — TRON message prefix + Keccak-256 |
+| **[`signer-sui`](signer-sui/)** | [![crates.io][signer-sui-crate]][signer-sui-crate-url] [![docs.rs][signer-sui-doc]][signer-sui-doc-url] | Sui — BLAKE2b-256 intent-based signing, BCS |
+| **[`signer-ton`](signer-ton/)** | [![crates.io][signer-ton-crate]][signer-ton-crate-url] [![docs.rs][signer-ton-doc]][signer-ton-doc-url] | TON — Ed25519 signing |
+| **[`signer-fil`](signer-fil/)** | [![crates.io][signer-fil-crate]][signer-fil-crate-url] [![docs.rs][signer-fil-doc]][signer-fil-doc-url] | Filecoin — secp256k1 + Blake2b-256 |
+| **[`signer-spark`](signer-spark/)** | [![crates.io][signer-spark-crate]][signer-spark-crate-url] [![docs.rs][signer-spark-doc]][signer-spark-doc-url] | Spark — secp256k1 + double-SHA256 (Bitcoin L2) |
+| **[`signer-cli`](signer-cli/)** | [![crates.io][signer-cli-crate]][signer-cli-crate-url] | CLI — sign, inspect keys across all 9 chains |
+
+## Dependency Graph
+
+```text
+signer-cli
+  └── signer-{evm,btc,svm,cosmos,tron,sui,ton,fil,spark}
+        └── signer-core (Sign trait, SignOutput)
+
+signer (umbrella)
+  ├── signer-core
+  ├── signer-evm    ── k256 + sha3 (Keccak-256)
+  ├── signer-btc    ── k256 + sha2 (double-SHA256)
+  ├── signer-svm    ── ed25519-dalek (Ed25519)
+  ├── signer-cosmos ── k256 + sha2
+  ├── signer-tron   ── k256 + sha3 + sha2
+  ├── signer-sui    ── ed25519-dalek + sha2 + sha3 (BLAKE2b intent)
+  ├── signer-ton    ── ed25519-dalek
+  ├── signer-fil    ── k256 + blake2
+  └── signer-spark  ── k256 + sha2
+```
+
+## Feature Flags
+
+The umbrella `signer` crate provides fine-grained feature control:
+
+| Feature | Default | Description |
+| --- | --- | --- |
+| `btc` | ✅ | Bitcoin signer |
+| `evm` | ✅ | Ethereum signer |
+| `svm` | ✅ | Solana signer |
+| `cosmos` | ✅ | Cosmos signer |
+| `tron` | ✅ | Tron signer |
+| `spark` | ✅ | Spark signer |
+| `fil` | ✅ | Filecoin signer |
+| `ton` | ✅ | TON signer |
+| `sui` | ✅ | Sui signer |
+| `kobe` | | Enable [kobe](https://github.com/qntx/kobe) HD wallet bridging for all chains |
+
+Each chain crate also exposes a `kobe` feature for individual HD wallet bridging.
+
+## Cryptography Libraries
+
+| Curve | Library | Chains |
+| --- | --- | --- |
+| secp256k1 | [k256](https://docs.rs/k256) 0.13 | EVM, BTC, Cosmos, Tron, Spark, Filecoin |
+| Ed25519 | [ed25519-dalek](https://docs.rs/ed25519-dalek) 2.2 | Solana, Sui, TON |
+
+| Hash | Library | Chains |
+| --- | --- | --- |
+| SHA-256 | [sha2](https://docs.rs/sha2) 0.10 | BTC, Cosmos, Tron, Spark, Sui |
+| Keccak-256 | [sha3](https://docs.rs/sha3) 0.10 | EVM, Tron, Sui |
+| BLAKE2b-256 | [blake2](https://docs.rs/blake2) 0.10 | Filecoin, Sui |
+
+[signer-crate]: https://img.shields.io/crates/v/signer.svg
+[signer-crate-url]: https://crates.io/crates/signer
+[signer-core-crate]: https://img.shields.io/crates/v/signer-core.svg
+[signer-core-crate-url]: https://crates.io/crates/signer-core
+[signer-evm-crate]: https://img.shields.io/crates/v/signer-evm.svg
+[signer-evm-crate-url]: https://crates.io/crates/signer-evm
+[signer-btc-crate]: https://img.shields.io/crates/v/signer-btc.svg
+[signer-btc-crate-url]: https://crates.io/crates/signer-btc
+[signer-svm-crate]: https://img.shields.io/crates/v/signer-svm.svg
+[signer-svm-crate-url]: https://crates.io/crates/signer-svm
+[signer-cosmos-crate]: https://img.shields.io/crates/v/signer-cosmos.svg
+[signer-cosmos-crate-url]: https://crates.io/crates/signer-cosmos
+[signer-tron-crate]: https://img.shields.io/crates/v/signer-tron.svg
+[signer-tron-crate-url]: https://crates.io/crates/signer-tron
+[signer-sui-crate]: https://img.shields.io/crates/v/signer-sui.svg
+[signer-sui-crate-url]: https://crates.io/crates/signer-sui
+[signer-ton-crate]: https://img.shields.io/crates/v/signer-ton.svg
+[signer-ton-crate-url]: https://crates.io/crates/signer-ton
+[signer-fil-crate]: https://img.shields.io/crates/v/signer-fil.svg
+[signer-fil-crate-url]: https://crates.io/crates/signer-fil
+[signer-spark-crate]: https://img.shields.io/crates/v/signer-spark.svg
+[signer-spark-crate-url]: https://crates.io/crates/signer-spark
+[signer-cli-crate]: https://img.shields.io/crates/v/signer-cli.svg
+[signer-cli-crate-url]: https://crates.io/crates/signer-cli
+[signer-doc]: https://img.shields.io/docsrs/signer.svg
+[signer-doc-url]: https://docs.rs/signer
+[signer-core-doc]: https://img.shields.io/docsrs/signer-core.svg
+[signer-core-doc-url]: https://docs.rs/signer-core
+[signer-evm-doc]: https://img.shields.io/docsrs/signer-evm.svg
+[signer-evm-doc-url]: https://docs.rs/signer-evm
+[signer-btc-doc]: https://img.shields.io/docsrs/signer-btc.svg
+[signer-btc-doc-url]: https://docs.rs/signer-btc
+[signer-svm-doc]: https://img.shields.io/docsrs/signer-svm.svg
+[signer-svm-doc-url]: https://docs.rs/signer-svm
+[signer-cosmos-doc]: https://img.shields.io/docsrs/signer-cosmos.svg
+[signer-cosmos-doc-url]: https://docs.rs/signer-cosmos
+[signer-tron-doc]: https://img.shields.io/docsrs/signer-tron.svg
+[signer-tron-doc-url]: https://docs.rs/signer-tron
+[signer-sui-doc]: https://img.shields.io/docsrs/signer-sui.svg
+[signer-sui-doc-url]: https://docs.rs/signer-sui
+[signer-ton-doc]: https://img.shields.io/docsrs/signer-ton.svg
+[signer-ton-doc-url]: https://docs.rs/signer-ton
+[signer-fil-doc]: https://img.shields.io/docsrs/signer-fil.svg
+[signer-fil-doc-url]: https://docs.rs/signer-fil
+[signer-spark-doc]: https://img.shields.io/docsrs/signer-spark.svg
+[signer-spark-doc-url]: https://docs.rs/signer-spark
