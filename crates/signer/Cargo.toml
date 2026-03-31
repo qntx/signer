@@ -44,6 +44,7 @@ spark = ["dep:signer-spark"]
 fil = ["dep:signer-fil"]
 ton = ["dep:signer-ton"]
 sui = ["dep:signer-sui"]
+all-chains = ["btc", "evm", "svm", "cosmos", "tron", "spark", "fil", "ton", "sui"]
 kobe = [
     "signer-btc?/kobe", "signer-evm?/kobe", "signer-svm?/kobe",
     "signer-cosmos?/kobe", "signer-tron?/kobe", "signer-spark?/kobe",
