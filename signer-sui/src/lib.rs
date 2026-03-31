@@ -26,6 +26,10 @@ impl Signer {
     }
 
     /// Create from a hex-encoded 32-byte private key (with or without `0x`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the hex is invalid or not 32 bytes.
     pub fn from_hex(hex_str: &str) -> Result<Self, Error> {
         let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
         let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
@@ -82,6 +86,10 @@ impl Signer {
     }
 
     /// Verify an Ed25519 signature.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the signature is invalid.
     pub fn verify(&self, message: &[u8], signature: &Signature) -> Result<(), Error> {
         use ed25519_dalek::Verifier;
         self.key.verifying_key().verify(message, signature)?;
@@ -109,6 +117,10 @@ impl Signer {
 #[cfg(feature = "kobe")]
 impl Signer {
     /// Create from a [`kobe_sui::DerivedAccount`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the private key is invalid.
     pub fn from_derived(account: &kobe_sui::DerivedAccount) -> Result<Self, Error> {
         Self::from_hex(&account.private_key)
     }

@@ -156,8 +156,12 @@ impl Signer {
             return Err(Error::InvalidSignature("expected 65-byte signature".into()));
         }
         let v = signature[64];
-        let r: [u8; 32] = signature[..32].try_into().expect("checked length");
-        let s: [u8; 32] = signature[32..64].try_into().expect("checked length");
+        let r: [u8; 32] = signature[..32]
+            .try_into()
+            .map_err(|_| Error::InvalidSignature("bad r component".into()))?;
+        let s: [u8; 32] = signature[32..64]
+            .try_into()
+            .map_err(|_| Error::InvalidSignature("bad s component".into()))?;
         rlp::encode_signed_typed_tx(unsigned_tx, v, &r, &s)
             .map_err(|e| Error::InvalidTransaction(e.into()))
     }

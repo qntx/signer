@@ -165,6 +165,7 @@ fn encode_value(
     encode_atomic(type_name, value)
 }
 
+#[allow(clippy::many_single_char_names)]
 fn encode_atomic(ty: &str, value: &serde_json::Value) -> Result<[u8; 32], Error> {
     let mut w = [0u8; 32];
     match ty {
@@ -309,7 +310,7 @@ fn negate_twos_complement(bytes: &mut [u8; 32]) {
     let mut carry = 1u16;
     for b in bytes.iter_mut().rev() {
         let sum = u16::from(*b) + carry;
-        *b = sum as u8;
+        *b = (sum & 0xFF) as u8;
         carry = sum >> 8;
     }
 }

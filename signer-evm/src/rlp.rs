@@ -69,6 +69,7 @@ pub fn encode_signed_typed_tx(
     Ok(result)
 }
 
+#[allow(clippy::cast_possible_truncation)] // guarded: len < 56 and len_bytes.len() <= 8
 fn encode_length(len: usize, offset: u8) -> Vec<u8> {
     if len < 56 {
         vec![offset + len as u8]

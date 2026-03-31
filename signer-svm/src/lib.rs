@@ -44,6 +44,7 @@ impl Deref for Signer {
 impl Signer {
     /// Create from raw 32-byte secret key bytes.
     #[must_use]
+    #[inline]
     pub fn from_bytes(bytes: &[u8; 32]) -> Self {
         Self {
             key: SigningKey::from_bytes(bytes),
@@ -51,6 +52,10 @@ impl Signer {
     }
 
     /// Create from a hex-encoded 32-byte private key (with or without `0x`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the hex is invalid or not 32 bytes.
     pub fn from_hex(hex_str: &str) -> Result<Self, Error> {
         let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
         let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
@@ -62,6 +67,10 @@ impl Signer {
     /// Create from a Base58-encoded keypair (64 bytes: secret ‖ public).
     ///
     /// Standard format used by Phantom, Backpack, and Solflare.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the Base58 is invalid or not 64 bytes.
     pub fn from_keypair_base58(b58: &str) -> Result<Self, Error> {
         let decoded = bs58::decode(b58)
             .into_vec()
@@ -80,10 +89,6 @@ impl Signer {
     }
 
     /// Generate a random signer.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the system CSPRNG is unavailable.
     #[must_use]
     pub fn random() -> Self {
         use rand_core::{OsRng, RngCore};
@@ -95,6 +100,10 @@ impl Signer {
     }
 
     /// Verify an Ed25519 signature.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the signature is invalid.
     pub fn verify(&self, msg: &[u8], signature: &Signature) -> Result<(), Error> {
         self.key.verifying_key().verify(msg, signature)?;
         Ok(())
@@ -134,6 +143,10 @@ impl Signer {
     /// Extract the signable message portion from a full serialized Solana transaction.
     ///
     /// Strips the compact-u16 header and signature slot placeholders.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction is empty or malformed.
     pub fn extract_signable_bytes(tx_bytes: &[u8]) -> Result<&[u8], Error> {
         if tx_bytes.is_empty() {
             return Err(Error::InvalidTransaction("empty transaction".into()));
@@ -147,6 +160,10 @@ impl Signer {
     }
 
     /// Encode a signed transaction by splicing the signature into the first slot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction is empty or has no signature slots.
     pub fn encode_signed_transaction(
         tx_bytes: &[u8],
         signature: &Signature,
@@ -170,6 +187,10 @@ impl Signer {
 #[cfg(feature = "kobe")]
 impl Signer {
     /// Create from a [`kobe_svm::DerivedAddress`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the private key is invalid.
     pub fn from_derived(derived: &kobe_svm::DerivedAddress) -> Result<Self, Error> {
         Self::from_hex(&derived.private_key_hex)
     }
