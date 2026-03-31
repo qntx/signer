@@ -125,21 +125,6 @@ println!("Address: {}", signer.address());
 
 See **[`crates/README.md`](crates/README.md)** for the full crate table, dependency graph, and feature flag reference.
 
-| Crate | Description |
-| --- | --- |
-| **[`signer`](crates/signer/)** | Umbrella crate — re-exports all chain signers |
-| **[`signer-core`](crates/signer-core/)** | `Sign` trait, `SignOutput`, error types |
-| **[`signer-evm`](crates/signer-evm/)** | Ethereum — EIP-191, EIP-712, Keccak-256 |
-| **[`signer-btc`](crates/signer-btc/)** | Bitcoin — message signing, double-SHA256 |
-| **[`signer-svm`](crates/signer-svm/)** | Solana — Ed25519, compact-u16, tx encoding |
-| **[`signer-cosmos`](crates/signer-cosmos/)** | Cosmos — secp256k1 + SHA-256 |
-| **[`signer-tron`](crates/signer-tron/)** | Tron — TRON message prefix + Keccak-256 |
-| **[`signer-sui`](crates/signer-sui/)** | Sui — BLAKE2b-256 intent-based signing |
-| **[`signer-ton`](crates/signer-ton/)** | TON — Ed25519 |
-| **[`signer-fil`](crates/signer-fil/)** | Filecoin — secp256k1 + Blake2b-256 |
-| **[`signer-spark`](crates/signer-spark/)** | Spark — secp256k1 + double-SHA256 |
-| **[`signer-cli`](crates/signer-cli/)** | CLI — sign and inspect keys across all 9 chains |
-
 ## Security
 
 This library has **not** been independently audited. Use at your own risk.
