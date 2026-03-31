@@ -17,7 +17,7 @@ pub use error::Error;
 use k256::ecdsa::SigningKey;
 use sha2::{Digest, Sha256};
 use sha3::Keccak256;
-pub use signer_core::{self, Sign, SignExt, SignOutput};
+pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 use zeroize::ZeroizeOnDrop;
 
 /// TRON transaction signer.

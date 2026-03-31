@@ -84,9 +84,9 @@ impl SignOutput {
 /// # Example
 ///
 /// ```ignore
-/// use signer_core::Sign;
+/// use signer_primitives::Sign;
 ///
-/// fn sign_with_any(s: &impl Sign, msg: &[u8]) -> signer_core::SignOutput {
+/// fn sign_with_any(s: &impl Sign, msg: &[u8]) -> signer_primitives::SignOutput {
 ///     s.sign_message(msg).unwrap()
 /// }
 /// ```

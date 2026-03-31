@@ -17,7 +17,7 @@ use blake2::digest::consts::U32;
 use blake2::{Blake2b, Digest};
 pub use error::Error;
 use k256::ecdsa::SigningKey;
-pub use signer_core::{self, Sign, SignExt, SignOutput};
+pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 use zeroize::ZeroizeOnDrop;
 
 type Blake2b256 = Blake2b<U32>;

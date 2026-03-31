@@ -3,7 +3,7 @@
 | Crate | | Description |
 | --- | --- | --- |
 | **[`signer`](signer/)** | [![crates.io][signer-crate]][signer-crate-url] [![docs.rs][signer-doc]][signer-doc-url] | Umbrella crate — re-exports all chain signers via feature flags |
-| **[`signer-core`](signer-core/)** | [![crates.io][signer-core-crate]][signer-core-crate-url] [![docs.rs][signer-core-doc]][signer-core-doc-url] | Core library — `Sign` trait, `SignOutput`, error types |
+| **[`signer-primitives`](signer-primitives/)** | [![crates.io][signer-primitives-crate]][signer-primitives-crate-url] [![docs.rs][signer-primitives-doc]][signer-primitives-doc-url] | Core library — `Sign` trait, `SignOutput`, error types |
 | **[`signer-evm`](signer-evm/)** | [![crates.io][signer-evm-crate]][signer-evm-crate-url] [![docs.rs][signer-evm-doc]][signer-evm-doc-url] | Ethereum — EIP-191, EIP-712, RLP transaction encoding |
 | **[`signer-btc`](signer-btc/)** | [![crates.io][signer-btc-crate]][signer-btc-crate-url] [![docs.rs][signer-btc-doc]][signer-btc-doc-url] | Bitcoin — message signing, CompactSize varint, double-SHA256 |
 | **[`signer-svm`](signer-svm/)** | [![crates.io][signer-svm-crate]][signer-svm-crate-url] [![docs.rs][signer-svm-doc]][signer-svm-doc-url] | Solana — Ed25519, compact-u16, transaction encoding |
@@ -20,10 +20,10 @@
 ```text
 signer-cli
   └── signer-{evm,btc,svm,cosmos,tron,sui,ton,fil,spark}
-        └── signer-core (Sign trait, SignOutput)
+        └── signer-primitives (Sign trait, SignOutput)
 
 signer (umbrella)
-  ├── signer-core
+  ├── signer-primitives
   ├── signer-evm    ── k256 + sha3 (Keccak-256)
   ├── signer-btc    ── k256 + sha2 (double-SHA256)
   ├── signer-svm    ── ed25519-dalek (Ed25519)
@@ -69,8 +69,8 @@ Each chain crate also exposes a `kobe` feature for individual HD wallet bridging
 
 [signer-crate]: https://img.shields.io/crates/v/signer.svg
 [signer-crate-url]: https://crates.io/crates/signer
-[signer-core-crate]: https://img.shields.io/crates/v/signer-core.svg
-[signer-core-crate-url]: https://crates.io/crates/signer-core
+[signer-primitives-crate]: https://img.shields.io/crates/v/signer-primitives.svg
+[signer-primitives-crate-url]: https://crates.io/crates/signer-primitives
 [signer-evm-crate]: https://img.shields.io/crates/v/signer-evm.svg
 [signer-evm-crate-url]: https://crates.io/crates/signer-evm
 [signer-btc-crate]: https://img.shields.io/crates/v/signer-btc.svg
@@ -93,8 +93,8 @@ Each chain crate also exposes a `kobe` feature for individual HD wallet bridging
 [signer-cli-crate-url]: https://crates.io/crates/signer-cli
 [signer-doc]: https://img.shields.io/docsrs/signer.svg
 [signer-doc-url]: https://docs.rs/signer
-[signer-core-doc]: https://img.shields.io/docsrs/signer-core.svg
-[signer-core-doc-url]: https://docs.rs/signer-core
+[signer-primitives-doc]: https://img.shields.io/docsrs/signer-primitives.svg
+[signer-primitives-doc-url]: https://docs.rs/signer-primitives
 [signer-evm-doc]: https://img.shields.io/docsrs/signer-evm.svg
 [signer-evm-doc-url]: https://docs.rs/signer-evm
 [signer-btc-doc]: https://img.shields.io/docsrs/signer-btc.svg

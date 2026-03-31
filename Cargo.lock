@@ -1130,13 +1130,13 @@ dependencies = [
 
 [[package]]
 name = "signer"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "signer-btc",
- "signer-core",
  "signer-cosmos",
  "signer-evm",
  "signer-fil",
+ "signer-primitives",
  "signer-spark",
  "signer-sui",
  "signer-svm",
@@ -1146,21 +1146,21 @@ dependencies = [
 
 [[package]]
 name = "signer-btc"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "hex",
  "k256",
  "kobe-btc",
  "rand_core 0.6.4",
  "sha2",
- "signer-core",
+ "signer-primitives",
  "thiserror",
  "zeroize",
 ]
 
 [[package]]
 name = "signer-cli"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "bs58",
  "clap",
@@ -1170,10 +1170,10 @@ dependencies = [
  "serde",
  "serde_json",
  "signer-btc",
- "signer-core",
  "signer-cosmos",
  "signer-evm",
  "signer-fil",
+ "signer-primitives",
  "signer-spark",
  "signer-sui",
  "signer-svm",
@@ -1182,29 +1182,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "signer-core"
-version = "0.4.1"
-dependencies = [
- "thiserror",
-]
-
-[[package]]
 name = "signer-cosmos"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "hex",
  "k256",
  "kobe-cosmos",
  "rand_core 0.6.4",
  "sha2",
- "signer-core",
+ "signer-primitives",
  "thiserror",
  "zeroize",
 ]
 
 [[package]]
 name = "signer-evm"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "hex",
  "k256",
@@ -1212,83 +1205,90 @@ dependencies = [
  "rand_core 0.6.4",
  "serde_json",
  "sha3",
- "signer-core",
+ "signer-primitives",
  "thiserror",
  "zeroize",
 ]
 
 [[package]]
 name = "signer-fil"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "blake2",
  "hex",
  "k256",
  "kobe-fil",
  "rand_core 0.6.4",
- "signer-core",
+ "signer-primitives",
  "thiserror",
  "zeroize",
 ]
 
 [[package]]
+name = "signer-primitives"
+version = "0.4.2"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
 name = "signer-spark"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "hex",
  "k256",
  "kobe-spark",
  "rand_core 0.6.4",
  "sha2",
- "signer-core",
+ "signer-primitives",
  "thiserror",
  "zeroize",
 ]
 
 [[package]]
 name = "signer-sui"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "blake2",
  "ed25519-dalek",
  "hex",
  "kobe-sui",
  "rand_core 0.6.4",
- "signer-core",
+ "signer-primitives",
  "thiserror",
  "zeroize",
 ]
 
 [[package]]
 name = "signer-svm"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "bs58",
  "ed25519-dalek",
  "hex",
  "kobe-svm",
  "rand_core 0.6.4",
- "signer-core",
+ "signer-primitives",
  "thiserror",
  "zeroize",
 ]
 
 [[package]]
 name = "signer-ton"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "ed25519-dalek",
  "hex",
  "kobe-ton",
  "rand_core 0.6.4",
- "signer-core",
+ "signer-primitives",
  "thiserror",
  "zeroize",
 ]
 
 [[package]]
 name = "signer-tron"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "hex",
  "k256",
@@ -1296,7 +1296,7 @@ dependencies = [
  "rand_core 0.6.4",
  "sha2",
  "sha3",
- "signer-core",
+ "signer-primitives",
  "thiserror",
  "zeroize",
 ]

@@ -31,14 +31,14 @@ impl From<hex::FromHexError> for Error {
     }
 }
 
-impl From<signer_core::Error> for Error {
-    fn from(e: signer_core::Error) -> Self {
+impl From<signer_primitives::Error> for Error {
+    fn from(e: signer_primitives::Error) -> Self {
         match e {
-            signer_core::Error::InvalidKey(m) => Self::InvalidKey(m),
-            signer_core::Error::InvalidMessage(m) => Self::InvalidMessage(m),
-            signer_core::Error::SigningFailed(m) => Self::SigningFailed(m),
-            signer_core::Error::InvalidSignature(m) => Self::InvalidSignature(m),
-            signer_core::Error::InvalidTransaction(m) => Self::InvalidTransaction(m),
+            signer_primitives::Error::InvalidKey(m) => Self::InvalidKey(m),
+            signer_primitives::Error::InvalidMessage(m) => Self::InvalidMessage(m),
+            signer_primitives::Error::SigningFailed(m) => Self::SigningFailed(m),
+            signer_primitives::Error::InvalidSignature(m) => Self::InvalidSignature(m),
+            signer_primitives::Error::InvalidTransaction(m) => Self::InvalidTransaction(m),
         }
     }
 }

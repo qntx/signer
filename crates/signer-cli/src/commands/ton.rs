@@ -1,7 +1,7 @@
 //! TON signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_core::Sign;
+use signer_primitives::Sign;
 use signer_ton::Signer;
 
 use crate::output::{self, AddressOutput, SignOutput};

@@ -19,7 +19,7 @@ use blake2::digest::{Update, VariableOutput};
 pub use ed25519_dalek::{self, Signature};
 use ed25519_dalek::{Signer as _, SigningKey};
 pub use error::Error;
-pub use signer_core::{self, Sign, SignExt, SignOutput};
+pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 
 /// Ed25519 signature scheme flag used by Sui.
 const ED25519_FLAG: u8 = 0x00;

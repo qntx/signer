@@ -18,7 +18,7 @@ use core::ops::Deref;
 pub use ed25519_dalek::{self, Signature};
 use ed25519_dalek::{SigningKey, Verifier};
 pub use error::Error;
-pub use signer_core::{self, Sign, SignExt, SignOutput};
+pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 use zeroize::Zeroizing;
 
 /// Solana transaction signer.

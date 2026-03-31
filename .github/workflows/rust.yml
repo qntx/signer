@@ -47,10 +47,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install ARM cross-compiler
         run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi
-      - name: signer-core (pure no_std)
-        run: cargo check -p signer-core --target thumbv7m-none-eabi --no-default-features
-      - name: signer-core (alloc)
-        run: cargo check -p signer-core --target thumbv7m-none-eabi --no-default-features --features alloc
+      - name: signer-primitives (pure no_std)
+        run: cargo check -p signer-primitives --target thumbv7m-none-eabi --no-default-features
+      - name: signer-primitives (alloc)
+        run: cargo check -p signer-primitives --target thumbv7m-none-eabi --no-default-features --features alloc
       - name: signer-btc (no_std)
         run: cargo check -p signer-btc --target thumbv7m-none-eabi --no-default-features --features alloc
       - name: signer-evm (no_std)

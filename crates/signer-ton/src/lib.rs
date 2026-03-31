@@ -14,7 +14,7 @@ mod error;
 pub use ed25519_dalek::{self, Signature};
 use ed25519_dalek::{Signer as _, SigningKey};
 pub use error::Error;
-pub use signer_core::{self, Sign, SignExt, SignOutput};
+pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 
 /// TON transaction signer.
 ///

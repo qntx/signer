@@ -13,7 +13,7 @@ name = "signer"
 path = "src/main.rs"
 
 [dependencies]
-signer-core = { workspace = true, features = ["std"] }
+signer-primitives = { workspace = true, features = ["std"] }
 signer-btc = { workspace = true, features = ["std", "getrandom"] }
 signer-evm = { workspace = true, features = ["std", "getrandom"] }
 signer-svm = { workspace = true, features = ["std", "getrandom"] }

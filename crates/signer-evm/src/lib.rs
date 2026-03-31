@@ -30,7 +30,7 @@ mod rlp;
 pub use error::Error;
 use k256::ecdsa::SigningKey;
 use sha3::{Digest, Keccak256};
-pub use signer_core::{self, Sign, SignExt, SignOutput};
+pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 use zeroize::ZeroizeOnDrop;
 
 /// EVM transaction signer.

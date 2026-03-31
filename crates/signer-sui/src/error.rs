@@ -30,8 +30,8 @@ impl From<ed25519_dalek::SignatureError> for Error {
     }
 }
 
-impl From<signer_core::Error> for Error {
-    fn from(e: signer_core::Error) -> Self {
+impl From<signer_primitives::Error> for Error {
+    fn from(e: signer_primitives::Error) -> Self {
         Self::InvalidKey(e.to_string())
     }
 }

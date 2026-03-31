@@ -15,7 +15,7 @@ check:
 # Verify no_std compilation (all crates use #![cfg_attr(not(feature = "std"), no_std)])
 # CI uses thumbv7m-none-eabi for strict bare-metal verification
 check-no-std:
-	cargo check -p signer-core --no-default-features
+	cargo check -p signer-primitives --no-default-features
 	cargo check -p signer-btc --no-default-features --features alloc
 	cargo check -p signer-evm --no-default-features --features alloc
 	cargo check -p signer-svm --no-default-features --features alloc

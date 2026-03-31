@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "crates/signer", "crates/signer-core",
+    "crates/signer", "crates/signer-primitives",
     "crates/signer-btc", "crates/signer-evm", "crates/signer-svm",
     "crates/signer-cosmos", "crates/signer-tron", "crates/signer-spark",
     "crates/signer-fil", "crates/signer-ton", "crates/signer-sui",
@@ -10,14 +10,14 @@ default-members = ["crates/signer"]
 resolver = "3"
 
 [workspace.package]
-version = "0.4.1"
+version = "0.4.2"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/qntx/signer"
 description = "Lightweight multi-chain transaction signer."
 
 [workspace.dependencies]
-signer-core = { version = "0.4", path = "crates/signer-core", default-features = false }
+signer-primitives = { version = "0.4", path = "crates/signer-primitives", default-features = false }
 signer-btc = { version = "0.4", path = "crates/signer-btc", default-features = false }
 signer-evm = { version = "0.4", path = "crates/signer-evm", default-features = false }
 signer-svm = { version = "0.4", path = "crates/signer-svm", default-features = false }

@@ -7,7 +7,7 @@ repository.workspace = true
 description = "Multi-chain transaction signer — umbrella crate re-exporting chain-specific signers."
 
 [dependencies]
-signer-core.workspace = true
+signer-primitives.workspace = true
 signer-btc = { workspace = true, optional = true }
 signer-evm = { workspace = true, optional = true }
 signer-svm = { workspace = true, optional = true }
@@ -20,12 +20,12 @@ signer-sui = { workspace = true, optional = true }
 
 [features]
 default = ["std", "btc", "evm", "svm", "cosmos", "tron", "spark", "fil", "ton", "sui"]
-std = ["alloc", "signer-core/std",
+std = ["alloc", "signer-primitives/std",
     "signer-btc?/std", "signer-evm?/std", "signer-svm?/std",
     "signer-cosmos?/std", "signer-tron?/std", "signer-spark?/std",
     "signer-fil?/std", "signer-ton?/std", "signer-sui?/std",
 ]
-alloc = ["signer-core/alloc",
+alloc = ["signer-primitives/alloc",
     "signer-btc?/alloc", "signer-evm?/alloc", "signer-svm?/alloc",
     "signer-cosmos?/alloc", "signer-tron?/alloc", "signer-spark?/alloc",
     "signer-fil?/alloc", "signer-ton?/alloc", "signer-sui?/alloc",

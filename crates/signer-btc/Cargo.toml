@@ -8,13 +8,13 @@ description = "Bitcoin transaction signer — secp256k1 ECDSA, message signing."
 
 [features]
 default = ["std"]
-std = ["alloc", "signer-core/std", "zeroize/std"]
-alloc = ["signer-core/alloc", "zeroize/alloc"]
+std = ["alloc", "signer-primitives/std", "zeroize/std"]
+alloc = ["signer-primitives/alloc", "zeroize/alloc"]
 getrandom = ["rand_core/getrandom"]
 kobe = ["dep:kobe-btc"]
 
 [dependencies]
-signer-core.workspace = true
+signer-primitives.workspace = true
 k256.workspace = true
 rand_core.workspace = true
 sha2.workspace = true

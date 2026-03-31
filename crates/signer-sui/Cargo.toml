@@ -8,13 +8,13 @@ description = "Sui transaction signer — Ed25519 + intent-based signing."
 
 [features]
 default = ["std"]
-std = ["alloc", "signer-core/std", "zeroize/std"]
-alloc = ["signer-core/alloc", "zeroize/alloc"]
+std = ["alloc", "signer-primitives/std", "zeroize/std"]
+alloc = ["signer-primitives/alloc", "zeroize/alloc"]
 getrandom = ["rand_core/getrandom"]
 kobe = ["dep:kobe-sui"]
 
 [dependencies]
-signer-core.workspace = true
+signer-primitives.workspace = true
 ed25519-dalek.workspace = true
 rand_core.workspace = true
 blake2.workspace = true

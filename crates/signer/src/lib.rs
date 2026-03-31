@@ -22,14 +22,14 @@
 
 #[cfg(feature = "btc")]
 pub use signer_btc as btc;
-pub use signer_core as core;
-pub use signer_core::{Sign, SignExt, SignOutput};
 #[cfg(feature = "cosmos")]
 pub use signer_cosmos as cosmos;
 #[cfg(feature = "evm")]
 pub use signer_evm as evm;
 #[cfg(feature = "fil")]
 pub use signer_fil as fil;
+pub use signer_primitives as core;
+pub use signer_primitives::{Sign, SignExt, SignOutput};
 #[cfg(feature = "spark")]
 pub use signer_spark as spark;
 #[cfg(feature = "sui")]
