@@ -127,31 +127,64 @@ impl Signer {
 mod tests {
     use super::*;
 
-    #[test]
-    fn sign_and_verify() {
-        let s = Signer::random();
-        let sig = s.sign(b"hello TON");
-        s.verify(b"hello TON", &sig).unwrap();
+    // RFC 8032 Test Vector 1
+    const TEST_KEY: &str = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
+    const TEST_PUBKEY: &str = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
+
+    fn test_signer() -> Signer {
+        Signer::from_hex(TEST_KEY).unwrap()
     }
 
     #[test]
-    fn verify_wrong_message_fails() {
-        let s = Signer::random();
+    fn rfc8032_pubkey() {
+        assert_eq!(test_signer().public_key_hex(), TEST_PUBKEY);
+    }
+
+    #[test]
+    fn from_bytes_matches_from_hex() {
+        let bytes: [u8; 32] = hex::decode(TEST_KEY).unwrap().try_into().unwrap();
+        let s = Signer::from_bytes(&bytes);
+        assert_eq!(s.public_key_bytes(), test_signer().public_key_bytes());
+    }
+
+    #[test]
+    fn sign_and_verify() {
+        let s = test_signer();
+        let msg = b"hello TON";
+        let sig = s.sign(msg);
+        s.verify(msg, &sig).expect("signature must verify");
+    }
+
+    #[test]
+    fn sign_wrong_message_fails() {
+        let s = test_signer();
         let sig = s.sign(b"correct");
         assert!(s.verify(b"wrong", &sig).is_err());
     }
 
     #[test]
-    fn hex_roundtrip() {
-        let s = Signer::random();
-        let hex_key = hex::encode(s.key.as_bytes());
-        let restored = Signer::from_hex(&hex_key).unwrap();
-        assert_eq!(s.public_key_bytes(), restored.public_key_bytes());
+    fn sign_trait_verify() {
+        let s = test_signer();
+        let out = Sign::sign_message(&s, b"test").unwrap();
+        assert_eq!(out.signature.len(), 64);
+        assert!(out.recovery_id.is_none());
+        let sig = Signature::from_slice(&out.signature).unwrap();
+        s.verify(b"test", &sig)
+            .expect("trait signature must verify");
     }
 
     #[test]
-    fn public_key_is_32_bytes() {
-        let s = Signer::random();
-        assert_eq!(s.public_key_bytes().len(), 32);
+    fn deterministic_signature() {
+        let s = test_signer();
+        let s1 = s.sign(b"deterministic");
+        let s2 = s.sign(b"deterministic");
+        assert_eq!(s1.to_bytes(), s2.to_bytes());
+    }
+
+    #[test]
+    fn debug_does_not_leak_key() {
+        let debug = format!("{:?}", test_signer());
+        assert!(debug.contains("[REDACTED]"));
+        assert!(!debug.contains("9d61b1"));
     }
 }

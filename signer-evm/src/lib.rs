@@ -249,68 +249,112 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn from_hex_and_address() {
-        let s =
-            Signer::from_hex("4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318")
-                .unwrap();
-        assert_eq!(s.address(), "0x2c7536E3605D9C16a7a3D7b1898e529396a65c23");
+    const TEST_KEY: &str = "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318";
+    const TEST_ADDR: &str = "0x2c7536E3605D9C16a7a3D7b1898e529396a65c23";
+
+    fn test_signer() -> Signer {
+        Signer::from_hex(TEST_KEY).unwrap()
     }
 
     #[test]
-    fn from_hex_with_0x_prefix() {
-        let s =
-            Signer::from_hex("0x4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318")
-                .unwrap();
-        assert_eq!(s.address(), "0x2c7536E3605D9C16a7a3D7b1898e529396a65c23");
+    fn known_address_from_hex() {
+        assert_eq!(test_signer().address(), TEST_ADDR);
     }
 
     #[test]
-    fn random_signer() {
-        let s = Signer::random();
-        let addr = s.address();
-        assert!(addr.starts_with("0x"));
-        assert_eq!(addr.len(), 42);
+    fn known_address_0x_prefix() {
+        let s = Signer::from_hex(&format!("0x{TEST_KEY}")).unwrap();
+        assert_eq!(s.address(), TEST_ADDR);
     }
 
     #[test]
-    fn sign_hash_and_verify() {
-        let s =
-            Signer::from_hex("4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318")
-                .unwrap();
-        let hash = Keccak256::digest(b"test");
+    fn known_address_from_bytes() {
+        let bytes: [u8; 32] = hex::decode(TEST_KEY).unwrap().try_into().unwrap();
+        let s = Signer::from_bytes(&bytes).unwrap();
+        assert_eq!(s.address(), TEST_ADDR);
+    }
+
+    #[test]
+    fn sign_hash_verify() {
+        let s = test_signer();
+        let hash = Keccak256::digest(b"test message");
         let out = s.sign_hash(&hash).unwrap();
+
         assert_eq!(out.signature.len(), 65);
+        assert!(out.recovery_id.is_some());
+        let v = out.recovery_id.unwrap();
+        assert!(v == 0 || v == 1, "raw recovery_id must be 0 or 1, got {v}");
 
         let r: [u8; 32] = out.signature[..32].try_into().unwrap();
-        let s_arr: [u8; 32] = out.signature[32..64].try_into().unwrap();
-        let sig = k256::ecdsa::Signature::from_scalars(r, s_arr).unwrap();
+        let s_bytes: [u8; 32] = out.signature[32..64].try_into().unwrap();
+        let sig = k256::ecdsa::Signature::from_scalars(r, s_bytes).unwrap();
         s.signing_key()
             .verifying_key()
             .verify_prehash(&hash, &sig)
-            .unwrap();
+            .expect("signature must verify");
     }
 
     #[test]
-    fn sign_message_v_byte() {
-        let s = Signer::random();
-        let out = s.sign_message(b"Hello").unwrap();
+    fn sign_message_eip191_verify() {
+        let s = test_signer();
+        let msg = b"Hello World";
+        let out = s.sign_message(msg).unwrap();
+
+        assert_eq!(out.signature.len(), 65);
         let v = out.signature[64];
-        assert!(v == 27 || v == 28);
+        assert!(v == 27 || v == 28, "EIP-191 v must be 27 or 28, got {v}");
+
+        let prefix = format!("\x19Ethereum Signed Message:\n{}", msg.len());
+        let mut prefixed = Vec::new();
+        prefixed.extend_from_slice(prefix.as_bytes());
+        prefixed.extend_from_slice(msg);
+        let hash = Keccak256::digest(&prefixed);
+
+        let r: [u8; 32] = out.signature[..32].try_into().unwrap();
+        let s_bytes: [u8; 32] = out.signature[32..64].try_into().unwrap();
+        let sig = k256::ecdsa::Signature::from_scalars(r, s_bytes).unwrap();
+        s.signing_key()
+            .verifying_key()
+            .verify_prehash(&hash, &sig)
+            .expect("EIP-191 signature must verify");
     }
 
     #[test]
-    fn rejects_wrong_hash_length() {
-        let s = Signer::random();
+    fn sign_message_recovery_id_matches_v() {
+        let s = test_signer();
+        let out = s.sign_message(b"recovery test").unwrap();
+        let v = out.signature[64];
+        let rid = out.recovery_id.unwrap();
+        assert_eq!(v, rid, "v byte must equal recovery_id");
+        assert!(rid == 27 || rid == 28);
+    }
+
+    #[test]
+    fn deterministic_signature() {
+        let s = test_signer();
+        let hash = Keccak256::digest(b"deterministic");
+        let out1 = s.sign_hash(&hash).unwrap();
+        let out2 = s.sign_hash(&hash).unwrap();
+        assert_eq!(out1.signature, out2.signature);
+    }
+
+    #[test]
+    fn rejects_non_32_byte_hash() {
+        let s = test_signer();
         assert!(s.sign_hash(b"short").is_err());
+        assert!(s.sign_hash(&[0u8; 33]).is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_input() {
+        assert!(Signer::from_hex("not-hex").is_err());
+        assert!(Signer::from_hex("abcd").is_err());
+        assert!(Signer::from_bytes(&[0u8; 32]).is_err());
     }
 
     #[test]
     fn debug_does_not_leak_key() {
-        let s =
-            Signer::from_hex("4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318")
-                .unwrap();
-        let debug = format!("{s:?}");
+        let debug = format!("{:?}", test_signer());
         assert!(debug.contains("[REDACTED]"));
         assert!(!debug.contains("4c0883"));
         assert!(!debug.contains("362318"));

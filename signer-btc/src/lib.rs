@@ -189,54 +189,124 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn sign_hash_and_verify() {
-        let s = Signer::random();
-        let hash = Sha256::digest(b"test");
-        let out = s.sign_hash(&hash).unwrap();
-        assert_eq!(out.signature.len(), 65);
+    const TEST_KEY: &str = "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318";
 
+    fn test_signer() -> Signer {
+        Signer::from_hex(TEST_KEY).unwrap()
+    }
+
+    fn verify_secp256k1(s: &Signer, hash: &[u8], out: &SignOutput) {
         let r: [u8; 32] = out.signature[..32].try_into().unwrap();
-        let s_arr: [u8; 32] = out.signature[32..64].try_into().unwrap();
-        let sig = k256::ecdsa::Signature::from_scalars(r, s_arr).unwrap();
+        let s_bytes: [u8; 32] = out.signature[32..64].try_into().unwrap();
+        let sig = k256::ecdsa::Signature::from_scalars(r, s_bytes).unwrap();
         s.signing_key()
             .verifying_key()
-            .verify_prehash(&hash, &sig)
-            .unwrap();
+            .verify_prehash(hash, &sig)
+            .expect("signature must verify");
     }
 
     #[test]
-    fn hex_roundtrip() {
-        let s = Signer::random();
-        let hex_key = hex::encode(s.key.to_bytes());
-        let restored = Signer::from_hex(&hex_key).unwrap();
-        assert_eq!(s.public_key_bytes(), restored.public_key_bytes());
-    }
-
-    #[test]
-    fn sign_message_short() {
-        let s = Signer::random();
-        let out = s.sign_message(b"Hello Bitcoin!").unwrap();
+    fn sign_hash_verify() {
+        let s = test_signer();
+        let hash = Sha256::digest(b"test message");
+        let out = s.sign_hash(&hash).unwrap();
         assert_eq!(out.signature.len(), 65);
+        assert!(out.recovery_id.is_some());
+        verify_secp256k1(&s, &hash, &out);
     }
 
     #[test]
-    fn sign_message_long_varint() {
-        let s = Signer::random();
+    fn sign_transaction_double_sha256_verify() {
+        let s = test_signer();
+        let tx = b"bitcoin tx bytes";
+        let out = s.sign_transaction(tx).unwrap();
+        let expected = Sha256::digest(Sha256::digest(tx));
+        verify_secp256k1(&s, &expected, &out);
+    }
+
+    #[test]
+    fn compressed_public_key_33_bytes() {
+        let pk = test_signer().public_key_bytes();
+        assert_eq!(pk.len(), 33);
+        assert!(pk[0] == 0x02 || pk[0] == 0x03);
+    }
+
+    #[test]
+    fn from_bytes_roundtrip() {
+        let bytes: [u8; 32] = hex::decode(TEST_KEY).unwrap().try_into().unwrap();
+        let s = Signer::from_bytes(&bytes).unwrap();
+        assert_eq!(s.public_key_bytes(), test_signer().public_key_bytes());
+    }
+
+    #[test]
+    fn sign_message_short_verify() {
+        let s = test_signer();
+        let msg = b"Hello Bitcoin!";
+        let out = s.sign_message(msg).unwrap();
+
+        let mut data = Vec::new();
+        data.extend_from_slice(b"\x18Bitcoin Signed Message:\n");
+        #[allow(clippy::cast_possible_truncation)]
+        data.push(msg.len() as u8);
+        data.extend_from_slice(msg);
+        let expected = Sha256::digest(Sha256::digest(&data));
+        verify_secp256k1(&s, &expected, &out);
+    }
+
+    #[test]
+    fn sign_message_long_varint_verify() {
+        let s = test_signer();
         let msg = vec![0x42u8; 300];
         let out = s.sign_message(&msg).unwrap();
-        assert_eq!(out.signature.len(), 65);
+
+        let mut data = Vec::new();
+        data.extend_from_slice(b"\x18Bitcoin Signed Message:\n");
+        data.push(0xFD);
+        data.extend_from_slice(&300u16.to_le_bytes());
+        data.extend_from_slice(&msg);
+        let expected = Sha256::digest(Sha256::digest(&data));
+        verify_secp256k1(&s, &expected, &out);
     }
 
     #[test]
-    fn rejects_wrong_hash_length() {
-        let s = Signer::random();
-        assert!(s.sign_hash(b"short").is_err());
+    fn sign_message_varint_boundary_253() {
+        let s = test_signer();
+        let msg = vec![0xAA; 253];
+        let out = s.sign_message(&msg).unwrap();
+
+        let mut data = Vec::new();
+        data.extend_from_slice(b"\x18Bitcoin Signed Message:\n");
+        data.push(0xFD);
+        data.extend_from_slice(&253u16.to_le_bytes());
+        data.extend_from_slice(&msg);
+        let expected = Sha256::digest(Sha256::digest(&data));
+        verify_secp256k1(&s, &expected, &out);
     }
 
     #[test]
-    fn public_key_is_33_bytes() {
-        let s = Signer::random();
-        assert_eq!(s.public_key_bytes().len(), 33);
+    fn deterministic_signature() {
+        let s = test_signer();
+        let out1 = s.sign_transaction(b"same data").unwrap();
+        let out2 = s.sign_transaction(b"same data").unwrap();
+        assert_eq!(out1.signature, out2.signature);
+    }
+
+    #[test]
+    fn rejects_non_32_byte_hash() {
+        assert!(test_signer().sign_hash(b"short").is_err());
+        assert!(test_signer().sign_hash(&[0u8; 33]).is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_input() {
+        assert!(Signer::from_hex("not-hex").is_err());
+        assert!(Signer::from_bytes(&[0u8; 32]).is_err());
+    }
+
+    #[test]
+    fn debug_does_not_leak_key() {
+        let debug = format!("{:?}", test_signer());
+        assert!(debug.contains("[REDACTED]"));
+        assert!(!debug.contains("4c0883"));
     }
 }
