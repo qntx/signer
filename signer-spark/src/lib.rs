@@ -9,12 +9,24 @@ pub use error::Error;
 use k256::ecdsa::SigningKey;
 use sha2::{Digest, Sha256};
 pub use signer_core::{self, Sign, SignExt, SignOutput};
+use zeroize::ZeroizeOnDrop;
 
 /// Spark transaction signer.
-#[derive(Debug, Clone)]
+///
+/// Wraps a secp256k1 signing key. The inner key is zeroized on drop.
 pub struct Signer {
     key: SigningKey,
 }
+
+impl core::fmt::Debug for Signer {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Signer")
+            .field("key", &"[REDACTED]")
+            .finish()
+    }
+}
+
+impl ZeroizeOnDrop for Signer {}
 
 impl Signer {
     /// Create from a raw 32-byte private key.

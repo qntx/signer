@@ -28,9 +28,16 @@ use zeroize::ZeroizeOnDrop;
 /// EVM transaction signer.
 ///
 /// Wraps a secp256k1 signing key. The inner key is zeroized on drop.
-#[derive(Debug, Clone)]
 pub struct Signer {
     key: SigningKey,
+}
+
+impl core::fmt::Debug for Signer {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Signer")
+            .field("key", &"[REDACTED]")
+            .finish()
+    }
 }
 
 impl Signer {
@@ -176,7 +183,6 @@ impl Signer {
     }
 }
 
-/// Wrapper to ensure zeroization of the signing key on drop.
 impl ZeroizeOnDrop for Signer {}
 
 impl Sign for Signer {
@@ -283,13 +289,6 @@ mod tests {
         let out = s.sign_message(b"Hello").unwrap();
         let v = out.signature[64];
         assert!(v == 27 || v == 28);
-    }
-
-    #[test]
-    fn clone_preserves_address() {
-        let s = Signer::random();
-        let s2 = s.clone();
-        assert_eq!(s.address(), s2.address());
     }
 
     #[test]

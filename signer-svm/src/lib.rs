@@ -17,9 +17,16 @@ use zeroize::Zeroizing;
 ///
 /// Wraps an [`ed25519_dalek::SigningKey`] with [`Deref`] for full upstream
 /// API access. The inner key implements [`ZeroizeOnDrop`](zeroize::ZeroizeOnDrop).
-#[derive(Debug, Clone)]
 pub struct Signer {
     key: SigningKey,
+}
+
+impl core::fmt::Debug for Signer {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Signer")
+            .field("key", &"[REDACTED]")
+            .finish()
+    }
 }
 
 impl Deref for Signer {

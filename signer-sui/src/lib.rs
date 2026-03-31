@@ -25,9 +25,18 @@ const TX_INTENT: [u8; 3] = [0x00, 0x00, 0x00];
 const MSG_INTENT: [u8; 3] = [0x03, 0x00, 0x00];
 
 /// Sui transaction signer.
-#[derive(Debug, Clone)]
+///
+/// Wraps an Ed25519 signing key. The inner key is zeroized on drop.
 pub struct Signer {
     key: SigningKey,
+}
+
+impl core::fmt::Debug for Signer {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Signer")
+            .field("key", &"[REDACTED]")
+            .finish()
+    }
 }
 
 impl Signer {
