@@ -11,8 +11,8 @@
 //! use signer_evm::Signer;
 //!
 //! let signer = Signer::random();
-//! let sig = signer.sign_message(b"hello").unwrap();
-//! assert_eq!(sig.len(), 65); // r(32) + s(32) + v(1)
+//! let out = signer.sign_message(b"hello").unwrap();
+//! assert_eq!(out.signature.len(), 65); // r(32) + s(32) + v(1)
 //! ```
 
 mod eip712;

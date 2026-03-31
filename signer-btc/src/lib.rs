@@ -12,8 +12,8 @@
 //!
 //! let signer = Signer::random();
 //! let hash = [0u8; 32];
-//! let sig = signer.sign_hash(&hash).unwrap();
-//! assert_eq!(sig.len(), 65); // r(32) + s(32) + recovery_id(1)
+//! let out = signer.sign_hash(&hash).unwrap();
+//! assert_eq!(out.signature.len(), 65); // r(32) + s(32) + recovery_id(1)
 //! ```
 
 mod error;
