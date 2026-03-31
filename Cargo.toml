@@ -1,57 +1,51 @@
 [workspace]
-members = [
-    "signer", "signer-btc", "signer-cli", "signer-evm", "signer-svm",
-    "signer-cosmos", "signer-tron", "signer-spark", "signer-fil", "signer-ton", "signer-sui",
-]
+members = ["signer"]
 default-members = ["signer"]
 resolver = "3"
 
 [workspace.package]
-version = "0.3.2"
+version = "0.4.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/qntx/signer"
-description = "Multi-chain transaction signer built on mature cryptography libraries."
+description = "Lightweight multi-chain cryptographic signer."
 
 [workspace.dependencies]
-signer-btc = { version = "0.3", path = "signer-btc" }
-signer-evm = { version = "0.3", path = "signer-evm" }
-signer-svm = { version = "0.3", path = "signer-svm" }
-signer-cosmos = { version = "0.3", path = "signer-cosmos" }
-signer-tron = { version = "0.3", path = "signer-tron" }
-signer-spark = { version = "0.3", path = "signer-spark" }
-signer-fil = { version = "0.3", path = "signer-fil" }
-signer-ton = { version = "0.3", path = "signer-ton" }
-signer-sui = { version = "0.3", path = "signer-sui" }
+signer = { version = "0.4", path = "signer" }
 
-# EVM (alloy ecosystem)
-alloy-signer = "1.7"
-alloy-signer-local = "1.7"
-alloy-network = "1.7"
-alloy-primitives = { version = "1", default-features = false, features = ["k256"] }
-alloy-consensus = "1.7"
+# Cryptography
+k256 = { version = "0.13.4", default-features = false, features = ["ecdsa", "arithmetic"] }
+ed25519-dalek = { version = "2.2.0", default-features = false, features = ["hazmat"] }
+sha2 = { version = ">=0.10, <0.11", default-features = false }
+sha3 = { version = ">=0.10, <0.11", default-features = false }
+blake2 = { version = ">=0.10, <0.11", default-features = false }
+ripemd = { version = ">=0.1, <0.2", default-features = false }
+hmac = { version = ">=0.12, <0.13", default-features = false }
+hkdf = { version = ">=0.12, <0.13", default-features = false }
+digest = { version = ">=0.10, <0.11", default-features = false }
+aes-gcm = { version = ">=0.10, <0.11", default-features = false, features = ["aes"] }
+scrypt = { version = ">=0.11, <0.12", default-features = false }
 
-# BTC
-bitcoin = { version = "0.32", features = ["rand-std", "base64"] }
+# Encoding
+hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
+bs58 = { version = "0.5.1", default-features = false, features = ["alloc", "check"] }
+bech32 = { version = "0.11.1", default-features = false, features = ["alloc"] }
+base64 = { version = "0.22.1", default-features = false, features = ["alloc"] }
 
-# SVM
-ed25519-dalek = "2"
-bs58 = { version = "0.5", default-features = false, features = ["alloc"] }
-getrandom = { version = "0.4", default-features = false, features = ["std"] }
+# Utilities
+zeroize = { version = "1.8.2", default-features = false, features = ["derive"] }
+serde = { version = "1.0.228", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "1.0.149", default-features = false, features = ["alloc"] }
+thiserror = { version = "2.0.18", default-features = false }
+rand = { version = ">=0.8, <0.9", default-features = false }
 
-# Shared
-clap = { version = "4", features = ["derive"] }
-colored = "3"
-hex = { version = "0.4", default-features = false, features = ["alloc", "std"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-thiserror = { version = "2", default-features = false }
-zeroize = { version = "1.7", default-features = false }
+# CLI
+clap = { version = "4.6.0", features = ["derive"] }
+colored = "3.1.1"
 
-# Kobe
-kobe-btc = { version = "0.5", default-features = false, features = ["std"] }
-kobe-evm = { version = "0.5", default-features = false, features = ["std"] }
-kobe-svm = { version = "0.5", default-features = false, features = ["std"] }
+# System (std-only)
+libc = "0.2.183"
+signal-hook = "0.4.3"
 
 [profile.release]
 codegen-units = 1

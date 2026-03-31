@@ -1,41 +1,54 @@
-//! Multi-chain transaction signer.
+//! Lightweight multi-chain cryptographic signer.
 //!
-//! This is an umbrella crate that re-exports chain-specific signer crates:
+//! A single crate covering key derivation, mnemonic generation, and
+//! transaction signing for all major blockchain families — built from
+//! pure cryptographic primitives with no heavy framework dependencies.
 //!
-//! - [`btc`] — Bitcoin (ECDSA, Schnorr, PSBT, message signing)
-//! - [`evm`] — Ethereum / EVM (EIP-191, EIP-712, transaction signing)
-//! - [`svm`] — Solana / SVM (Ed25519 signing)
+//! # Features
 //!
-//! Each chain crate is feature-gated and enabled by default. Enable the
-//! `kobe` feature to activate wallet bridging with
-//! [`kobe`](https://github.com/qntx/kobe) HD wallet.
+//! - **`no_std` compatible** (with `alloc`) — disable the default `std` feature.
+//! - **Per-chain feature flags** — compile only the chains you need.
+//! - **Unified [`ChainSigner`] trait** — consistent API across all chains.
+//! - **Hand-written BIP-32 / BIP-39 / SLIP-10** — no `coins-bip32` / `coins-bip39`.
+//! - **Security hardening** (std) — `mlock`, zeroize-on-drop, signal cleanup.
 //!
-//! # Usage
+//! # Quick start
 //!
 //! ```rust,no_run
-//! // Via umbrella crate
-//! use signer::evm;
-//! let s = evm::Signer::random();
+//! use signer::{chains, chain::Chain, hd::HdDeriver, mnemonic::Mnemonic, curve::Curve};
 //!
-//! // Or depend on a chain crate directly
-//! // use signer_evm::Signer;
+//! let mnemonic = Mnemonic::from_phrase(
+//!     "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+//! ).unwrap();
+//!
+//! let signer = chains::signer_for_chain(Chain::Evm);
+//! let path = signer.default_derivation_path(0);
+//! let key = HdDeriver::derive_from_mnemonic(&mnemonic, "", &path, Curve::Secp256k1).unwrap();
+//! let address = signer.derive_address(key.expose()).unwrap();
 //! ```
 
-#[cfg(feature = "btc")]
-pub use signer_btc as btc;
-#[cfg(feature = "evm")]
-pub use signer_evm as evm;
-#[cfg(feature = "svm")]
-pub use signer_svm as svm;
-#[cfg(feature = "cosmos")]
-pub use signer_cosmos as cosmos;
-#[cfg(feature = "tron")]
-pub use signer_tron as tron;
-#[cfg(feature = "spark")]
-pub use signer_spark as spark;
-#[cfg(feature = "fil")]
-pub use signer_fil as fil;
-#[cfg(feature = "ton")]
-pub use signer_ton as ton;
-#[cfg(feature = "sui")]
-pub use signer_sui as sui;
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+
+pub mod chain;
+pub mod chains;
+pub mod curve;
+pub mod eip712;
+pub mod error;
+pub mod hd;
+pub mod mnemonic;
+pub mod rlp;
+pub mod secret;
+pub mod traits;
+
+#[cfg(feature = "std")]
+pub mod hardening;
+
+pub use chain::Chain;
+pub use curve::Curve;
+pub use error::{HdError, MnemonicError, SignerError};
+pub use hd::HdDeriver;
+pub use mnemonic::Mnemonic;
+pub use secret::SecretBytes;
+pub use traits::{ChainSigner, SignOutput};
