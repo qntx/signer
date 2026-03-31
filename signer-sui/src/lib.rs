@@ -1,15 +1,28 @@
-//! Sui transaction signer built on [`ed25519_dalek`].
+//! Sui transaction signer built on [`ed25519_dalek`] and [`blake2`].
 //!
-//! Provides Ed25519 signing with Sui's intent-based hashing.
+//! Sui uses **BLAKE2b-256** for address derivation and intent-based
+//! transaction/message signing. The wire signature format is
+//! `flag(0x00) || sig(64) || pubkey(32)` (97 bytes).
+//!
 //! Address derivation is handled by [`kobe-sui`].
 
 mod error;
 
+use blake2::Blake2bVar;
+use blake2::digest::{Update, VariableOutput};
 pub use ed25519_dalek::{self, Signature};
 use ed25519_dalek::{Signer as _, SigningKey};
 pub use error::Error;
-use sha2::Digest as _;
 pub use signer_core::{self, Sign, SignExt, SignOutput};
+
+/// Ed25519 signature scheme flag used by Sui.
+const ED25519_FLAG: u8 = 0x00;
+
+/// Sui transaction intent prefix: `[scope=0, version=0, app_id=0]`.
+const TX_INTENT: [u8; 3] = [0x00, 0x00, 0x00];
+
+/// Sui personal message intent prefix: `[scope=3, version=0, app_id=0]`.
+const MSG_INTENT: [u8; 3] = [0x03, 0x00, 0x00];
 
 /// Sui transaction signer.
 #[derive(Debug, Clone)]
@@ -50,37 +63,37 @@ impl Signer {
         signer
     }
 
-    /// Sign arbitrary bytes with Ed25519.
+    /// Sign arbitrary bytes with Ed25519 (raw, no intent prefix).
     #[must_use]
-    pub fn sign(&self, message: &[u8]) -> Signature {
+    pub fn sign_raw(&self, message: &[u8]) -> Signature {
         self.key.sign(message)
     }
 
-    /// Sign a Sui transaction with intent prefix `[0, 0, 0]` + SHA-256.
+    /// Sign a Sui transaction with intent-based BLAKE2b-256 hashing.
+    ///
+    /// Computes `BLAKE2b-256(intent[0,0,0] || tx_bytes)` then signs the digest.
     #[must_use]
     pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Signature {
-        let mut prefixed = Vec::with_capacity(3 + tx_bytes.len());
-        prefixed.extend_from_slice(&[0, 0, 0]); // TransactionData intent
-        prefixed.extend_from_slice(tx_bytes);
-        let hash = sha2::Sha256::digest(&prefixed);
-        self.key.sign(&hash)
+        let digest = intent_hash(TX_INTENT, tx_bytes);
+        self.key.sign(&digest)
     }
 
-    /// Sign a personal message with intent prefix `[3, 0, 0]` + SHA-256.
+    /// Sign a personal message with intent-based BLAKE2b-256 hashing.
+    ///
+    /// The message is first BCS-serialized (ULEB128 length prefix), then
+    /// `BLAKE2b-256(intent[3,0,0] || bcs_bytes)` is signed.
     #[must_use]
     pub fn sign_message(&self, message: &[u8]) -> Signature {
-        let mut prefixed = Vec::with_capacity(3 + message.len());
-        prefixed.extend_from_slice(&[3, 0, 0]); // PersonalMessage intent
-        prefixed.extend_from_slice(message);
-        let hash = sha2::Sha256::digest(&prefixed);
-        self.key.sign(&hash)
+        let bcs = bcs_serialize_bytes(message);
+        let digest = intent_hash(MSG_INTENT, &bcs);
+        self.key.sign(&digest)
     }
 
-    /// Encode a Sui serialized signature: `flag(1) || sig(64) || pubkey(32)`.
+    /// Encode a Sui wire signature: `flag(0x00) || sig(64) || pubkey(32)`.
     #[must_use]
     pub fn encode_signature(&self, signature: &Signature) -> Vec<u8> {
         let mut out = Vec::with_capacity(97);
-        out.push(0x00); // Ed25519 scheme flag
+        out.push(ED25519_FLAG);
         out.extend_from_slice(&signature.to_bytes());
         out.extend_from_slice(self.key.verifying_key().as_bytes());
         out
@@ -103,14 +116,13 @@ impl Signer {
         *self.key.verifying_key().as_bytes()
     }
 
-    /// Sui address: `0x` + hex(SHA3-256(`0x00` || pubkey)).
+    /// Sui address: `0x` + hex(BLAKE2b-256(`0x00` || pubkey)).
     #[must_use]
     pub fn address(&self) -> String {
-        use sha3::{Digest, Sha3_256};
-        let mut data = Vec::with_capacity(33);
-        data.push(0x00); // Ed25519 scheme flag
-        data.extend_from_slice(self.key.verifying_key().as_bytes());
-        let hash = Sha3_256::digest(&data);
+        let mut buf = Vec::with_capacity(33);
+        buf.push(ED25519_FLAG);
+        buf.extend_from_slice(self.key.verifying_key().as_bytes());
+        let hash = blake2b_256(&buf);
         format!("0x{}", hex::encode(hash))
     }
 }
@@ -119,19 +131,33 @@ impl Sign for Signer {
     type Error = Error;
 
     fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
-        use ed25519_dalek::Signer as _;
         let sig = self.key.sign(hash);
-        Ok(SignOutput::ed25519(sig.to_bytes().to_vec()))
+        let pubkey = self.key.verifying_key().as_bytes().to_vec();
+        Ok(SignOutput::ed25519_with_pubkey(
+            sig.to_bytes().to_vec(),
+            pubkey,
+        ))
     }
 
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
-        self.sign_hash(message)
+        let sig = Self::sign_message(self, message);
+        let pubkey = self.key.verifying_key().as_bytes().to_vec();
+        Ok(SignOutput::ed25519_with_pubkey(
+            sig.to_bytes().to_vec(),
+            pubkey,
+        ))
     }
 
     fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
-        self.sign_hash(tx_bytes)
+        let sig = Self::sign_transaction(self, tx_bytes);
+        let pubkey = self.key.verifying_key().as_bytes().to_vec();
+        Ok(SignOutput::ed25519_with_pubkey(
+            sig.to_bytes().to_vec(),
+            pubkey,
+        ))
     }
 }
+
 #[cfg(feature = "kobe")]
 impl Signer {
     /// Create from a [`kobe_sui::DerivedAccount`].
@@ -144,32 +170,118 @@ impl Signer {
     }
 }
 
+/// BLAKE2b-256 hash.
+fn blake2b_256(data: &[u8]) -> [u8; 32] {
+    let mut hasher = Blake2bVar::new(32).expect("valid output size");
+    hasher.update(data);
+    let mut out = [0u8; 32];
+    hasher.finalize_variable(&mut out).expect("correct length");
+    out
+}
+
+/// Compute intent message hash: `BLAKE2b-256(intent_prefix || data)`.
+fn intent_hash(intent: [u8; 3], data: &[u8]) -> [u8; 32] {
+    let mut hasher = Blake2bVar::new(32).expect("valid output size");
+    hasher.update(&intent);
+    hasher.update(data);
+    let mut out = [0u8; 32];
+    hasher.finalize_variable(&mut out).expect("correct length");
+    out
+}
+
+/// BCS-serialize a byte slice: ULEB128 length prefix followed by the bytes.
+fn bcs_serialize_bytes(data: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(5 + data.len());
+    let mut len = data.len();
+    loop {
+        #[allow(clippy::cast_possible_truncation)] // guarded: & 0x7F always fits u8
+        let mut byte = (len & 0x7F) as u8;
+        len >>= 7;
+        if len > 0 {
+            byte |= 0x80;
+        }
+        out.push(byte);
+        if len == 0 {
+            break;
+        }
+    }
+    out.extend_from_slice(data);
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn sign_and_verify() {
-        let s = Signer::random();
-        let sig = s.sign(b"hello Sui");
-        s.verify(b"hello Sui", &sig).unwrap();
-    }
-
-    #[test]
-    fn address_format() {
+    fn address_uses_blake2b() {
         let s = Signer::random();
         let addr = s.address();
         assert!(addr.starts_with("0x"));
         assert_eq!(addr.len(), 66); // 0x + 64 hex chars
+
+        // Verify manually
+        let mut buf = Vec::with_capacity(33);
+        buf.push(ED25519_FLAG);
+        buf.extend_from_slice(&s.public_key_bytes());
+        let hash = blake2b_256(&buf);
+        assert_eq!(addr, format!("0x{}", hex::encode(hash)));
+    }
+
+    #[test]
+    fn sign_transaction_uses_intent_and_blake2b() {
+        let s = Signer::random();
+        let tx = b"fake transaction bytes";
+        let sig = s.sign_transaction(tx);
+
+        // Verify against the intent-hashed digest
+        let digest = intent_hash(TX_INTENT, tx);
+        s.verify(&digest, &sig).unwrap();
+    }
+
+    #[test]
+    fn sign_message_uses_bcs_and_intent() {
+        let s = Signer::random();
+        let msg = b"hello sui";
+        let sig = s.sign_message(msg);
+
+        // Verify against the BCS + intent-hashed digest
+        let bcs = bcs_serialize_bytes(msg);
+        let digest = intent_hash(MSG_INTENT, &bcs);
+        s.verify(&digest, &sig).unwrap();
     }
 
     #[test]
     fn encode_signature_length() {
         let s = Signer::random();
-        let sig = s.sign(b"test");
+        let sig = s.sign_raw(b"test");
         let encoded = s.encode_signature(&sig);
-        assert_eq!(encoded.len(), 97); // 1 + 64 + 32
-        assert_eq!(encoded[0], 0x00); // Ed25519 flag
+        assert_eq!(encoded.len(), 97);
+        assert_eq!(encoded[0], ED25519_FLAG);
+    }
+
+    #[test]
+    fn sign_trait_includes_pubkey() {
+        let s = Signer::random();
+        let out = Sign::sign_transaction(&s, b"tx").unwrap();
+        assert_eq!(out.signature.len(), 64);
+        assert!(out.public_key.is_some());
+        assert_eq!(out.public_key.unwrap().len(), 32);
+    }
+
+    #[test]
+    fn bcs_uleb128_encoding() {
+        // Short message: length < 128 → single byte
+        let bcs = bcs_serialize_bytes(b"hi");
+        assert_eq!(bcs[0], 2); // length = 2
+        assert_eq!(&bcs[1..], b"hi");
+
+        // Longer message: length = 200 → two bytes
+        let data = vec![0xAA; 200];
+        let bcs = bcs_serialize_bytes(&data);
+        assert_eq!(bcs[0], 0xC8); // 200 & 0x7F | 0x80 = 0xC8
+        assert_eq!(bcs[1], 0x01); // 200 >> 7 = 1
+        assert_eq!(&bcs[2..], data.as_slice());
     }
 
     #[test]

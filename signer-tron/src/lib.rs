@@ -93,7 +93,11 @@ impl Signer {
         data.extend_from_slice(prefix.as_bytes());
         data.extend_from_slice(message);
         let hash = Keccak256::digest(&data);
-        self.sign_hash(&hash)
+        let mut out = self.sign_hash(&hash)?;
+        // TRON follows EVM convention: v = 27 + recovery_id
+        out.signature[64] += 27;
+        out.recovery_id = out.recovery_id.map(|r| r + 27);
+        Ok(out)
     }
 
     /// Expose the inner [`SigningKey`].

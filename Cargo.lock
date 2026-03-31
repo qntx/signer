@@ -1102,12 +1102,11 @@ dependencies = [
 name = "signer-sui"
 version = "0.4.0"
 dependencies = [
+ "blake2",
  "ed25519-dalek",
  "hex",
  "kobe-sui",
  "rand_core 0.6.4",
- "sha2",
- "sha3",
  "signer-core",
  "thiserror",
  "zeroize",
