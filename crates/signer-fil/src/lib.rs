@@ -3,6 +3,12 @@
 //! Provides secp256k1 ECDSA signing with Blake2b-256 hashing for Filecoin.
 //! Address derivation is handled by [`kobe-fil`].
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+
+use alloc::{format, vec::Vec};
+
 mod error;
 
 use blake2::digest::consts::U32;
@@ -56,6 +62,7 @@ impl Signer {
     }
 
     /// Generate a random signer.
+    #[cfg(feature = "getrandom")]
     #[must_use]
     pub fn random() -> Self {
         Self {

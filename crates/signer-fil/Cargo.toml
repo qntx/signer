@@ -6,6 +6,13 @@ license.workspace = true
 repository.workspace = true
 description = "Filecoin transaction signer — secp256k1 ECDSA + Blake2b."
 
+[features]
+default = ["std"]
+std = ["alloc", "signer-core/std", "zeroize/std"]
+alloc = ["signer-core/alloc", "zeroize/alloc"]
+getrandom = ["rand_core/getrandom"]
+kobe = ["dep:kobe-fil"]
+
 [dependencies]
 signer-core.workspace = true
 k256.workspace = true
@@ -16,10 +23,6 @@ zeroize.workspace = true
 thiserror.workspace = true
 
 kobe-fil = { workspace = true, optional = true }
-
-[features]
-default = []
-kobe = ["dep:kobe-fil"]
 
 [lints]
 workspace = true

@@ -1,6 +1,6 @@
 //! EIP-712 typed structured data hashing.
 
-use std::collections::{BTreeMap, BTreeSet};
+use alloc::collections::{BTreeMap, BTreeSet};
 
 use sha3::{Digest, Keccak256};
 

@@ -3,6 +3,12 @@
 //! Provides Ed25519 signing for TON transactions and messages.
 //! Address derivation is handled by [`kobe-ton`].
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+
+use alloc::{format, string::String, vec::Vec};
+
 mod error;
 
 pub use ed25519_dalek::{self, Signature};
@@ -48,6 +54,7 @@ impl Signer {
     }
 
     /// Generate a random signer.
+    #[cfg(feature = "getrandom")]
     #[must_use]
     pub fn random() -> Self {
         use rand_core::{OsRng, RngCore};

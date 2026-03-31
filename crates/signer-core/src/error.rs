@@ -1,5 +1,7 @@
 //! Core error type shared across all signer crates.
 
+use alloc::string::String;
+
 /// Errors from signing operations.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

@@ -3,6 +3,12 @@
 //! Provides secp256k1 ECDSA signing for Spark transactions.
 //! Address derivation is handled by [`kobe-spark`].
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+
+use alloc::{format, vec::Vec};
+
 mod error;
 
 pub use error::Error;
@@ -53,6 +59,7 @@ impl Signer {
     }
 
     /// Generate a random signer.
+    #[cfg(feature = "getrandom")]
     #[must_use]
     pub fn random() -> Self {
         Self {

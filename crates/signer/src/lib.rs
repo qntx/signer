@@ -18,6 +18,8 @@
 //! let sig = s.sign_message(b"hello").unwrap();
 //! ```
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
 #[cfg(feature = "btc")]
 pub use signer_btc as btc;
 pub use signer_core as core;

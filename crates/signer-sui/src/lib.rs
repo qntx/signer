@@ -6,6 +6,12 @@
 //!
 //! Address derivation is handled by [`kobe-sui`].
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+
+use alloc::{format, string::String, vec::Vec};
+
 mod error;
 
 use blake2::Blake2bVar;
@@ -62,6 +68,7 @@ impl Signer {
     }
 
     /// Generate a random signer.
+    #[cfg(feature = "getrandom")]
     #[must_use]
     pub fn random() -> Self {
         use rand_core::{OsRng, RngCore};

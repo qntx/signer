@@ -10,23 +10,23 @@ default-members = ["crates/signer"]
 resolver = "3"
 
 [workspace.package]
-version = "0.4.0"
+version = "0.4.1"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/qntx/signer"
 description = "Lightweight multi-chain transaction signer."
 
 [workspace.dependencies]
-signer-core = { version = "0.4", path = "crates/signer-core" }
-signer-btc = { version = "0.4", path = "crates/signer-btc" }
-signer-evm = { version = "0.4", path = "crates/signer-evm" }
-signer-svm = { version = "0.4", path = "crates/signer-svm" }
-signer-cosmos = { version = "0.4", path = "crates/signer-cosmos" }
-signer-tron = { version = "0.4", path = "crates/signer-tron" }
-signer-spark = { version = "0.4", path = "crates/signer-spark" }
-signer-fil = { version = "0.4", path = "crates/signer-fil" }
-signer-ton = { version = "0.4", path = "crates/signer-ton" }
-signer-sui = { version = "0.4", path = "crates/signer-sui" }
+signer-core = { version = "0.4", path = "crates/signer-core", default-features = false }
+signer-btc = { version = "0.4", path = "crates/signer-btc", default-features = false }
+signer-evm = { version = "0.4", path = "crates/signer-evm", default-features = false }
+signer-svm = { version = "0.4", path = "crates/signer-svm", default-features = false }
+signer-cosmos = { version = "0.4", path = "crates/signer-cosmos", default-features = false }
+signer-tron = { version = "0.4", path = "crates/signer-tron", default-features = false }
+signer-spark = { version = "0.4", path = "crates/signer-spark", default-features = false }
+signer-fil = { version = "0.4", path = "crates/signer-fil", default-features = false }
+signer-ton = { version = "0.4", path = "crates/signer-ton", default-features = false }
+signer-sui = { version = "0.4", path = "crates/signer-sui", default-features = false }
 
 # Cryptography (versions aligned with kobe)
 k256 = { version = "0.13.4", default-features = false, features = ["ecdsa", "arithmetic"] }
@@ -42,14 +42,14 @@ serde_json = { version = "1", default-features = false, features = ["alloc"] }
 
 # CLI
 clap = { version = "4", features = ["derive"] }
-colored = "2"
+colored = "3.1.1"
 serde = { version = "1", features = ["derive"] }
 
 # Random
-rand_core = { version = "0.6", features = ["getrandom"] }
+rand_core = { version = "0.6", default-features = false }
 
 # Utilities
-zeroize = { version = "1.8.2", default-features = false, features = ["derive", "alloc"] }
+zeroize = { version = "1.8.2", default-features = false, features = ["derive"] }
 thiserror = { version = "2.0.18", default-features = false }
 
 # Kobe (optional bridge)

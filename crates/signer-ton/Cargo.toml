@@ -6,6 +6,13 @@ license.workspace = true
 repository.workspace = true
 description = "TON transaction signer — Ed25519 signing."
 
+[features]
+default = ["std"]
+std = ["alloc", "signer-core/std", "zeroize/std"]
+alloc = ["signer-core/alloc", "zeroize/alloc"]
+getrandom = ["rand_core/getrandom"]
+kobe = ["dep:kobe-ton"]
+
 [dependencies]
 signer-core.workspace = true
 ed25519-dalek.workspace = true
@@ -15,10 +22,6 @@ zeroize.workspace = true
 thiserror.workspace = true
 
 kobe-ton = { workspace = true, optional = true }
-
-[features]
-default = []
-kobe = ["dep:kobe-ton"]
 
 [lints]
 workspace = true

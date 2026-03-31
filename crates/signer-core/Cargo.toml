@@ -8,6 +8,11 @@ description = "Unified signing trait and types for multi-chain transaction signe
 keywords = ["crypto", "signer", "trait", "multi-chain"]
 categories = ["cryptography::cryptocurrencies"]
 
+[features]
+default = ["std"]
+std = ["alloc"]
+alloc = []
+
 [dependencies]
 thiserror.workspace = true
 

@@ -14,6 +14,12 @@
 //! - **Associated error type** — matches kobe's `Derive` trait pattern.
 //! - **[`SignExt`]** — blanket extension trait (like kobe's `DeriveExt`).
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+
+use alloc::vec::Vec;
+
 mod error;
 
 pub use error::Error;

@@ -51,20 +51,20 @@ pub fn render_sign(out: &SignOutput, json: bool) -> Result<(), Box<dyn std::erro
     if json { return Ok(print_json(out)?); }
 
     println!();
-    println!("      {} {}", "Chain".cyan().bold(), out.chain);
-    println!("  {} {}", "Operation".cyan().bold(), out.operation);
+    println!("      {}       {}", "Chain".cyan().bold(), out.chain);
+    println!("      {}   {}", "Operation".cyan().bold(), out.operation);
     if let Some(ref addr) = out.address {
-        println!("    {} {}", "Address".cyan().bold(), addr.green());
+        println!("      {}     {}", "Address".cyan().bold(), addr.green());
     }
     if let Some(ref msg) = out.message {
-        println!("    {} {}", "Message".cyan().bold(), msg.dimmed());
+        println!("      {}     {}", "Message".cyan().bold(), msg.dimmed());
     }
-    println!("  {} {}", "Signature".cyan().bold(), out.signature);
+    println!("      {}   {}", "Signature".cyan().bold(), out.signature);
     if let Some(rid) = out.recovery_id {
-        println!("    {} {}", "Recovery".cyan().bold(), rid);
+        println!("      {}    {}", "Recovery".cyan().bold(), rid);
     }
     if let Some(ref pk) = out.public_key {
-        println!(" {} {}", "Public Key".cyan().bold(), pk.dimmed());
+        println!("      {}  {}", "Public Key".cyan().bold(), pk.dimmed());
     }
     println!();
     Ok(())
@@ -80,11 +80,11 @@ pub fn render_address(out: &AddressOutput, json: bool) -> Result<(), Box<dyn std
     if json { return Ok(print_json(out)?); }
 
     println!();
-    println!("      {} {}", "Chain".cyan().bold(), out.chain);
+    println!("      {}       {}", "Chain".cyan().bold(), out.chain);
     if let Some(ref addr) = out.address {
-        println!("    {} {}", "Address".cyan().bold(), addr.green());
+        println!("      {}     {}", "Address".cyan().bold(), addr.green());
     }
-    println!(" {} {}", "Public Key".cyan().bold(), out.public_key);
+    println!("      {}  {}", "Public Key".cyan().bold(), out.public_key);
     println!();
     Ok(())
 }

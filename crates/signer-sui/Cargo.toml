@@ -6,6 +6,13 @@ license.workspace = true
 repository.workspace = true
 description = "Sui transaction signer — Ed25519 + intent-based signing."
 
+[features]
+default = ["std"]
+std = ["alloc", "signer-core/std", "zeroize/std"]
+alloc = ["signer-core/alloc", "zeroize/alloc"]
+getrandom = ["rand_core/getrandom"]
+kobe = ["dep:kobe-sui"]
+
 [dependencies]
 signer-core.workspace = true
 ed25519-dalek.workspace = true
@@ -16,10 +23,6 @@ zeroize.workspace = true
 thiserror.workspace = true
 
 kobe-sui = { workspace = true, optional = true }
-
-[features]
-default = []
-kobe = ["dep:kobe-sui"]
 
 [lints]
 workspace = true

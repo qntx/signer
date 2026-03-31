@@ -19,7 +19,22 @@ signer-ton = { workspace = true, optional = true }
 signer-sui = { workspace = true, optional = true }
 
 [features]
-default = ["btc", "evm", "svm", "cosmos", "tron", "spark", "fil", "ton", "sui"]
+default = ["std", "btc", "evm", "svm", "cosmos", "tron", "spark", "fil", "ton", "sui"]
+std = ["alloc", "signer-core/std",
+    "signer-btc?/std", "signer-evm?/std", "signer-svm?/std",
+    "signer-cosmos?/std", "signer-tron?/std", "signer-spark?/std",
+    "signer-fil?/std", "signer-ton?/std", "signer-sui?/std",
+]
+alloc = ["signer-core/alloc",
+    "signer-btc?/alloc", "signer-evm?/alloc", "signer-svm?/alloc",
+    "signer-cosmos?/alloc", "signer-tron?/alloc", "signer-spark?/alloc",
+    "signer-fil?/alloc", "signer-ton?/alloc", "signer-sui?/alloc",
+]
+getrandom = [
+    "signer-btc?/getrandom", "signer-evm?/getrandom", "signer-svm?/getrandom",
+    "signer-cosmos?/getrandom", "signer-tron?/getrandom", "signer-spark?/getrandom",
+    "signer-fil?/getrandom", "signer-ton?/getrandom", "signer-sui?/getrandom",
+]
 btc = ["dep:signer-btc"]
 evm = ["dep:signer-evm"]
 svm = ["dep:signer-svm"]

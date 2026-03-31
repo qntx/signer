@@ -13,16 +13,16 @@ name = "signer"
 path = "src/main.rs"
 
 [dependencies]
-signer-core.workspace = true
-signer-btc.workspace = true
-signer-evm.workspace = true
-signer-svm.workspace = true
-signer-cosmos.workspace = true
-signer-tron.workspace = true
-signer-spark.workspace = true
-signer-fil.workspace = true
-signer-ton.workspace = true
-signer-sui.workspace = true
+signer-core = { workspace = true, features = ["std"] }
+signer-btc = { workspace = true, features = ["std", "getrandom"] }
+signer-evm = { workspace = true, features = ["std", "getrandom"] }
+signer-svm = { workspace = true, features = ["std", "getrandom"] }
+signer-cosmos = { workspace = true, features = ["std", "getrandom"] }
+signer-tron = { workspace = true, features = ["std", "getrandom"] }
+signer-spark = { workspace = true, features = ["std", "getrandom"] }
+signer-fil = { workspace = true, features = ["std", "getrandom"] }
+signer-ton = { workspace = true, features = ["std", "getrandom"] }
+signer-sui = { workspace = true, features = ["std", "getrandom"] }
 k256.workspace = true
 clap.workspace = true
 colored.workspace = true

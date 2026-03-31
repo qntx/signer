@@ -15,6 +15,12 @@
 //! assert_eq!(out.signature.len(), 65); // r(32) + s(32) + v(1)
 //! ```
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+
+use alloc::{format, string::String, vec::Vec};
+
 mod eip712;
 mod error;
 mod rlp;
@@ -68,6 +74,7 @@ impl Signer {
     }
 
     /// Generate a random signer.
+    #[cfg(feature = "getrandom")]
     #[must_use]
     pub fn random() -> Self {
         Self {
