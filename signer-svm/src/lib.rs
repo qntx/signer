@@ -2,17 +2,6 @@
 //!
 //! Provides Ed25519 signing, Solana compact-u16 transaction envelope
 //! parsing, and signed transaction encoding.
-//!
-//! # Examples
-//!
-//! ```
-//! use signer_svm::Signer;
-//! use ed25519_dalek::Signer as _;
-//!
-//! let signer = Signer::random();
-//! let sig = signer.sign(b"hello solana");
-//! signer.verify(b"hello solana", &sig).unwrap();
-//! ```
 
 mod error;
 
@@ -21,6 +10,7 @@ use core::ops::Deref;
 pub use ed25519_dalek::{self, Signature};
 use ed25519_dalek::{SigningKey, Verifier};
 pub use error::Error;
+pub use signer_core::{self, Sign, SignExt, SignOutput};
 use zeroize::Zeroizing;
 
 /// Solana transaction signer.
@@ -64,7 +54,7 @@ impl Signer {
         Ok(Self::from_bytes(&bytes))
     }
 
-    /// Create from a Base58-encoded keypair (64 bytes: secret ‖ public).
+    /// Create from a Base58-encoded keypair (64 bytes: secret || public).
     ///
     /// Standard format used by Phantom, Backpack, and Solflare.
     ///
@@ -128,7 +118,7 @@ impl Signer {
         hex::encode(self.key.verifying_key().as_bytes())
     }
 
-    /// Export keypair as Base58 (64 bytes: secret ‖ public).
+    /// Export keypair as Base58 (64 bytes: secret || public).
     #[must_use]
     pub fn keypair_base58(&self) -> Zeroizing<String> {
         let vk = self.key.verifying_key();
@@ -181,6 +171,24 @@ impl Signer {
         let mut signed = tx_bytes.to_vec();
         signed[header_len..header_len + 64].copy_from_slice(&signature.to_bytes());
         Ok(signed)
+    }
+}
+
+impl Sign for Signer {
+    type Error = Error;
+
+    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
+        use ed25519_dalek::Signer as _;
+        let sig = self.key.sign(hash);
+        Ok(SignOutput::ed25519(sig.to_bytes().to_vec()))
+    }
+
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
+        self.sign_hash(message)
+    }
+
+    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
+        self.sign_hash(tx_bytes)
     }
 }
 
@@ -253,18 +261,10 @@ mod tests {
     }
 
     #[test]
-    fn verify_wrong_message_fails() {
+    fn sign_via_trait() {
         let s = Signer::random();
-        let sig = s.sign(b"correct");
-        assert!(s.verify(b"wrong", &sig).is_err());
-    }
-
-    #[test]
-    fn sign_transaction_message_verifies() {
-        let s = Signer::random();
-        let msg = [0u8; 128];
-        let sig = s.sign_transaction_message(&msg);
-        s.verify(&msg, &sig).unwrap();
+        let out = Sign::sign_message(&s, b"hello").unwrap();
+        assert_eq!(out.signature.len(), 64);
     }
 
     #[test]

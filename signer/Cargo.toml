@@ -7,6 +7,7 @@ repository.workspace = true
 description = "Multi-chain transaction signer — umbrella crate re-exporting chain-specific signers."
 
 [dependencies]
+signer-core.workspace = true
 signer-btc = { workspace = true, optional = true }
 signer-evm = { workspace = true, optional = true }
 signer-svm = { workspace = true, optional = true }

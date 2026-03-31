@@ -36,3 +36,9 @@ impl From<ed25519_dalek::SignatureError> for Error {
         Self::VerifyFailed(e)
     }
 }
+
+impl From<signer_core::Error> for Error {
+    fn from(e: signer_core::Error) -> Self {
+        Self::InvalidKey(e.to_string())
+    }
+}

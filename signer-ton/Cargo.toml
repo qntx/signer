@@ -7,6 +7,7 @@ repository.workspace = true
 description = "TON transaction signer — Ed25519 signing."
 
 [dependencies]
+signer-core.workspace = true
 ed25519-dalek.workspace = true
 rand_core.workspace = true
 hex.workspace = true

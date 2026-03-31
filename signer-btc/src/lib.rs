@@ -21,6 +21,7 @@ mod error;
 pub use error::Error;
 use k256::ecdsa::SigningKey;
 use sha2::{Digest, Sha256};
+pub use signer_core::{self, Sign, SignExt, SignOutput};
 
 /// Bitcoin transaction signer.
 ///
@@ -58,7 +59,7 @@ impl Signer {
     #[must_use]
     pub fn random() -> Self {
         Self {
-            key: SigningKey::random(&mut k256::elliptic_curve::rand_core::OsRng),
+            key: SigningKey::random(&mut rand_core::OsRng),
         }
     }
 
@@ -67,7 +68,7 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if `hash` is not 32 bytes or the signing primitive fails.
-    pub fn sign_hash(&self, hash: &[u8]) -> Result<Vec<u8>, Error> {
+    pub fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
         if hash.len() != 32 {
             return Err(Error::InvalidMessage(format!(
                 "expected 32-byte hash, got {}",
@@ -81,7 +82,7 @@ impl Signer {
 
         let mut out = sig.to_bytes().to_vec();
         out.push(rid.to_byte());
-        Ok(out)
+        Ok(SignOutput::secp256k1(out, rid.to_byte()))
     }
 
     /// Sign a Bitcoin transaction sighash preimage (double-SHA256 then ECDSA).
@@ -89,7 +90,7 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the signing primitive fails.
-    pub fn sign_transaction(&self, sighash_preimage: &[u8]) -> Result<Vec<u8>, Error> {
+    pub fn sign_transaction(&self, sighash_preimage: &[u8]) -> Result<SignOutput, Error> {
         let hash = Sha256::digest(Sha256::digest(sighash_preimage));
         self.sign_hash(&hash)
     }
@@ -101,7 +102,7 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the signing primitive fails.
-    pub fn sign_message(&self, message: &[u8]) -> Result<Vec<u8>, Error> {
+    pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
         let prefix = b"\x18Bitcoin Signed Message:\n";
         let mut data = Vec::with_capacity(prefix.len() + 9 + message.len());
         data.extend_from_slice(prefix);
@@ -125,6 +126,22 @@ impl Signer {
     #[must_use]
     pub const fn signing_key(&self) -> &SigningKey {
         &self.key
+    }
+}
+
+impl Sign for Signer {
+    type Error = Error;
+
+    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
+        Self::sign_hash(self, hash)
+    }
+
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
+        Self::sign_message(self, message)
+    }
+
+    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
+        Self::sign_transaction(self, tx_bytes)
     }
 }
 
@@ -166,11 +183,11 @@ mod tests {
     fn sign_hash_and_verify() {
         let s = Signer::random();
         let hash = Sha256::digest(b"test");
-        let sig_bytes = s.sign_hash(&hash).unwrap();
-        assert_eq!(sig_bytes.len(), 65);
+        let out = s.sign_hash(&hash).unwrap();
+        assert_eq!(out.signature.len(), 65);
 
-        let r: [u8; 32] = sig_bytes[..32].try_into().unwrap();
-        let s_arr: [u8; 32] = sig_bytes[32..64].try_into().unwrap();
+        let r: [u8; 32] = out.signature[..32].try_into().unwrap();
+        let s_arr: [u8; 32] = out.signature[32..64].try_into().unwrap();
         let sig = k256::ecdsa::Signature::from_scalars(r, s_arr).unwrap();
         s.signing_key()
             .verifying_key()
@@ -189,16 +206,16 @@ mod tests {
     #[test]
     fn sign_message_short() {
         let s = Signer::random();
-        let sig = s.sign_message(b"Hello Bitcoin!").unwrap();
-        assert_eq!(sig.len(), 65);
+        let out = s.sign_message(b"Hello Bitcoin!").unwrap();
+        assert_eq!(out.signature.len(), 65);
     }
 
     #[test]
     fn sign_message_long_varint() {
         let s = Signer::random();
         let msg = vec![0x42u8; 300];
-        let sig = s.sign_message(&msg).unwrap();
-        assert_eq!(sig.len(), 65);
+        let out = s.sign_message(&msg).unwrap();
+        assert_eq!(out.signature.len(), 65);
     }
 
     #[test]

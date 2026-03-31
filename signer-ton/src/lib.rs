@@ -8,6 +8,7 @@ mod error;
 pub use ed25519_dalek::{self, Signature};
 use ed25519_dalek::{Signer as _, SigningKey};
 pub use error::Error;
+pub use signer_core::{self, Sign, SignExt, SignOutput};
 
 /// TON transaction signer.
 #[derive(Debug, Clone)]
@@ -84,6 +85,23 @@ impl Signer {
     }
 }
 
+impl Sign for Signer {
+    type Error = Error;
+
+    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
+        use ed25519_dalek::Signer as _;
+        let sig = self.key.sign(hash);
+        Ok(SignOutput::ed25519(sig.to_bytes().to_vec()))
+    }
+
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
+        self.sign_hash(message)
+    }
+
+    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
+        self.sign_hash(tx_bytes)
+    }
+}
 #[cfg(feature = "kobe")]
 impl Signer {
     /// Create from a [`kobe_ton::DerivedAccount`].

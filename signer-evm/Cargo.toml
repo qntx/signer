@@ -7,7 +7,9 @@ repository.workspace = true
 description = "EVM transaction signer — EIP-191, EIP-712, typed transaction signing."
 
 [dependencies]
+signer-core.workspace = true
 k256.workspace = true
+rand_core.workspace = true
 sha3.workspace = true
 hex.workspace = true
 serde_json.workspace = true

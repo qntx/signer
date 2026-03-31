@@ -22,6 +22,7 @@ mod rlp;
 pub use error::Error;
 use k256::ecdsa::SigningKey;
 use sha3::{Digest, Keccak256};
+pub use signer_core::{self, Sign, SignExt, SignOutput};
 use zeroize::ZeroizeOnDrop;
 
 /// EVM transaction signer.
@@ -63,7 +64,7 @@ impl Signer {
     #[must_use]
     pub fn random() -> Self {
         Self {
-            key: SigningKey::random(&mut k256::elliptic_curve::rand_core::OsRng),
+            key: SigningKey::random(&mut rand_core::OsRng),
         }
     }
 
@@ -83,7 +84,7 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if `hash` is not exactly 32 bytes.
-    pub fn sign_hash(&self, hash: &[u8]) -> Result<Vec<u8>, Error> {
+    pub fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
         if hash.len() != 32 {
             return Err(Error::InvalidMessage(format!(
                 "expected 32-byte hash, got {}",
@@ -99,7 +100,7 @@ impl Signer {
         out.extend_from_slice(&sig.r().to_bytes());
         out.extend_from_slice(&sig.s().to_bytes());
         out.push(rid.to_byte());
-        Ok(out)
+        Ok(SignOutput::secp256k1(out, rid.to_byte()))
     }
 
     /// EIP-191 `personal_sign`. Returns 65 bytes with `v = 27 | 28`.
@@ -107,16 +108,17 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if signing fails.
-    pub fn sign_message(&self, message: &[u8]) -> Result<Vec<u8>, Error> {
+    pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
         let prefix = format!("\x19Ethereum Signed Message:\n{}", message.len());
         let mut data = Vec::with_capacity(prefix.len() + message.len());
         data.extend_from_slice(prefix.as_bytes());
         data.extend_from_slice(message);
         let hash = Keccak256::digest(&data);
 
-        let mut sig = self.sign_hash(&hash)?;
-        sig[64] += 27; // v = 27 + recovery_id
-        Ok(sig)
+        let mut out = self.sign_hash(&hash)?;
+        out.signature[64] += 27; // v = 27 + recovery_id
+        out.recovery_id = out.recovery_id.map(|r| r + 27);
+        Ok(out)
     }
 
     /// Sign EIP-712 typed structured data (JSON input).
@@ -125,11 +127,12 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the JSON is malformed or signing fails.
-    pub fn sign_typed_data(&self, typed_data_json: &str) -> Result<Vec<u8>, Error> {
+    pub fn sign_typed_data(&self, typed_data_json: &str) -> Result<SignOutput, Error> {
         let hash = eip712::hash_typed_data_json(typed_data_json)?;
-        let mut sig = self.sign_hash(&hash)?;
-        sig[64] += 27;
-        Ok(sig)
+        let mut out = self.sign_hash(&hash)?;
+        out.signature[64] += 27;
+        out.recovery_id = out.recovery_id.map(|r| r + 27);
+        Ok(out)
     }
 
     /// Sign an unsigned typed transaction (EIP-1559 / EIP-2930).
@@ -138,7 +141,7 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the transaction bytes are malformed.
-    pub fn sign_transaction(&self, unsigned_tx: &[u8]) -> Result<Vec<u8>, Error> {
+    pub fn sign_transaction(&self, unsigned_tx: &[u8]) -> Result<SignOutput, Error> {
         let hash = Keccak256::digest(unsigned_tx);
         self.sign_hash(&hash)
     }
@@ -175,6 +178,22 @@ impl Signer {
 
 /// Wrapper to ensure zeroization of the signing key on drop.
 impl ZeroizeOnDrop for Signer {}
+
+impl Sign for Signer {
+    type Error = Error;
+
+    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
+        Self::sign_hash(self, hash)
+    }
+
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
+        Self::sign_message(self, message)
+    }
+
+    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
+        Self::sign_transaction(self, tx_bytes)
+    }
+}
 
 #[cfg(feature = "kobe")]
 impl Signer {
@@ -246,11 +265,11 @@ mod tests {
             Signer::from_hex("4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318")
                 .unwrap();
         let hash = Keccak256::digest(b"test");
-        let sig_bytes = s.sign_hash(&hash).unwrap();
-        assert_eq!(sig_bytes.len(), 65);
+        let out = s.sign_hash(&hash).unwrap();
+        assert_eq!(out.signature.len(), 65);
 
-        let r: [u8; 32] = sig_bytes[..32].try_into().unwrap();
-        let s_arr: [u8; 32] = sig_bytes[32..64].try_into().unwrap();
+        let r: [u8; 32] = out.signature[..32].try_into().unwrap();
+        let s_arr: [u8; 32] = out.signature[32..64].try_into().unwrap();
         let sig = k256::ecdsa::Signature::from_scalars(r, s_arr).unwrap();
         s.signing_key()
             .verifying_key()
@@ -261,8 +280,8 @@ mod tests {
     #[test]
     fn sign_message_v_byte() {
         let s = Signer::random();
-        let sig = s.sign_message(b"Hello").unwrap();
-        let v = sig[64];
+        let out = s.sign_message(b"Hello").unwrap();
+        let v = out.signature[64];
         assert!(v == 27 || v == 28);
     }
 

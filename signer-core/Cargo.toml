@@ -1,0 +1,15 @@
+[package]
+name = "signer-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Unified signing trait and types for multi-chain transaction signers."
+keywords = ["crypto", "signer", "trait", "multi-chain"]
+categories = ["cryptography::cryptocurrencies"]
+
+[dependencies]
+thiserror.workspace = true
+
+[lints]
+workspace = true

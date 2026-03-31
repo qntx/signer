@@ -33,3 +33,16 @@ impl From<hex::FromHexError> for Error {
         Self::Hex(e)
     }
 }
+
+impl From<signer_core::Error> for Error {
+    fn from(e: signer_core::Error) -> Self {
+        match e {
+            signer_core::Error::InvalidKey(m) => Self::InvalidKey(m),
+            signer_core::Error::InvalidMessage(m) => Self::InvalidMessage(m),
+            signer_core::Error::SigningFailed(m) => Self::SigningFailed(m),
+            signer_core::Error::InvalidSignature(_) | signer_core::Error::InvalidTransaction(_) => {
+                Self::SigningFailed(e.to_string())
+            }
+        }
+    }
+}

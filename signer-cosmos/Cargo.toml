@@ -7,7 +7,9 @@ repository.workspace = true
 description = "Cosmos transaction signer — secp256k1 ECDSA + SHA-256."
 
 [dependencies]
+signer-core.workspace = true
 k256.workspace = true
+rand_core.workspace = true
 sha2.workspace = true
 hex.workspace = true
 zeroize.workspace = true

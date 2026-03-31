@@ -1,4 +1,4 @@
-//! Filecoin transaction signer built on [`k256`] and [`blake2`].
+﻿//! Filecoin transaction signer built on [`k256`] and [`blake2`].
 //!
 //! Provides secp256k1 ECDSA signing with Blake2b-256 hashing for Filecoin.
 //! Address derivation is handled by [`kobe-fil`].
@@ -9,6 +9,7 @@ use blake2::digest::consts::U32;
 use blake2::{Blake2b, Digest};
 pub use error::Error;
 use k256::ecdsa::SigningKey;
+pub use signer_core::{self, Sign, SignExt, SignOutput};
 
 type Blake2b256 = Blake2b<U32>;
 
@@ -46,7 +47,7 @@ impl Signer {
     #[must_use]
     pub fn random() -> Self {
         Self {
-            key: SigningKey::random(&mut k256::elliptic_curve::rand_core::OsRng),
+            key: SigningKey::random(&mut rand_core::OsRng),
         }
     }
 
@@ -55,7 +56,7 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if `hash` is not 32 bytes or signing fails.
-    pub fn sign_hash(&self, hash: &[u8]) -> Result<Vec<u8>, Error> {
+    pub fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
         if hash.len() != 32 {
             return Err(Error::InvalidMessage(format!(
                 "expected 32-byte hash, got {}",
@@ -68,7 +69,7 @@ impl Signer {
             .map_err(|e| Error::SigningFailed(e.to_string()))?;
         let mut out = sig.to_bytes().to_vec();
         out.push(rid.to_byte());
-        Ok(out)
+        Ok(SignOutput::secp256k1(out, rid.to_byte()))
     }
 
     /// Sign a Filecoin transaction (Blake2b-256 hash then ECDSA).
@@ -76,7 +77,7 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if signing fails.
-    pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<Vec<u8>, Error> {
+    pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
         let hash = Blake2b256::digest(tx_bytes);
         self.sign_hash(&hash)
     }
@@ -86,7 +87,7 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if signing fails.
-    pub fn sign_message(&self, message: &[u8]) -> Result<Vec<u8>, Error> {
+    pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
         let hash = Blake2b256::digest(message);
         self.sign_hash(&hash)
     }
@@ -98,6 +99,21 @@ impl Signer {
     }
 }
 
+impl Sign for Signer {
+    type Error = Error;
+
+    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
+        Self::sign_hash(self, hash)
+    }
+
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
+        Self::sign_message(self, message)
+    }
+
+    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
+        Self::sign_transaction(self, tx_bytes)
+    }
+}
 #[cfg(feature = "kobe")]
 impl Signer {
     /// Create from a [`kobe_fil::DerivedAccount`].
@@ -117,8 +133,8 @@ mod tests {
     #[test]
     fn sign_hash_length() {
         let s = Signer::random();
-        let sig = s.sign_hash(&[0u8; 32]).unwrap();
-        assert_eq!(sig.len(), 65);
+        let out = s.sign_hash(&[0u8; 32]).unwrap();
+        assert_eq!(out.signature.len(), 65);
     }
 
     #[test]

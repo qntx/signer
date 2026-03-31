@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "signer",
+    "signer", "signer-core",
     "signer-btc", "signer-evm", "signer-svm",
     "signer-cosmos", "signer-tron", "signer-spark",
     "signer-fil", "signer-ton", "signer-sui",
@@ -16,6 +16,7 @@ repository = "https://github.com/qntx/signer"
 description = "Lightweight multi-chain transaction signer."
 
 [workspace.dependencies]
+signer-core = { version = "0.4", path = "signer-core" }
 signer-btc = { version = "0.4", path = "signer-btc" }
 signer-evm = { version = "0.4", path = "signer-evm" }
 signer-svm = { version = "0.4", path = "signer-svm" }

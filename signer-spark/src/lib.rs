@@ -1,4 +1,4 @@
-//! Spark (Bitcoin L2) transaction signer built on [`k256`] and [`sha2`].
+﻿//! Spark (Bitcoin L2) transaction signer built on [`k256`] and [`sha2`].
 //!
 //! Provides secp256k1 ECDSA signing for Spark transactions.
 //! Address derivation is handled by [`kobe-spark`].
@@ -8,6 +8,7 @@ mod error;
 pub use error::Error;
 use k256::ecdsa::SigningKey;
 use sha2::{Digest, Sha256};
+pub use signer_core::{self, Sign, SignExt, SignOutput};
 
 /// Spark transaction signer.
 #[derive(Debug, Clone)]
@@ -43,7 +44,7 @@ impl Signer {
     #[must_use]
     pub fn random() -> Self {
         Self {
-            key: SigningKey::random(&mut k256::elliptic_curve::rand_core::OsRng),
+            key: SigningKey::random(&mut rand_core::OsRng),
         }
     }
 
@@ -52,7 +53,7 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if `hash` is not 32 bytes or signing fails.
-    pub fn sign_hash(&self, hash: &[u8]) -> Result<Vec<u8>, Error> {
+    pub fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
         if hash.len() != 32 {
             return Err(Error::InvalidMessage(format!(
                 "expected 32-byte hash, got {}",
@@ -65,7 +66,7 @@ impl Signer {
             .map_err(|e| Error::SigningFailed(e.to_string()))?;
         let mut out = sig.to_bytes().to_vec();
         out.push(rid.to_byte());
-        Ok(out)
+        Ok(SignOutput::secp256k1(out, rid.to_byte()))
     }
 
     /// Sign a Spark transaction (double-SHA256 then ECDSA).
@@ -73,7 +74,7 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if signing fails.
-    pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<Vec<u8>, Error> {
+    pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
         let hash = Sha256::digest(Sha256::digest(tx_bytes));
         self.sign_hash(&hash)
     }
@@ -83,7 +84,7 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if signing fails.
-    pub fn sign_message(&self, message: &[u8]) -> Result<Vec<u8>, Error> {
+    pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
         let hash = Sha256::digest(Sha256::digest(message));
         self.sign_hash(&hash)
     }
@@ -95,6 +96,21 @@ impl Signer {
     }
 }
 
+impl Sign for Signer {
+    type Error = Error;
+
+    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
+        Self::sign_hash(self, hash)
+    }
+
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
+        Self::sign_message(self, message)
+    }
+
+    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
+        Self::sign_transaction(self, tx_bytes)
+    }
+}
 #[cfg(feature = "kobe")]
 impl Signer {
     /// Create from a [`kobe_spark::DerivedAccount`].
@@ -114,8 +130,8 @@ mod tests {
     #[test]
     fn sign_hash_length() {
         let s = Signer::random();
-        let sig = s.sign_hash(&[0u8; 32]).unwrap();
-        assert_eq!(sig.len(), 65);
+        let out = s.sign_hash(&[0u8; 32]).unwrap();
+        assert_eq!(out.signature.len(), 65);
     }
 
     #[test]

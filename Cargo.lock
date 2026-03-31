@@ -1009,6 +1009,7 @@ name = "signer"
 version = "0.4.0"
 dependencies = [
  "signer-btc",
+ "signer-core",
  "signer-cosmos",
  "signer-evm",
  "signer-fil",
@@ -1026,9 +1027,18 @@ dependencies = [
  "hex",
  "k256",
  "kobe-btc",
+ "rand_core 0.6.4",
  "sha2",
+ "signer-core",
  "thiserror",
  "zeroize",
+]
+
+[[package]]
+name = "signer-core"
+version = "0.4.0"
+dependencies = [
+ "thiserror",
 ]
 
 [[package]]
@@ -1038,7 +1048,9 @@ dependencies = [
  "hex",
  "k256",
  "kobe-cosmos",
+ "rand_core 0.6.4",
  "sha2",
+ "signer-core",
  "thiserror",
  "zeroize",
 ]
@@ -1050,8 +1062,10 @@ dependencies = [
  "hex",
  "k256",
  "kobe-evm",
+ "rand_core 0.6.4",
  "serde_json",
  "sha3",
+ "signer-core",
  "thiserror",
  "zeroize",
 ]
@@ -1064,6 +1078,8 @@ dependencies = [
  "hex",
  "k256",
  "kobe-fil",
+ "rand_core 0.6.4",
+ "signer-core",
  "thiserror",
  "zeroize",
 ]
@@ -1075,7 +1091,9 @@ dependencies = [
  "hex",
  "k256",
  "kobe-spark",
+ "rand_core 0.6.4",
  "sha2",
+ "signer-core",
  "thiserror",
  "zeroize",
 ]
@@ -1090,6 +1108,7 @@ dependencies = [
  "rand_core 0.6.4",
  "sha2",
  "sha3",
+ "signer-core",
  "thiserror",
  "zeroize",
 ]
@@ -1103,6 +1122,7 @@ dependencies = [
  "hex",
  "kobe-svm",
  "rand_core 0.6.4",
+ "signer-core",
  "thiserror",
  "zeroize",
 ]
@@ -1115,6 +1135,7 @@ dependencies = [
  "hex",
  "kobe-ton",
  "rand_core 0.6.4",
+ "signer-core",
  "thiserror",
  "zeroize",
 ]
@@ -1126,8 +1147,10 @@ dependencies = [
  "hex",
  "k256",
  "kobe-tron",
+ "rand_core 0.6.4",
  "sha2",
  "sha3",
+ "signer-core",
  "thiserror",
  "zeroize",
 ]

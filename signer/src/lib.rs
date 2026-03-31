@@ -20,6 +20,8 @@
 
 #[cfg(feature = "btc")]
 pub use signer_btc as btc;
+pub use signer_core as core;
+pub use signer_core::{Sign, SignExt, SignOutput};
 #[cfg(feature = "cosmos")]
 pub use signer_cosmos as cosmos;
 #[cfg(feature = "evm")]
