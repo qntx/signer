@@ -199,6 +199,14 @@ impl Sign for Signer {
     fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
         Self::sign_transaction(self, tx_bytes)
     }
+
+    fn encode_signed_transaction(
+        &self,
+        tx_bytes: &[u8],
+        signature: &SignOutput,
+    ) -> Result<Vec<u8>, Error> {
+        Self::encode_signed_transaction(tx_bytes, &signature.signature)
+    }
 }
 
 #[cfg(feature = "kobe")]
@@ -295,5 +303,16 @@ mod tests {
     fn rejects_wrong_hash_length() {
         let s = Signer::random();
         assert!(s.sign_hash(b"short").is_err());
+    }
+
+    #[test]
+    fn debug_does_not_leak_key() {
+        let s =
+            Signer::from_hex("4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318")
+                .unwrap();
+        let debug = format!("{s:?}");
+        assert!(debug.contains("[REDACTED]"));
+        assert!(!debug.contains("4c0883"));
+        assert!(!debug.contains("362318"));
     }
 }

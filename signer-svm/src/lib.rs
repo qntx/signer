@@ -197,6 +197,20 @@ impl Sign for Signer {
     fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
         self.sign_hash(tx_bytes)
     }
+
+    fn extract_signable_bytes<'a>(&self, tx_bytes: &'a [u8]) -> Result<&'a [u8], Error> {
+        Self::extract_signable_bytes(tx_bytes)
+    }
+
+    fn encode_signed_transaction(
+        &self,
+        tx_bytes: &[u8],
+        signature: &SignOutput,
+    ) -> Result<Vec<u8>, Error> {
+        let sig = Signature::from_slice(&signature.signature)
+            .map_err(|e| Error::InvalidTransaction(e.to_string()))?;
+        Self::encode_signed_transaction(tx_bytes, &sig)
+    }
 }
 
 #[cfg(feature = "kobe")]
