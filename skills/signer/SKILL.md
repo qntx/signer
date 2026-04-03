@@ -1,8 +1,8 @@
 ---
 name: signer
 description: >-
-  Multi-chain transaction signing CLI tool for 9 chains: Ethereum, Bitcoin,
-  Solana, Cosmos, Tron, Sui, TON, Filecoin, and Spark. Use when the user asks
+  Multi-chain transaction signing CLI tool for 10 chains: Ethereum, Bitcoin,
+  Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, and XRP Ledger. Use when the user asks
   to sign messages, sign hashes, sign transactions, or look up addresses/public
   keys from private keys. Supports JSON output via --json flag for
   programmatic/agent consumption.
@@ -10,7 +10,7 @@ description: >-
 
 # Signer CLI — Multi-Chain Transaction Signing Tool
 
-`signer` is a single binary CLI for cryptographic signing operations across **9 chains**: Ethereum, Bitcoin, Solana, Cosmos, Tron, Sui, TON, Filecoin, and Spark. It uses lightweight, battle-tested cryptographic libraries (k256, ed25519-dalek, sha2, sha3, blake2).
+`signer` is a single binary CLI for cryptographic signing operations across **10 chains**: Ethereum, Bitcoin, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, and XRP Ledger. It uses lightweight, battle-tested cryptographic libraries (k256, ed25519-dalek, sha2, sha3, blake2).
 
 ## Installation
 
@@ -50,17 +50,18 @@ The `--json` flag is **global** and must appear **before** the chain subcommand.
 
 ### Chain subcommands and aliases
 
-| Chain    | Primary  | Aliases           |
-| -------- | -------- | ----------------- |
-| Ethereum | `evm`    | `eth`, `ethereum` |
-| Bitcoin  | `btc`    | `bitcoin`         |
-| Solana   | `svm`    | `sol`, `solana`   |
-| Cosmos   | `cosmos` | `atom`            |
-| Tron     | `tron`   | `trx`             |
-| Sui      | `sui`    | —                 |
-| TON      | `ton`    | —                 |
-| Filecoin | `fil`    | `filecoin`        |
-| Spark    | `spark`  | —                 |
+| Chain      | Primary  | Aliases           |
+| ---------- | -------- | ----------------- |
+| Ethereum   | `evm`    | `eth`, `ethereum` |
+| Bitcoin    | `btc`    | `bitcoin`         |
+| Solana     | `svm`    | `sol`, `solana`   |
+| Cosmos     | `cosmos` | `atom`            |
+| Tron       | `tron`   | `trx`             |
+| Sui        | `sui`    | —                 |
+| TON        | `ton`    | —                 |
+| Filecoin   | `fil`    | `filecoin`        |
+| Spark      | `spark`  | —                 |
+| XRP Ledger | `xrpl`   | `xrp`, `ripple`   |
 
 ### Subcommands per chain
 
@@ -100,17 +101,18 @@ The `--json` flag is **global** and must appear **before** the chain subcommand.
 
 ## Chain-Specific Hashing
 
-| Chain    | `sign-message` hash                              | `sign-tx` hash           |
-| -------- | ------------------------------------------------ | ------------------------ |
-| Ethereum | Keccak-256 (EIP-191 prefix)                      | Keccak-256               |
-| Bitcoin  | double-SHA256 (Bitcoin Signed Message prefix)    | double-SHA256            |
-| Solana   | Ed25519 direct                                   | Ed25519 direct           |
-| Cosmos   | SHA-256                                          | SHA-256                  |
-| Tron     | Keccak-256 (TRON Signed Message prefix)          | SHA-256                  |
-| Sui      | BLAKE2b-256 (BCS + intent)                       | BLAKE2b-256 (intent)     |
-| TON      | Ed25519 direct                                   | Ed25519 direct           |
-| Filecoin | Blake2b-256                                      | Blake2b-256              |
-| Spark    | double-SHA256                                    | double-SHA256            |
+| Chain      | `sign-message` hash                            | `sign-tx` hash       |
+| ---------- | ---------------------------------------------- | -------------------- |
+| Ethereum   | Keccak-256 (EIP-191 prefix)                    | Keccak-256           |
+| Bitcoin    | double-SHA256 (Bitcoin Signed Message prefix)  | double-SHA256        |
+| Solana     | Ed25519 direct                                 | Ed25519 direct       |
+| Cosmos     | SHA-256                                        | SHA-256              |
+| Tron       | Keccak-256 (TRON Signed Message prefix)        | SHA-256              |
+| Sui        | BLAKE2b-256 (BCS + intent)                     | BLAKE2b-256 (intent) |
+| TON        | Ed25519 direct                                 | Ed25519 direct       |
+| Filecoin   | Blake2b-256                                    | Blake2b-256          |
+| Spark      | double-SHA256                                  | double-SHA256        |
+| XRP Ledger | Not supported (no canonical message standard)  | SHA-512-half + DER   |
 
 ## Usage Examples
 
@@ -168,7 +170,7 @@ signer svm sign-tx -k "9d61b19d..." -t "01000103..."
 signer svm address -k "9d61b19d..."
 ```
 
-### Cosmos / Tron / Spark / Filecoin
+### Cosmos / Tron / Spark / Filecoin / XRP Ledger
 
 ```bash
 # All secp256k1 chains follow the same pattern
@@ -176,6 +178,11 @@ signer cosmos sign-message -k "4c0883a6..." -m "Hello"
 signer tron sign-message -k "4c0883a6..." -m "Hello"
 signer spark sign-tx -k "4c0883a6..." -t "deadbeef..."
 signer fil sign-hash -k "4c0883a6..." -x "abcdef..."
+
+# XRP Ledger (no sign-message, only sign-hash and sign-tx)
+signer xrpl sign-hash -k "4c0883a6..." -x "abcdef..."
+signer xrpl sign-tx -k "4c0883a6..." -t "535458..."
+signer xrpl address -k "4c0883a6..."
 ```
 
 ### Sui
@@ -256,6 +263,7 @@ All errors in JSON mode return exit code 1 with:
 | BTC, Cosmos, Tron, etc.  | 64-char hex (32 bytes)                                   |
 | SVM                      | 64-char hex or Base58 keypair (64 bytes: secret+public)  |
 | SUI, TON                 | 64-char hex (Ed25519 secret key)                         |
+| XRP Ledger               | 64-char hex (32 bytes secp256k1 key)                     |
 
 ## Agent Best Practices
 
