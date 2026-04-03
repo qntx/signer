@@ -653,25 +653,25 @@ dependencies = [
 
 [[package]]
 name = "kobe-btc"
-version = "0.7.6"
+version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1e868217d1579f2076dc78cfd418e69bc8771c67e3d115a07ed881222728fc5"
+checksum = "ec48ebc71bc375da83d8f86791e6e2616dd00ece06cafeb16eb67055a2e4d389"
 dependencies = [
  "bitcoin",
  "hex",
- "kobe-primitives 0.7.6",
+ "kobe-primitives",
  "thiserror",
  "zeroize",
 ]
 
 [[package]]
 name = "kobe-cosmos"
-version = "0.7.6"
+version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40ac0d2f769327d85aeb9d3ad66f70775ef641f609240205ab42d5567b94ccf8"
+checksum = "66699d8804f1569a5eebd2e47b155be26efd94720d9f7a6c5d080d9fac03829d"
 dependencies = [
  "bech32",
- "kobe-primitives 0.7.6",
+ "kobe-primitives",
  "ripemd 0.2.0",
  "sha2",
  "thiserror",
@@ -680,33 +680,33 @@ dependencies = [
 
 [[package]]
 name = "kobe-evm"
-version = "0.7.6"
+version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6891cb9c47cbfa9f5a66d387965dc8ee7bb16853d012b9278c97475acf8fa750"
+checksum = "981f03078e195c712799adad2ccb55a3caf89da3aa43ac4079092007789394c9"
 dependencies = [
  "alloy-primitives",
- "kobe-primitives 0.7.6",
+ "kobe-primitives",
  "thiserror",
  "zeroize",
 ]
 
 [[package]]
 name = "kobe-fil"
-version = "0.7.6"
+version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "564427e95a5697c6eab6e6ae5b5d2ae590ce5fbac2924274a8aca35ce4a1ef4e"
+checksum = "b77aa9426bb319d000e6486cdbe92c30b3113103af15dc713c22e6d259e9b48c"
 dependencies = [
  "blake2",
- "kobe-primitives 0.7.6",
+ "kobe-primitives",
  "thiserror",
  "zeroize",
 ]
 
 [[package]]
 name = "kobe-primitives"
-version = "0.7.6"
+version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5e4cc4666f3a56faa3bafa3c83b19708a584c93df3282676ba3363b235de738"
+checksum = "99c4b810e91198619c5cfae9ec57d6b0f8965eda951c77cf22efae58788c9025"
 dependencies = [
  "bip32",
  "bip39",
@@ -720,66 +720,54 @@ dependencies = [
 ]
 
 [[package]]
-name = "kobe-primitives"
-version = "0.7.7"
-dependencies = [
- "bip32",
- "bip39",
- "hex",
- "k256",
- "thiserror",
- "zeroize",
-]
-
-[[package]]
 name = "kobe-spark"
-version = "0.7.6"
+version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f835a4062e20d4a3fe76797feda4531a66dbfef3ee8d44f66b3957531371234"
+checksum = "00dcefcf1560e187654ee36cf3551ab6c7312f148b98bfaa0e3beca07425505f"
 dependencies = [
- "kobe-primitives 0.7.6",
+ "kobe-primitives",
  "thiserror",
  "zeroize",
 ]
 
 [[package]]
 name = "kobe-sui"
-version = "0.7.6"
+version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89eccfd49964423c5da0d5cf5f0b55a2a868ea63321048a8bac4e1bcba4ca98a"
+checksum = "c0ced85b81f41045cf5ba98b8fc6f63b38c2d836ecb59aaa502a166f6a2df48b"
 dependencies = [
  "blake2",
  "ed25519-dalek",
  "hex",
- "kobe-primitives 0.7.6",
+ "kobe-primitives",
  "thiserror",
  "zeroize",
 ]
 
 [[package]]
 name = "kobe-svm"
-version = "0.7.6"
+version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52a0962feb3e9602965b3cac21d68f5603e423117c1e48dcf2583922fd1933e1"
+checksum = "9b3bdcfc61dc310f91d6efaeef455484fd7db36e6249f8afc85c5f0812c8710c"
 dependencies = [
  "bs58",
  "ed25519-dalek",
  "hex",
- "kobe-primitives 0.7.6",
+ "kobe-primitives",
  "thiserror",
  "zeroize",
 ]
 
 [[package]]
 name = "kobe-ton"
-version = "0.7.6"
+version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da62e0db5eba2ca588b136d639a99cc7a699935bc292a6b10f3af96200e0f7d7"
+checksum = "8cfe73dcdfe1d95fa3b06663593e28d1588085beedaae88117fae5e1063570e6"
 dependencies = [
  "base64",
  "ed25519-dalek",
  "hex",
- "kobe-primitives 0.7.6",
+ "kobe-primitives",
  "sha2",
  "thiserror",
  "zeroize",
@@ -787,12 +775,12 @@ dependencies = [
 
 [[package]]
 name = "kobe-tron"
-version = "0.7.6"
+version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f8741204756ead8c26c6bc4157ec5b90ce8a4adca16a1db0114b9007c3d1596"
+checksum = "8eb494be3989f649923e1db6ea864c2f3af518117d7ba4814f13ea1091e067ca"
 dependencies = [
  "bs58",
- "kobe-primitives 0.7.6",
+ "kobe-primitives",
  "sha3",
  "thiserror",
  "zeroize",
@@ -801,9 +789,11 @@ dependencies = [
 [[package]]
 name = "kobe-xrpl"
 version = "0.7.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9156f0c864e65de847822f7883222865c60f49673a31cce4548ac0dfbf71f28"
 dependencies = [
  "bs58",
- "kobe-primitives 0.7.7",
+ "kobe-primitives",
  "ripemd 0.2.0",
  "sha2",
  "thiserror",

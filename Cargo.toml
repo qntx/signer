@@ -64,7 +64,7 @@ kobe-spark = { version = "0.7", default-features = false, features = ["std"] }
 kobe-fil = { version = "0.7", default-features = false, features = ["std"] }
 kobe-ton = { version = "0.7", default-features = false, features = ["std"] }
 kobe-sui = { version = "0.7", default-features = false, features = ["std"] }
-kobe-xrpl = { version = "0.7", path = "../kobe/crates/kobe-xrpl", default-features = false, features = ["std"] }
+kobe-xrpl = { version = "0.7", default-features = false, features = ["std"] }
 
 [profile.release]
 codegen-units = 1
