@@ -9,11 +9,11 @@ extern crate alloc;
 
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
-use alloc::{format, vec::Vec};
+use alloc::{format, string::String, vec::Vec};
 
 mod error;
 
-use blake2::digest::consts::U32;
+use blake2::digest::consts::{U4, U20, U32};
 use blake2::{Blake2b, Digest};
 pub use error::Error;
 use k256::ecdsa::SigningKey;
@@ -21,6 +21,8 @@ pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 use zeroize::ZeroizeOnDrop;
 
 type Blake2b256 = Blake2b<U32>;
+type Blake2b160 = Blake2b<U20>;
+type Blake2b4 = Blake2b<U4>;
 
 /// Filecoin transaction signer.
 ///
@@ -113,11 +115,64 @@ impl Signer {
         self.sign_hash(&hash)
     }
 
+    /// Compressed public key (33 bytes).
+    #[must_use]
+    pub fn public_key_bytes(&self) -> Vec<u8> {
+        self.key
+            .verifying_key()
+            .to_encoded_point(true)
+            .as_bytes()
+            .to_vec()
+    }
+
+    /// Filecoin protocol-1 (secp256k1) address (`f1...`).
+    ///
+    /// Computed as `"f1" + base32_lower(BLAKE2b-160(pubkey) || BLAKE2b-4(0x01 || payload))`.
+    #[must_use]
+    pub fn address(&self) -> String {
+        let vk = self.key.verifying_key();
+        let uncompressed = vk.to_encoded_point(false);
+        let payload = Blake2b160::digest(uncompressed.as_bytes());
+        let mut checksum_input = Vec::with_capacity(1 + payload.len());
+        checksum_input.push(0x01); // protocol 1
+        checksum_input.extend_from_slice(&payload);
+        let checksum = Blake2b4::digest(&checksum_input);
+        let mut addr_bytes = Vec::with_capacity(payload.len() + checksum.len());
+        addr_bytes.extend_from_slice(&payload);
+        addr_bytes.extend_from_slice(&checksum);
+        let encoded = base32_lower_encode(&addr_bytes);
+        format!("f1{encoded}")
+    }
+
     /// Expose the inner [`SigningKey`].
     #[must_use]
     pub const fn signing_key(&self) -> &SigningKey {
         &self.key
     }
+}
+
+/// RFC 4648 base32 lowercase encoding without padding.
+fn base32_lower_encode(data: &[u8]) -> String {
+    const ALPHABET: &[u8; 32] = b"abcdefghijklmnopqrstuvwxyz234567";
+    let mut out = String::with_capacity((data.len() * 8).div_ceil(5));
+    let mut buffer: u64 = 0;
+    let mut bits: u32 = 0;
+    for &byte in data {
+        buffer = (buffer << 8) | u64::from(byte);
+        bits += 8;
+        while bits >= 5 {
+            bits -= 5;
+            #[allow(clippy::cast_possible_truncation)]
+            let idx = ((buffer >> bits) & 0x1F) as usize;
+            out.push(ALPHABET[idx] as char);
+        }
+    }
+    if bits > 0 {
+        #[allow(clippy::cast_possible_truncation)]
+        let idx = ((buffer << (5 - bits)) & 0x1F) as usize;
+        out.push(ALPHABET[idx] as char);
+    }
+    out
 }
 
 impl Sign for Signer {

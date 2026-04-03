@@ -93,6 +93,16 @@ impl Signer {
     pub fn public_key_hex(&self) -> String {
         hex::encode(self.public_key_bytes())
     }
+
+    /// TON signer identity (hex-encoded Ed25519 public key).
+    ///
+    /// TON wallet addresses depend on the deployed contract code and
+    /// workchain ID, so a full address cannot be derived from the key alone.
+    /// This returns the 64-character hex public key used to identify the signer.
+    #[must_use]
+    pub fn address(&self) -> String {
+        self.public_key_hex()
+    }
 }
 
 impl Sign for Signer {

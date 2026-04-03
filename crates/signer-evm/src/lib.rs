@@ -84,6 +84,16 @@ impl Signer {
         }
     }
 
+    /// Compressed public key (33 bytes).
+    #[must_use]
+    pub fn public_key_bytes(&self) -> Vec<u8> {
+        self.key
+            .verifying_key()
+            .to_encoded_point(true)
+            .as_bytes()
+            .to_vec()
+    }
+
     /// Ethereum address derived from this signing key (EIP-55 checksummed).
     #[must_use]
     pub fn address(&self) -> String {

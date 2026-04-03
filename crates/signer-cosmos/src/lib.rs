@@ -9,12 +9,14 @@ extern crate alloc;
 
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
-use alloc::{format, vec::Vec};
+use alloc::{format, string::String, vec::Vec};
 
 mod error;
 
 pub use error::Error;
+use bech32::{Bech32, Hrp};
 use k256::ecdsa::SigningKey;
+use ripemd::{Digest as RipemdDigest, Ripemd160};
 use sha2::{Digest, Sha256};
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 use zeroize::ZeroizeOnDrop;
@@ -118,6 +120,20 @@ impl Signer {
             .to_encoded_point(true)
             .as_bytes()
             .to_vec()
+    }
+
+    /// Cosmos address with `cosmos1` prefix (bech32-encoded RIPEMD160(SHA256(pubkey))).
+    ///
+    /// # Panics
+    ///
+    /// Panics if bech32 encoding fails (should never happen with valid input).
+    #[must_use]
+    pub fn address(&self) -> String {
+        let pubkey = self.public_key_bytes();
+        let sha = Sha256::digest(&pubkey);
+        let hash160 = Ripemd160::digest(sha);
+        let hrp = Hrp::parse_unchecked("cosmos");
+        bech32::encode::<Bech32>(hrp, &hash160).expect("valid bech32")
     }
 
     /// Expose the inner [`SigningKey`].

@@ -9,12 +9,13 @@ extern crate alloc;
 
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
-use alloc::{format, vec::Vec};
+use alloc::{format, string::String, vec::Vec};
 
 mod error;
 
 pub use error::Error;
 use k256::ecdsa::SigningKey;
+use ripemd::{Digest as RipemdDigest, Ripemd160};
 use sha2::{Digest, Sha256};
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 use zeroize::ZeroizeOnDrop;
@@ -108,6 +109,32 @@ impl Signer {
     pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
         let hash = Sha256::digest(Sha256::digest(message));
         self.sign_hash(&hash)
+    }
+
+    /// Compressed public key (33 bytes).
+    #[must_use]
+    pub fn public_key_bytes(&self) -> Vec<u8> {
+        self.key
+            .verifying_key()
+            .to_encoded_point(true)
+            .as_bytes()
+            .to_vec()
+    }
+
+    /// Spark P2PKH address (legacy, starts with `1`).
+    ///
+    /// Same derivation as Bitcoin: `Base58Check(0x00 || RIPEMD160(SHA256(compressed_pubkey)))`.
+    #[must_use]
+    pub fn address(&self) -> String {
+        let pubkey = self.public_key_bytes();
+        let sha = Sha256::digest(&pubkey);
+        let hash160 = <Ripemd160 as RipemdDigest>::digest(sha);
+        let mut payload = Vec::with_capacity(25);
+        payload.push(0x00);
+        payload.extend_from_slice(&hash160);
+        let checksum = Sha256::digest(Sha256::digest(&payload));
+        payload.extend_from_slice(&checksum[..4]);
+        bs58::encode(&payload).into_string()
     }
 
     /// Expose the inner [`SigningKey`].
