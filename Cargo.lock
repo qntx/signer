@@ -1145,7 +1145,7 @@ dependencies = [
 
 [[package]]
 name = "signer"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
  "signer-btc",
  "signer-cosmos",
@@ -1162,12 +1162,14 @@ dependencies = [
 
 [[package]]
 name = "signer-btc"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
+ "bs58",
  "hex",
  "k256",
  "kobe-btc",
  "rand_core 0.6.4",
+ "ripemd 0.2.0",
  "sha2",
  "signer-primitives",
  "thiserror",
@@ -1176,7 +1178,7 @@ dependencies = [
 
 [[package]]
 name = "signer-cli"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
  "bs58",
  "clap",
@@ -1200,12 +1202,14 @@ dependencies = [
 
 [[package]]
 name = "signer-cosmos"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
+ "bech32",
  "hex",
  "k256",
  "kobe-cosmos",
  "rand_core 0.6.4",
+ "ripemd 0.2.0",
  "sha2",
  "signer-primitives",
  "thiserror",
@@ -1214,7 +1218,7 @@ dependencies = [
 
 [[package]]
 name = "signer-evm"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
  "hex",
  "k256",
@@ -1229,7 +1233,7 @@ dependencies = [
 
 [[package]]
 name = "signer-fil"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
  "blake2",
  "hex",
@@ -1243,19 +1247,21 @@ dependencies = [
 
 [[package]]
 name = "signer-primitives"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "signer-spark"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
+ "bs58",
  "hex",
  "k256",
  "kobe-spark",
  "rand_core 0.6.4",
+ "ripemd 0.2.0",
  "sha2",
  "signer-primitives",
  "thiserror",
@@ -1264,7 +1270,7 @@ dependencies = [
 
 [[package]]
 name = "signer-sui"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
  "blake2",
  "ed25519-dalek",
@@ -1278,7 +1284,7 @@ dependencies = [
 
 [[package]]
 name = "signer-svm"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
  "bs58",
  "ed25519-dalek",
@@ -1292,7 +1298,7 @@ dependencies = [
 
 [[package]]
 name = "signer-ton"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
  "ed25519-dalek",
  "hex",
@@ -1305,8 +1311,9 @@ dependencies = [
 
 [[package]]
 name = "signer-tron"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
+ "bs58",
  "hex",
  "k256",
  "kobe-tron",
@@ -1320,12 +1327,14 @@ dependencies = [
 
 [[package]]
 name = "signer-xrpl"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
+ "bs58",
  "hex",
  "k256",
  "kobe-xrpl",
  "rand_core 0.6.4",
+ "ripemd 0.2.0",
  "sha2",
  "signer-primitives",
  "thiserror",

@@ -32,7 +32,8 @@ mod error;
 pub use error::Error;
 use k256::ecdsa::signature::hazmat::PrehashSigner;
 use k256::ecdsa::{Signature, SigningKey};
-use sha2::{Digest, Sha512};
+use ripemd::{Digest as RipemdDigest, Ripemd160};
+use sha2::{Digest, Sha256, Sha512};
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 use zeroize::ZeroizeOnDrop;
 
@@ -165,6 +166,13 @@ impl Signer {
     pub const fn signing_key(&self) -> &SigningKey {
         &self.key
     }
+
+    /// Derive the XRPL classic `r`-address from the signing key.
+    #[must_use]
+    pub fn address(&self) -> String {
+        let pubkey = self.public_key_bytes();
+        encode_classic_address(&pubkey)
+    }
 }
 
 impl Sign for Signer {
@@ -193,6 +201,43 @@ impl Signer {
     pub fn from_derived(account: &kobe_xrpl::DerivedAccount) -> Result<Self, Error> {
         Self::from_hex(&account.private_key)
     }
+}
+
+/// XRPL base58 alphabet.
+const XRPL_ALPHABET: bs58::Alphabet = *bs58::Alphabet::RIPPLE;
+
+/// XRPL account address version byte.
+const ACCOUNT_VERSION: u8 = 0x00;
+
+/// Hash160: SHA-256 then RIPEMD-160.
+fn hash160(data: &[u8]) -> [u8; 20] {
+    let sha = Sha256::digest(data);
+    let ripe = Ripemd160::digest(sha);
+    let mut out = [0u8; 20];
+    out.copy_from_slice(&ripe);
+    out
+}
+
+/// Double SHA-256 (used for checksum).
+fn double_sha256(data: &[u8]) -> [u8; 32] {
+    let first = Sha256::digest(data);
+    let second = Sha256::digest(first);
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&second);
+    out
+}
+
+/// Encode a compressed public key as an XRPL classic `r`-address.
+fn encode_classic_address(compressed_pubkey: &[u8]) -> String {
+    let account_id = hash160(compressed_pubkey);
+    let mut payload = Vec::with_capacity(25);
+    payload.push(ACCOUNT_VERSION);
+    payload.extend_from_slice(&account_id);
+    let checksum = double_sha256(&payload);
+    payload.extend_from_slice(&checksum[..4]);
+    bs58::encode(&payload)
+        .with_alphabet(&XRPL_ALPHABET)
+        .into_string()
 }
 
 /// SHA-512-half: SHA-512 of `prefix || data`, taking the first 32 bytes.

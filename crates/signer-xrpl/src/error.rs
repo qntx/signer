@@ -1,8 +1,6 @@
 //! Error types for the XRPL signer.
 
 use alloc::string::String;
-#[cfg(not(feature = "std"))]
-use alloc::string::ToString;
 
 /// Errors from XRPL signing operations.
 #[derive(Debug, thiserror::Error)]
@@ -16,6 +14,9 @@ pub enum Error {
     /// Signing primitive failed.
     #[error("signing failed: {0}")]
     SigningFailed(String),
+    /// Signature bytes are malformed.
+    #[error("invalid signature: {0}")]
+    InvalidSignature(String),
     /// Transaction bytes are malformed.
     #[error("invalid transaction: {0}")]
     InvalidTransaction(String),
@@ -32,6 +33,12 @@ impl From<hex::FromHexError> for Error {
 
 impl From<signer_primitives::Error> for Error {
     fn from(e: signer_primitives::Error) -> Self {
-        Self::InvalidKey(e.to_string())
+        match e {
+            signer_primitives::Error::InvalidKey(m) => Self::InvalidKey(m),
+            signer_primitives::Error::InvalidMessage(m) => Self::InvalidMessage(m),
+            signer_primitives::Error::SigningFailed(m) => Self::SigningFailed(m),
+            signer_primitives::Error::InvalidSignature(m) => Self::InvalidSignature(m),
+            signer_primitives::Error::InvalidTransaction(m) => Self::InvalidTransaction(m),
+        }
     }
 }
