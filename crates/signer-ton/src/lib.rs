@@ -65,16 +65,10 @@ impl Signer {
         signer
     }
 
-    /// Sign arbitrary bytes with Ed25519.
+    /// Sign arbitrary bytes with raw Ed25519 (no hashing or prefixing).
     #[must_use]
-    pub fn sign(&self, message: &[u8]) -> Signature {
+    pub fn sign_raw(&self, message: &[u8]) -> Signature {
         self.key.sign(message)
-    }
-
-    /// Sign a TON transaction (Ed25519 over raw message bytes).
-    #[must_use]
-    pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Signature {
-        self.key.sign(tx_bytes)
     }
 
     /// Verify an Ed25519 signature.
@@ -90,8 +84,8 @@ impl Signer {
 
     /// Public key bytes (32 bytes).
     #[must_use]
-    pub fn public_key_bytes(&self) -> [u8; 32] {
-        *self.key.verifying_key().as_bytes()
+    pub fn public_key_bytes(&self) -> Vec<u8> {
+        self.key.verifying_key().as_bytes().to_vec()
     }
 
     /// Public key in hex.
@@ -158,14 +152,14 @@ mod tests {
     fn sign_and_verify() {
         let s = test_signer();
         let msg = b"hello TON";
-        let sig = s.sign(msg);
+        let sig = s.sign_raw(msg);
         s.verify(msg, &sig).expect("signature must verify");
     }
 
     #[test]
     fn sign_wrong_message_fails() {
         let s = test_signer();
-        let sig = s.sign(b"correct");
+        let sig = s.sign_raw(b"correct");
         assert!(s.verify(b"wrong", &sig).is_err());
     }
 
@@ -183,8 +177,8 @@ mod tests {
     #[test]
     fn deterministic_signature() {
         let s = test_signer();
-        let s1 = s.sign(b"deterministic");
-        let s2 = s.sign(b"deterministic");
+        let s1 = s.sign_raw(b"deterministic");
+        let s2 = s.sign_raw(b"deterministic");
         assert_eq!(s1.to_bytes(), s2.to_bytes());
     }
 

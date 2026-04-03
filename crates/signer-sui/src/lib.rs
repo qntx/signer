@@ -88,8 +88,9 @@ impl Signer {
     /// Sign a Sui transaction with intent-based BLAKE2b-256 hashing.
     ///
     /// Computes `BLAKE2b-256(intent[0,0,0] || tx_bytes)` then signs the digest.
+    /// Returns the raw Ed25519 [`Signature`].
     #[must_use]
-    pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Signature {
+    pub fn sign_transaction_intent(&self, tx_bytes: &[u8]) -> Signature {
         let digest = intent_hash(TX_INTENT, tx_bytes);
         self.key.sign(&digest)
     }
@@ -98,8 +99,9 @@ impl Signer {
     ///
     /// The message is first BCS-serialized (ULEB128 length prefix), then
     /// `BLAKE2b-256(intent[3,0,0] || bcs_bytes)` is signed.
+    /// Returns the raw Ed25519 [`Signature`].
     #[must_use]
-    pub fn sign_message(&self, message: &[u8]) -> Signature {
+    pub fn sign_message_intent(&self, message: &[u8]) -> Signature {
         let bcs = bcs_serialize_bytes(message);
         let digest = intent_hash(MSG_INTENT, &bcs);
         self.key.sign(&digest)
@@ -128,8 +130,8 @@ impl Signer {
 
     /// Public key bytes (32 bytes).
     #[must_use]
-    pub fn public_key_bytes(&self) -> [u8; 32] {
-        *self.key.verifying_key().as_bytes()
+    pub fn public_key_bytes(&self) -> Vec<u8> {
+        self.key.verifying_key().as_bytes().to_vec()
     }
 
     /// Sui address: `0x` + hex(BLAKE2b-256(`0x00` || pubkey)).
@@ -156,7 +158,7 @@ impl Sign for Signer {
     }
 
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
-        let sig = Self::sign_message(self, message);
+        let sig = self.sign_message_intent(message);
         let pubkey = self.key.verifying_key().as_bytes().to_vec();
         Ok(SignOutput::ed25519_with_pubkey(
             sig.to_bytes().to_vec(),
@@ -165,7 +167,7 @@ impl Sign for Signer {
     }
 
     fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
-        let sig = Self::sign_transaction(self, tx_bytes);
+        let sig = self.sign_transaction_intent(tx_bytes);
         let pubkey = self.key.verifying_key().as_bytes().to_vec();
         Ok(SignOutput::ed25519_with_pubkey(
             sig.to_bytes().to_vec(),
@@ -266,7 +268,7 @@ mod tests {
     fn sign_transaction_intent_verify() {
         let s = test_signer();
         let tx = b"bcs transaction data";
-        let sig = s.sign_transaction(tx);
+        let sig = s.sign_transaction_intent(tx);
         let digest = intent_hash(TX_INTENT, tx);
         s.verify(&digest, &sig).expect("intent digest must verify");
     }
@@ -275,7 +277,7 @@ mod tests {
     fn sign_message_bcs_intent_verify() {
         let s = test_signer();
         let msg = b"hello sui";
-        let sig = s.sign_message(msg);
+        let sig = s.sign_message_intent(msg);
         let bcs = bcs_serialize_bytes(msg);
         let digest = intent_hash(MSG_INTENT, &bcs);
         s.verify(&digest, &sig)
@@ -307,8 +309,8 @@ mod tests {
     #[test]
     fn deterministic_signing() {
         let s = test_signer();
-        let s1 = s.sign_transaction(b"same input");
-        let s2 = s.sign_transaction(b"same input");
+        let s1 = s.sign_transaction_intent(b"same input");
+        let s2 = s.sign_transaction_intent(b"same input");
         assert_eq!(s1.to_bytes(), s2.to_bytes());
     }
 

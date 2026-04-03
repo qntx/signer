@@ -7,13 +7,9 @@
 
 extern crate alloc;
 
-#[cfg(not(feature = "std"))]
-use alloc::string::ToString;
 use alloc::{format, string::String, vec::Vec};
 
 mod error;
-
-use core::ops::Deref;
 
 pub use ed25519_dalek::{self, Signature};
 use ed25519_dalek::{SigningKey, Verifier};
@@ -23,8 +19,7 @@ use zeroize::Zeroizing;
 
 /// Solana transaction signer.
 ///
-/// Wraps an [`ed25519_dalek::SigningKey`] with [`Deref`] for full upstream
-/// API access. The inner key implements [`ZeroizeOnDrop`](zeroize::ZeroizeOnDrop).
+/// Wraps an [`ed25519_dalek::SigningKey`]. The inner key is zeroized on drop.
 pub struct Signer {
     key: SigningKey,
 }
@@ -34,15 +29,6 @@ impl core::fmt::Debug for Signer {
         f.debug_struct("Signer")
             .field("key", &"[REDACTED]")
             .finish()
-    }
-}
-
-impl Deref for Signer {
-    type Target = SigningKey;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.key
     }
 }
 
@@ -105,6 +91,13 @@ impl Signer {
         signer
     }
 
+    /// Sign arbitrary bytes with raw Ed25519 (no hashing or prefixing).
+    #[must_use]
+    pub fn sign_raw(&self, message: &[u8]) -> Signature {
+        use ed25519_dalek::Signer as _;
+        self.key.sign(message)
+    }
+
     /// Verify an Ed25519 signature.
     ///
     /// # Errors
@@ -118,14 +111,19 @@ impl Signer {
     /// Sign serialized Solana transaction message bytes.
     #[must_use]
     pub fn sign_transaction_message(&self, message_bytes: &[u8]) -> Signature {
-        use ed25519_dalek::Signer as _;
-        self.key.sign(message_bytes)
+        self.sign_raw(message_bytes)
     }
 
     /// Solana address (Base58-encoded 32-byte public key).
     #[must_use]
     pub fn address(&self) -> String {
         bs58::encode(self.key.verifying_key().as_bytes()).into_string()
+    }
+
+    /// Public key bytes (32 bytes).
+    #[must_use]
+    pub fn public_key_bytes(&self) -> Vec<u8> {
+        self.key.verifying_key().as_bytes().to_vec()
     }
 
     /// Public key in hex.
@@ -254,8 +252,6 @@ fn decode_compact_u16(data: &[u8]) -> Result<(usize, usize), Error> {
 
 #[cfg(test)]
 mod tests {
-    use ed25519_dalek::Signer as _;
-
     use super::*;
 
     // RFC 8032 Test Vector 1
@@ -299,14 +295,14 @@ mod tests {
     fn sign_and_verify() {
         let s = test_signer();
         let msg = b"test message for solana";
-        let sig = s.sign(msg);
+        let sig = s.sign_raw(msg);
         s.verify(msg, &sig).expect("signature must verify");
     }
 
     #[test]
     fn sign_wrong_message_fails() {
         let s = test_signer();
-        let sig = s.sign(b"correct");
+        let sig = s.sign_raw(b"correct");
         assert!(s.verify(b"wrong", &sig).is_err());
     }
 
@@ -352,7 +348,7 @@ mod tests {
         tx.extend_from_slice(&[0u8; 64]);
         tx.extend_from_slice(msg);
 
-        let sig = s.sign(msg);
+        let sig = s.sign_raw(msg);
         let signed = Signer::encode_signed_transaction(&tx, &sig).unwrap();
 
         assert_eq!(&signed[1..65], &sig.to_bytes());
