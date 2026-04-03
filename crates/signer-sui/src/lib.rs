@@ -17,7 +17,7 @@ mod error;
 use blake2::Blake2bVar;
 use blake2::digest::{Update, VariableOutput};
 pub use ed25519_dalek::{self, Signature};
-use ed25519_dalek::{Signer as _, SigningKey};
+use ed25519_dalek::{Signer as _, SigningKey, Verifier};
 pub use error::Error;
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 
@@ -129,7 +129,6 @@ impl Signer {
     ///
     /// Returns an error if the signature is invalid.
     pub fn verify(&self, message: &[u8], signature: &Signature) -> Result<(), Error> {
-        use ed25519_dalek::Verifier;
         self.key.verifying_key().verify(message, signature)?;
         Ok(())
     }

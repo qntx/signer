@@ -16,7 +16,7 @@ mod error;
 use bech32::{Bech32, Hrp};
 pub use error::Error;
 use k256::ecdsa::SigningKey;
-use ripemd::{Digest as RipemdDigest, Ripemd160};
+use ripemd::{Digest as _, Ripemd160};
 use sha2::{Digest, Sha256};
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 use zeroize::ZeroizeOnDrop;

@@ -28,7 +28,7 @@ mod error;
 
 pub use error::Error;
 use k256::ecdsa::SigningKey;
-use ripemd::{Digest as RipemdDigest, Ripemd160};
+use ripemd::{Digest as _, Ripemd160};
 use sha2::{Digest, Sha256};
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 use zeroize::ZeroizeOnDrop;
@@ -90,7 +90,7 @@ impl Signer {
     pub fn address(&self) -> String {
         let pubkey = self.public_key_bytes();
         let sha = Sha256::digest(&pubkey);
-        let hash160 = <Ripemd160 as RipemdDigest>::digest(sha);
+        let hash160 = Ripemd160::digest(sha);
         let mut payload = Vec::with_capacity(25);
         payload.push(0x00);
         payload.extend_from_slice(&hash160);

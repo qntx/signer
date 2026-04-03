@@ -14,7 +14,7 @@ use alloc::{format, string::String, vec::Vec};
 mod error;
 
 pub use ed25519_dalek::{self, Signature};
-use ed25519_dalek::{SigningKey, Verifier};
+use ed25519_dalek::{Signer as _, SigningKey, Verifier};
 pub use error::Error;
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 use zeroize::Zeroizing;
@@ -37,7 +37,6 @@ impl core::fmt::Debug for Signer {
 impl Signer {
     /// Create from raw 32-byte secret key bytes.
     #[must_use]
-    #[inline]
     pub fn from_bytes(bytes: &[u8; 32]) -> Self {
         Self {
             key: SigningKey::from_bytes(bytes),
@@ -114,7 +113,6 @@ impl Signer {
     /// Sign arbitrary bytes with raw Ed25519 (no hashing or prefixing).
     #[must_use]
     pub fn sign_raw(&self, message: &[u8]) -> Signature {
-        use ed25519_dalek::Signer as _;
         self.key.sign(message)
     }
 
@@ -194,7 +192,6 @@ impl Sign for Signer {
     type Error = Error;
 
     fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
-        use ed25519_dalek::Signer as _;
         let sig = self.key.sign(hash);
         Ok(SignOutput::ed25519(sig.to_bytes().to_vec()))
     }

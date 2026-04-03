@@ -68,12 +68,9 @@ impl Signer {
     /// Returns an error if the hex is invalid or the key is out of range.
     pub fn from_hex(hex_str: &str) -> Result<Self, Error> {
         let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-        let bytes: [u8; 32] = hex::decode(hex_str)
-            .map_err(|e| Error::InvalidKey(e.to_string()))?
-            .try_into()
-            .map_err(|v: Vec<u8>| {
-                Error::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
-            })?;
+        let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
+            Error::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
+        })?;
         Self::from_bytes(&bytes)
     }
 

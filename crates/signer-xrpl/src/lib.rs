@@ -32,7 +32,7 @@ mod error;
 pub use error::Error;
 use k256::ecdsa::signature::hazmat::PrehashSigner;
 use k256::ecdsa::{Signature, SigningKey};
-use ripemd::{Digest as RipemdDigest, Ripemd160};
+use ripemd::{Digest as _, Ripemd160};
 use sha2::{Digest, Sha256, Sha512};
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 use zeroize::ZeroizeOnDrop;

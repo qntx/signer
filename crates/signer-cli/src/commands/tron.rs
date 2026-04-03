@@ -93,7 +93,7 @@ impl TronCommand {
                 let result = AddressOutput {
                     chain: "tron",
                     address: Some(signer.address()),
-                    public_key: super::secp256k1_pubkey_hex(signer.signing_key()),
+                    public_key: hex::encode(signer.public_key_bytes()),
                 };
                 output::render_address(&result, json)?;
             }

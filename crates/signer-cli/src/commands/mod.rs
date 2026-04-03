@@ -23,12 +23,6 @@ pub use ton::TonCommand;
 pub use tron::TronCommand;
 pub use xrpl::XrplCommand;
 
-/// Derive compressed public key hex from a secp256k1 signing key.
-pub fn secp256k1_pubkey_hex(sk: &k256::ecdsa::SigningKey) -> String {
-    let pt = sk.verifying_key().to_encoded_point(true);
-    hex::encode(pt.as_bytes())
-}
-
 /// Parse a hex string (with optional 0x prefix) into a 32-byte array.
 pub fn parse_hex32(input: &str) -> Result<[u8; 32], Box<dyn std::error::Error>> {
     let s = input.strip_prefix("0x").unwrap_or(input);

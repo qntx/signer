@@ -73,7 +73,7 @@ impl TonCommand {
                 let result = AddressOutput {
                     chain: "ton",
                     address: Some(signer.address()),
-                    public_key: signer.public_key_hex(),
+                    public_key: hex::encode(signer.public_key_bytes()),
                 };
                 output::render_address(&result, json)?;
             }

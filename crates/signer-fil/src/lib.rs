@@ -151,6 +151,22 @@ impl Signer {
     }
 }
 
+impl Sign for Signer {
+    type Error = Error;
+
+    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
+        Self::sign_hash(self, hash)
+    }
+
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
+        Self::sign_message(self, message)
+    }
+
+    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
+        Self::sign_transaction(self, tx_bytes)
+    }
+}
+
 /// RFC 4648 base32 lowercase encoding without padding.
 fn base32_lower_encode(data: &[u8]) -> String {
     const ALPHABET: &[u8; 32] = b"abcdefghijklmnopqrstuvwxyz234567";
@@ -173,22 +189,6 @@ fn base32_lower_encode(data: &[u8]) -> String {
         out.push(ALPHABET[idx] as char);
     }
     out
-}
-
-impl Sign for Signer {
-    type Error = Error;
-
-    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
-        Self::sign_hash(self, hash)
-    }
-
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
-        Self::sign_message(self, message)
-    }
-
-    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
-        Self::sign_transaction(self, tx_bytes)
-    }
 }
 
 #[cfg(feature = "kobe")]

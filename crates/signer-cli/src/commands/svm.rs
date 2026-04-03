@@ -65,9 +65,9 @@ impl SvmCommand {
                     chain: "solana",
                     operation: "Ed25519",
                     address: Some(signer.address()),
-                    signature: ::hex::encode(&out.signature),
+                    signature: hex::encode(&out.signature),
                     recovery_id: None,
-                    public_key: Some(signer.public_key_hex()),
+                    public_key: Some(hex::encode(signer.public_key_bytes())),
                     message: Some(message),
                 };
                 output::render_sign(&result, json)?;
@@ -80,7 +80,7 @@ impl SvmCommand {
                     chain: "solana",
                     operation: "transaction",
                     address: Some(signer.address()),
-                    signature: ::hex::encode(&out.signature),
+                    signature: hex::encode(&out.signature),
                     recovery_id: None,
                     public_key: None,
                     message: None,
@@ -92,7 +92,7 @@ impl SvmCommand {
                 let result = AddressOutput {
                     chain: "solana",
                     address: Some(signer.address()),
-                    public_key: signer.public_key_hex(),
+                    public_key: hex::encode(signer.public_key_bytes()),
                 };
                 output::render_address(&result, json)?;
             }
