@@ -70,6 +70,38 @@ impl Signer {
         }
     }
 
+    /// TRON address (`Base58Check` with `0x41` prefix, starts with `T`).
+    ///
+    /// Computed as `Base58Check(0x41 || Keccak256(uncompressed_pubkey[1..])[12..])`.
+    #[must_use]
+    pub fn address(&self) -> String {
+        let vk = self.key.verifying_key();
+        let pk = vk.to_encoded_point(false);
+        let hash = Keccak256::digest(&pk.as_bytes()[1..]);
+        let mut payload = Vec::with_capacity(25);
+        payload.push(0x41);
+        payload.extend_from_slice(&hash[12..]);
+        let checksum = Sha256::digest(Sha256::digest(&payload));
+        payload.extend_from_slice(&checksum[..4]);
+        bs58::encode(&payload).into_string()
+    }
+
+    /// Compressed public key (33 bytes).
+    #[must_use]
+    pub fn public_key_bytes(&self) -> Vec<u8> {
+        self.key
+            .verifying_key()
+            .to_encoded_point(true)
+            .as_bytes()
+            .to_vec()
+    }
+
+    /// Expose the inner [`SigningKey`].
+    #[must_use]
+    pub const fn signing_key(&self) -> &SigningKey {
+        &self.key
+    }
+
     /// Sign a 32-byte hash. Returns 65 bytes: `r(32) || s(32) || recovery_id(1)`.
     ///
     /// # Errors
@@ -120,38 +152,6 @@ impl Signer {
         out.recovery_id = out.recovery_id.map(|r| r + 27);
         Ok(out)
     }
-
-    /// Compressed public key (33 bytes).
-    #[must_use]
-    pub fn public_key_bytes(&self) -> Vec<u8> {
-        self.key
-            .verifying_key()
-            .to_encoded_point(true)
-            .as_bytes()
-            .to_vec()
-    }
-
-    /// TRON address (`Base58Check` with `0x41` prefix, starts with `T`).
-    ///
-    /// Computed as `Base58Check(0x41 || Keccak256(uncompressed_pubkey[1..])[12..])`.
-    #[must_use]
-    pub fn address(&self) -> String {
-        let vk = self.key.verifying_key();
-        let pk = vk.to_encoded_point(false);
-        let hash = Keccak256::digest(&pk.as_bytes()[1..]);
-        let mut payload = Vec::with_capacity(25);
-        payload.push(0x41);
-        payload.extend_from_slice(&hash[12..]);
-        let checksum = Sha256::digest(Sha256::digest(&payload));
-        payload.extend_from_slice(&checksum[..4]);
-        bs58::encode(&payload).into_string()
-    }
-
-    /// Expose the inner [`SigningKey`].
-    #[must_use]
-    pub const fn signing_key(&self) -> &SigningKey {
-        &self.key
-    }
 }
 
 impl Sign for Signer {
@@ -169,6 +169,7 @@ impl Sign for Signer {
         Self::sign_transaction(self, tx_bytes)
     }
 }
+
 #[cfg(feature = "kobe")]
 impl Signer {
     /// Create from a [`kobe_tron::DerivedAccount`].

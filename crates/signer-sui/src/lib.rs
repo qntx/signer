@@ -79,6 +79,22 @@ impl Signer {
         signer
     }
 
+    /// Sui address: `0x` + hex(BLAKE2b-256(`0x00` || pubkey)).
+    #[must_use]
+    pub fn address(&self) -> String {
+        let mut buf = Vec::with_capacity(33);
+        buf.push(ED25519_FLAG);
+        buf.extend_from_slice(self.key.verifying_key().as_bytes());
+        let hash = blake2b_256(&buf);
+        format!("0x{}", hex::encode(hash))
+    }
+
+    /// Public key bytes (32 bytes).
+    #[must_use]
+    pub fn public_key_bytes(&self) -> Vec<u8> {
+        self.key.verifying_key().as_bytes().to_vec()
+    }
+
     /// Sign arbitrary bytes with Ed25519 (raw, no intent prefix).
     #[must_use]
     pub fn sign_raw(&self, message: &[u8]) -> Signature {
@@ -107,16 +123,6 @@ impl Signer {
         self.key.sign(&digest)
     }
 
-    /// Encode a Sui wire signature: `flag(0x00) || sig(64) || pubkey(32)`.
-    #[must_use]
-    pub fn encode_signature(&self, signature: &Signature) -> Vec<u8> {
-        let mut out = Vec::with_capacity(97);
-        out.push(ED25519_FLAG);
-        out.extend_from_slice(&signature.to_bytes());
-        out.extend_from_slice(self.key.verifying_key().as_bytes());
-        out
-    }
-
     /// Verify an Ed25519 signature.
     ///
     /// # Errors
@@ -128,20 +134,14 @@ impl Signer {
         Ok(())
     }
 
-    /// Public key bytes (32 bytes).
+    /// Encode a Sui wire signature: `flag(0x00) || sig(64) || pubkey(32)`.
     #[must_use]
-    pub fn public_key_bytes(&self) -> Vec<u8> {
-        self.key.verifying_key().as_bytes().to_vec()
-    }
-
-    /// Sui address: `0x` + hex(BLAKE2b-256(`0x00` || pubkey)).
-    #[must_use]
-    pub fn address(&self) -> String {
-        let mut buf = Vec::with_capacity(33);
-        buf.push(ED25519_FLAG);
-        buf.extend_from_slice(self.key.verifying_key().as_bytes());
-        let hash = blake2b_256(&buf);
-        format!("0x{}", hex::encode(hash))
+    pub fn encode_signature(&self, signature: &Signature) -> Vec<u8> {
+        let mut out = Vec::with_capacity(97);
+        out.push(ED25519_FLAG);
+        out.extend_from_slice(&signature.to_bytes());
+        out.extend_from_slice(self.key.verifying_key().as_bytes());
+        out
     }
 }
 

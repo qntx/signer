@@ -65,6 +65,28 @@ impl Signer {
         signer
     }
 
+    /// TON signer identity (hex-encoded Ed25519 public key).
+    ///
+    /// TON wallet addresses depend on the deployed contract code and
+    /// workchain ID, so a full address cannot be derived from the key alone.
+    /// This returns the 64-character hex public key used to identify the signer.
+    #[must_use]
+    pub fn address(&self) -> String {
+        self.public_key_hex()
+    }
+
+    /// Public key bytes (32 bytes).
+    #[must_use]
+    pub fn public_key_bytes(&self) -> Vec<u8> {
+        self.key.verifying_key().as_bytes().to_vec()
+    }
+
+    /// Public key in hex.
+    #[must_use]
+    pub fn public_key_hex(&self) -> String {
+        hex::encode(self.public_key_bytes())
+    }
+
     /// Sign arbitrary bytes with raw Ed25519 (no hashing or prefixing).
     #[must_use]
     pub fn sign_raw(&self, message: &[u8]) -> Signature {
@@ -80,28 +102,6 @@ impl Signer {
         use ed25519_dalek::Verifier;
         self.key.verifying_key().verify(message, signature)?;
         Ok(())
-    }
-
-    /// Public key bytes (32 bytes).
-    #[must_use]
-    pub fn public_key_bytes(&self) -> Vec<u8> {
-        self.key.verifying_key().as_bytes().to_vec()
-    }
-
-    /// Public key in hex.
-    #[must_use]
-    pub fn public_key_hex(&self) -> String {
-        hex::encode(self.public_key_bytes())
-    }
-
-    /// TON signer identity (hex-encoded Ed25519 public key).
-    ///
-    /// TON wallet addresses depend on the deployed contract code and
-    /// workchain ID, so a full address cannot be derived from the key alone.
-    /// This returns the 64-character hex public key used to identify the signer.
-    #[must_use]
-    pub fn address(&self) -> String {
-        self.public_key_hex()
     }
 }
 
@@ -122,6 +122,7 @@ impl Sign for Signer {
         self.sign_hash(tx_bytes)
     }
 }
+
 #[cfg(feature = "kobe")]
 impl Signer {
     /// Create from a [`kobe_ton::DerivedAccount`].

@@ -48,6 +48,8 @@ impl core::fmt::Debug for Signer {
     }
 }
 
+impl ZeroizeOnDrop for Signer {}
+
 impl Signer {
     /// Create a signer from a raw 32-byte private key.
     ///
@@ -84,6 +86,15 @@ impl Signer {
         }
     }
 
+    /// Ethereum address derived from this signing key (EIP-55 checksummed).
+    #[must_use]
+    pub fn address(&self) -> String {
+        let vk = self.key.verifying_key();
+        let pk = vk.to_encoded_point(false);
+        let hash = Keccak256::digest(&pk.as_bytes()[1..]);
+        eip55_checksum(&hex::encode(&hash[12..]))
+    }
+
     /// Compressed public key (33 bytes).
     #[must_use]
     pub fn public_key_bytes(&self) -> Vec<u8> {
@@ -94,13 +105,10 @@ impl Signer {
             .to_vec()
     }
 
-    /// Ethereum address derived from this signing key (EIP-55 checksummed).
+    /// Expose the inner [`SigningKey`] reference.
     #[must_use]
-    pub fn address(&self) -> String {
-        let vk = self.key.verifying_key();
-        let pk = vk.to_encoded_point(false);
-        let hash = Keccak256::digest(&pk.as_bytes()[1..]);
-        eip55_checksum(&hex::encode(&hash[12..]))
+    pub const fn signing_key(&self) -> &SigningKey {
+        &self.key
     }
 
     /// Sign a 32-byte hash. Returns 65 bytes: `r(32) || s(32) || v(1)`.
@@ -194,15 +202,7 @@ impl Signer {
         rlp::encode_signed_typed_tx(unsigned_tx, v, &r, &s)
             .map_err(|e| Error::InvalidTransaction(String::from(e)))
     }
-
-    /// Expose the inner [`SigningKey`] reference.
-    #[must_use]
-    pub const fn signing_key(&self) -> &SigningKey {
-        &self.key
-    }
 }
-
-impl ZeroizeOnDrop for Signer {}
 
 impl Sign for Signer {
     type Error = Error;

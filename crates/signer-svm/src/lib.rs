@@ -93,29 +93,6 @@ impl Signer {
         signer
     }
 
-    /// Sign arbitrary bytes with raw Ed25519 (no hashing or prefixing).
-    #[must_use]
-    pub fn sign_raw(&self, message: &[u8]) -> Signature {
-        use ed25519_dalek::Signer as _;
-        self.key.sign(message)
-    }
-
-    /// Verify an Ed25519 signature.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the signature is invalid.
-    pub fn verify(&self, msg: &[u8], signature: &Signature) -> Result<(), Error> {
-        self.key.verifying_key().verify(msg, signature)?;
-        Ok(())
-    }
-
-    /// Sign serialized Solana transaction message bytes.
-    #[must_use]
-    pub fn sign_transaction_message(&self, message_bytes: &[u8]) -> Signature {
-        self.sign_raw(message_bytes)
-    }
-
     /// Solana address (Base58-encoded 32-byte public key).
     #[must_use]
     pub fn address(&self) -> String {
@@ -132,6 +109,29 @@ impl Signer {
     #[must_use]
     pub fn public_key_hex(&self) -> String {
         hex::encode(self.key.verifying_key().as_bytes())
+    }
+
+    /// Sign arbitrary bytes with raw Ed25519 (no hashing or prefixing).
+    #[must_use]
+    pub fn sign_raw(&self, message: &[u8]) -> Signature {
+        use ed25519_dalek::Signer as _;
+        self.key.sign(message)
+    }
+
+    /// Sign serialized Solana transaction message bytes.
+    #[must_use]
+    pub fn sign_transaction_message(&self, message_bytes: &[u8]) -> Signature {
+        self.sign_raw(message_bytes)
+    }
+
+    /// Verify an Ed25519 signature.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the signature is invalid.
+    pub fn verify(&self, msg: &[u8], signature: &Signature) -> Result<(), Error> {
+        self.key.verifying_key().verify(msg, signature)?;
+        Ok(())
     }
 
     /// Export keypair as Base58 (64 bytes: secret || public).

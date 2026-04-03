@@ -74,6 +74,41 @@ impl Signer {
         }
     }
 
+    /// Filecoin protocol-1 (secp256k1) address (`f1...`).
+    ///
+    /// Computed as `"f1" + base32_lower(BLAKE2b-160(pubkey) || BLAKE2b-4(0x01 || payload))`.
+    #[must_use]
+    pub fn address(&self) -> String {
+        let vk = self.key.verifying_key();
+        let uncompressed = vk.to_encoded_point(false);
+        let payload = Blake2b160::digest(uncompressed.as_bytes());
+        let mut checksum_input = Vec::with_capacity(1 + payload.len());
+        checksum_input.push(0x01); // protocol 1
+        checksum_input.extend_from_slice(&payload);
+        let checksum = Blake2b4::digest(&checksum_input);
+        let mut addr_bytes = Vec::with_capacity(payload.len() + checksum.len());
+        addr_bytes.extend_from_slice(&payload);
+        addr_bytes.extend_from_slice(&checksum);
+        let encoded = base32_lower_encode(&addr_bytes);
+        format!("f1{encoded}")
+    }
+
+    /// Compressed public key (33 bytes).
+    #[must_use]
+    pub fn public_key_bytes(&self) -> Vec<u8> {
+        self.key
+            .verifying_key()
+            .to_encoded_point(true)
+            .as_bytes()
+            .to_vec()
+    }
+
+    /// Expose the inner [`SigningKey`].
+    #[must_use]
+    pub const fn signing_key(&self) -> &SigningKey {
+        &self.key
+    }
+
     /// Sign a 32-byte hash. Returns 65 bytes: `r(32) || s(32) || recovery_id(1)`.
     ///
     /// # Errors
@@ -113,41 +148,6 @@ impl Signer {
     pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
         let hash = Blake2b256::digest(message);
         self.sign_hash(&hash)
-    }
-
-    /// Compressed public key (33 bytes).
-    #[must_use]
-    pub fn public_key_bytes(&self) -> Vec<u8> {
-        self.key
-            .verifying_key()
-            .to_encoded_point(true)
-            .as_bytes()
-            .to_vec()
-    }
-
-    /// Filecoin protocol-1 (secp256k1) address (`f1...`).
-    ///
-    /// Computed as `"f1" + base32_lower(BLAKE2b-160(pubkey) || BLAKE2b-4(0x01 || payload))`.
-    #[must_use]
-    pub fn address(&self) -> String {
-        let vk = self.key.verifying_key();
-        let uncompressed = vk.to_encoded_point(false);
-        let payload = Blake2b160::digest(uncompressed.as_bytes());
-        let mut checksum_input = Vec::with_capacity(1 + payload.len());
-        checksum_input.push(0x01); // protocol 1
-        checksum_input.extend_from_slice(&payload);
-        let checksum = Blake2b4::digest(&checksum_input);
-        let mut addr_bytes = Vec::with_capacity(payload.len() + checksum.len());
-        addr_bytes.extend_from_slice(&payload);
-        addr_bytes.extend_from_slice(&checksum);
-        let encoded = base32_lower_encode(&addr_bytes);
-        format!("f1{encoded}")
-    }
-
-    /// Expose the inner [`SigningKey`].
-    #[must_use]
-    pub const fn signing_key(&self) -> &SigningKey {
-        &self.key
     }
 }
 
@@ -190,6 +190,7 @@ impl Sign for Signer {
         Self::sign_transaction(self, tx_bytes)
     }
 }
+
 #[cfg(feature = "kobe")]
 impl Signer {
     /// Create from a [`kobe_fil::DerivedAccount`].

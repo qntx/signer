@@ -71,6 +71,36 @@ impl Signer {
         }
     }
 
+    /// Cosmos address with `cosmos1` prefix (bech32-encoded RIPEMD160(SHA256(pubkey))).
+    ///
+    /// # Panics
+    ///
+    /// Panics if bech32 encoding fails (should never happen with valid input).
+    #[must_use]
+    pub fn address(&self) -> String {
+        let pubkey = self.public_key_bytes();
+        let sha = Sha256::digest(&pubkey);
+        let hash160 = Ripemd160::digest(sha);
+        let hrp = Hrp::parse_unchecked("cosmos");
+        bech32::encode::<Bech32>(hrp, &hash160).expect("valid bech32")
+    }
+
+    /// Compressed public key (33 bytes).
+    #[must_use]
+    pub fn public_key_bytes(&self) -> Vec<u8> {
+        self.key
+            .verifying_key()
+            .to_encoded_point(true)
+            .as_bytes()
+            .to_vec()
+    }
+
+    /// Expose the inner [`SigningKey`].
+    #[must_use]
+    pub const fn signing_key(&self) -> &SigningKey {
+        &self.key
+    }
+
     /// Sign a 32-byte hash. Returns 65 bytes: `r(32) || s(32) || recovery_id(1)`.
     ///
     /// # Errors
@@ -110,36 +140,6 @@ impl Signer {
     pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
         let hash = Sha256::digest(message);
         self.sign_hash(&hash)
-    }
-
-    /// Compressed public key (33 bytes).
-    #[must_use]
-    pub fn public_key_bytes(&self) -> Vec<u8> {
-        self.key
-            .verifying_key()
-            .to_encoded_point(true)
-            .as_bytes()
-            .to_vec()
-    }
-
-    /// Cosmos address with `cosmos1` prefix (bech32-encoded RIPEMD160(SHA256(pubkey))).
-    ///
-    /// # Panics
-    ///
-    /// Panics if bech32 encoding fails (should never happen with valid input).
-    #[must_use]
-    pub fn address(&self) -> String {
-        let pubkey = self.public_key_bytes();
-        let sha = Sha256::digest(&pubkey);
-        let hash160 = Ripemd160::digest(sha);
-        let hrp = Hrp::parse_unchecked("cosmos");
-        bech32::encode::<Bech32>(hrp, &hash160).expect("valid bech32")
-    }
-
-    /// Expose the inner [`SigningKey`].
-    #[must_use]
-    pub const fn signing_key(&self) -> &SigningKey {
-        &self.key
     }
 }
 

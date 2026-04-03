@@ -25,7 +25,7 @@ extern crate alloc;
 
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
-use alloc::{format, vec::Vec};
+use alloc::{format, string::String, vec::Vec};
 
 mod error;
 
@@ -47,7 +47,6 @@ const STX_PREFIX: [u8; 4] = [0x53, 0x54, 0x58, 0x00];
 ///
 /// The inner key is zeroized on drop.
 pub struct Signer {
-    /// secp256k1 signing key.
     key: SigningKey,
 }
 
@@ -92,6 +91,29 @@ impl Signer {
         Self {
             key: SigningKey::random(&mut rand_core::OsRng),
         }
+    }
+
+    /// Derive the XRPL classic `r`-address from the signing key.
+    #[must_use]
+    pub fn address(&self) -> String {
+        let pubkey = self.public_key_bytes();
+        encode_classic_address(&pubkey)
+    }
+
+    /// Compressed public key (33 bytes).
+    #[must_use]
+    pub fn public_key_bytes(&self) -> Vec<u8> {
+        self.key
+            .verifying_key()
+            .to_encoded_point(true)
+            .as_bytes()
+            .to_vec()
+    }
+
+    /// Expose the inner [`SigningKey`].
+    #[must_use]
+    pub const fn signing_key(&self) -> &SigningKey {
+        &self.key
     }
 
     /// Sign a 32-byte pre-hashed digest with secp256k1.
@@ -149,29 +171,6 @@ impl Signer {
         Err(Error::SigningFailed(
             "XRPL has no canonical message signing standard".into(),
         ))
-    }
-
-    /// Compressed public key (33 bytes).
-    #[must_use]
-    pub fn public_key_bytes(&self) -> Vec<u8> {
-        self.key
-            .verifying_key()
-            .to_encoded_point(true)
-            .as_bytes()
-            .to_vec()
-    }
-
-    /// Expose the inner [`SigningKey`].
-    #[must_use]
-    pub const fn signing_key(&self) -> &SigningKey {
-        &self.key
-    }
-
-    /// Derive the XRPL classic `r`-address from the signing key.
-    #[must_use]
-    pub fn address(&self) -> String {
-        let pubkey = self.public_key_bytes();
-        encode_classic_address(&pubkey)
     }
 }
 
