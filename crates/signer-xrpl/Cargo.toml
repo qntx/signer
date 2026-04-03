@@ -1,0 +1,28 @@
+[package]
+name = "signer-xrpl"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "XRP Ledger transaction signer — secp256k1 ECDSA + SHA-512-half + DER."
+
+[features]
+default = ["std"]
+std = ["alloc", "signer-primitives/std", "zeroize/std"]
+alloc = ["signer-primitives/alloc", "zeroize/alloc"]
+getrandom = ["rand_core/getrandom"]
+kobe = ["dep:kobe-xrpl"]
+
+[dependencies]
+signer-primitives.workspace = true
+k256 = { workspace = true, features = ["pkcs8"] }
+rand_core.workspace = true
+sha2.workspace = true
+hex.workspace = true
+zeroize.workspace = true
+thiserror.workspace = true
+
+kobe-xrpl = { workspace = true, optional = true }
+
+[lints]
+workspace = true

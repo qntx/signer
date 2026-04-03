@@ -9,6 +9,7 @@ mod sui;
 mod svm;
 mod ton;
 mod tron;
+mod xrpl;
 
 pub use btc::BtcCommand;
 use clap::{Parser, Subcommand};
@@ -20,6 +21,7 @@ pub use sui::SuiCommand;
 pub use svm::SvmCommand;
 pub use ton::TonCommand;
 pub use tron::TronCommand;
+pub use xrpl::XrplCommand;
 
 /// Derive compressed public key hex from a secp256k1 signing key.
 pub fn secp256k1_pubkey_hex(sk: &k256::ecdsa::SigningKey) -> String {
@@ -94,4 +96,8 @@ pub enum Commands {
     /// Spark (Bitcoin L2) signing operations.
     #[command(name = "spark")]
     Spark(SparkCommand),
+
+    /// XRP Ledger signing operations.
+    #[command(name = "xrpl", alias = "xrp", alias = "ripple")]
+    Xrpl(XrplCommand),
 }

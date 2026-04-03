@@ -19,9 +19,9 @@
 [rust-badge]: https://img.shields.io/badge/rust-edition%202024-orange.svg
 [rust-url]: https://doc.rust-lang.org/edition-guide/
 
-**Modular, `no_std`-compatible Rust toolkit for multi-chain transaction signing — 9 chains, zero hand-written cryptography.**
+**Modular, `no_std`-compatible Rust toolkit for multi-chain transaction signing — 10 chains, zero hand-written cryptography.**
 
-Signer provides thin, secure wrappers around battle-tested cryptographic libraries ([k256](https://docs.rs/k256) for secp256k1, [ed25519-dalek](https://docs.rs/ed25519-dalek) for Ed25519), exposing a unified `Sign` trait across Bitcoin, Ethereum, Solana, Cosmos, Tron, Sui, TON, Filecoin, and Spark. All library crates compile under `no_std + alloc` and zeroize sensitive material on drop.
+Signer provides thin, secure wrappers around battle-tested cryptographic libraries ([k256](https://docs.rs/k256) for secp256k1, [ed25519-dalek](https://docs.rs/ed25519-dalek) for Ed25519), exposing a unified `Sign` trait across Bitcoin, Ethereum, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, and XRP Ledger. All library crates compile under `no_std + alloc` and zeroize sensitive material on drop.
 
 <p align="center">
   <img src="demo.gif" alt="Signer CLI Demo"/>
@@ -111,7 +111,7 @@ println!("Address: {}", signer.address());
 
 ## Design
 
-- **9 chains** — Ethereum, Bitcoin, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark
+- **10 chains** — Ethereum, Bitcoin, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger
 - **Zero hand-rolled crypto** — secp256k1 via [k256](https://docs.rs/k256), Ed25519 via [ed25519-dalek](https://docs.rs/ed25519-dalek)
 - **Unified trait** — `Sign` trait with `sign_hash`, `sign_message`, `sign_transaction` across all chains
 - **`no_std` + `alloc`** — All library crates compile without `std`; embedded / WASM ready

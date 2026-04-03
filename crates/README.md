@@ -13,13 +13,14 @@
 | **[`signer-ton`](signer-ton/)** | [![crates.io][signer-ton-crate]][signer-ton-crate-url] [![docs.rs][signer-ton-doc]][signer-ton-doc-url] | TON — Ed25519 signing |
 | **[`signer-fil`](signer-fil/)** | [![crates.io][signer-fil-crate]][signer-fil-crate-url] [![docs.rs][signer-fil-doc]][signer-fil-doc-url] | Filecoin — secp256k1 + Blake2b-256 |
 | **[`signer-spark`](signer-spark/)** | [![crates.io][signer-spark-crate]][signer-spark-crate-url] [![docs.rs][signer-spark-doc]][signer-spark-doc-url] | Spark — secp256k1 + double-SHA256 (Bitcoin L2) |
-| **[`signer-cli`](signer-cli/)** | [![crates.io][signer-cli-crate]][signer-cli-crate-url] | CLI — sign, inspect keys across all 9 chains |
+| **[`signer-xrpl`](signer-xrpl/)** | [![crates.io][signer-xrpl-crate]][signer-xrpl-crate-url] [![docs.rs][signer-xrpl-doc]][signer-xrpl-doc-url] | XRP Ledger — secp256k1 + SHA-512-half + DER |
+| **[`signer-cli`](signer-cli/)** | [![crates.io][signer-cli-crate]][signer-cli-crate-url] | CLI — sign, inspect keys across all 10 chains |
 
 ## Dependency Graph
 
 ```text
 signer-cli
-  └── signer-{evm,btc,svm,cosmos,tron,sui,ton,fil,spark}
+  └── signer-{evm,btc,svm,cosmos,tron,sui,ton,fil,spark,xrpl}
         └── signer-primitives (Sign trait, SignOutput)
 
 signer (umbrella)
@@ -32,7 +33,8 @@ signer (umbrella)
   ├── signer-sui    ── ed25519-dalek + sha2 + sha3 (BLAKE2b intent)
   ├── signer-ton    ── ed25519-dalek
   ├── signer-fil    ── k256 + blake2
-  └── signer-spark  ── k256 + sha2
+  ├── signer-spark  ── k256 + sha2
+  └── signer-xrpl   ── k256 + sha2 (SHA-512-half)
 ```
 
 ## Feature Flags
@@ -44,7 +46,7 @@ The umbrella `signer` crate provides fine-grained feature control:
 | `std` | ✅ | Enable standard library (implies `alloc`) |
 | `alloc` | | Enable `alloc` crate for `no_std` environments |
 | `getrandom` | | Enable `Signer::random()` via OS-provided CSPRNG |
-| `all-chains` | | Enable all 9 chain signers |
+| `all-chains` | | Enable all 10 chain signers |
 | `btc` | ✅ | Bitcoin signer |
 | `evm` | ✅ | Ethereum signer |
 | `svm` | ✅ | Solana signer |
@@ -54,18 +56,19 @@ The umbrella `signer` crate provides fine-grained feature control:
 | `fil` | ✅ | Filecoin signer |
 | `ton` | ✅ | TON signer |
 | `sui` | ✅ | Sui signer |
+| `xrpl` | ✅ | XRP Ledger signer |
 | `kobe` | | Enable [kobe](https://github.com/qntx/kobe) HD wallet bridging for all chains |
 
 ## Cryptography Libraries
 
 | Curve | Library | Chains |
 | --- | --- | --- |
-| secp256k1 | [k256](https://docs.rs/k256) 0.13 | EVM, BTC, Cosmos, Tron, Spark, Filecoin |
+| secp256k1 | [k256](https://docs.rs/k256) 0.13 | EVM, BTC, Cosmos, Tron, Spark, Filecoin, XRPL |
 | Ed25519 | [ed25519-dalek](https://docs.rs/ed25519-dalek) 2.2 | Solana, Sui, TON |
 
 | Hash | Library | Chains |
 | --- | --- | --- |
-| SHA-256 | [sha2](https://docs.rs/sha2) 0.10 | BTC, Cosmos, Tron, Spark, Sui |
+| SHA-256 / SHA-512 | [sha2](https://docs.rs/sha2) 0.10 | BTC, Cosmos, Tron, Spark, Sui, XRPL |
 | Keccak-256 | [sha3](https://docs.rs/sha3) 0.10 | EVM, Tron, Sui |
 | BLAKE2b-256 | [blake2](https://docs.rs/blake2) 0.10 | Filecoin, Sui |
 
@@ -115,3 +118,7 @@ The umbrella `signer` crate provides fine-grained feature control:
 [signer-fil-doc-url]: https://docs.rs/signer-fil
 [signer-spark-doc]: https://img.shields.io/docsrs/signer-spark.svg
 [signer-spark-doc-url]: https://docs.rs/signer-spark
+[signer-xrpl-crate]: https://img.shields.io/crates/v/signer-xrpl.svg
+[signer-xrpl-crate-url]: https://crates.io/crates/signer-xrpl
+[signer-xrpl-doc]: https://img.shields.io/docsrs/signer-xrpl.svg
+[signer-xrpl-doc-url]: https://docs.rs/signer-xrpl

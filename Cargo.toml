@@ -4,13 +4,14 @@ members = [
     "crates/signer-btc", "crates/signer-evm", "crates/signer-svm",
     "crates/signer-cosmos", "crates/signer-tron", "crates/signer-spark",
     "crates/signer-fil", "crates/signer-ton", "crates/signer-sui",
+    "crates/signer-xrpl",
     "crates/signer-cli",
 ]
 default-members = ["crates/signer"]
 resolver = "3"
 
 [workspace.package]
-version = "0.4.2"
+version = "0.4.3"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/qntx/signer"
@@ -27,6 +28,7 @@ signer-spark = { version = "0.4", path = "crates/signer-spark", default-features
 signer-fil = { version = "0.4", path = "crates/signer-fil", default-features = false }
 signer-ton = { version = "0.4", path = "crates/signer-ton", default-features = false }
 signer-sui = { version = "0.4", path = "crates/signer-sui", default-features = false }
+signer-xrpl = { version = "0.4", path = "crates/signer-xrpl", default-features = false }
 
 # Cryptography (versions aligned with kobe)
 k256 = { version = "0.13.4", default-features = false, features = ["ecdsa", "arithmetic"] }
@@ -62,6 +64,7 @@ kobe-spark = { version = "0.7", default-features = false, features = ["std"] }
 kobe-fil = { version = "0.7", default-features = false, features = ["std"] }
 kobe-ton = { version = "0.7", default-features = false, features = ["std"] }
 kobe-sui = { version = "0.7", default-features = false, features = ["std"] }
+kobe-xrpl = { version = "0.7", path = "../kobe/crates/kobe-xrpl", default-features = false, features = ["std"] }
 
 [profile.release]
 codegen-units = 1

@@ -23,6 +23,7 @@ signer-spark = { workspace = true, features = ["std", "getrandom"] }
 signer-fil = { workspace = true, features = ["std", "getrandom"] }
 signer-ton = { workspace = true, features = ["std", "getrandom"] }
 signer-sui = { workspace = true, features = ["std", "getrandom"] }
+signer-xrpl = { workspace = true, features = ["std", "getrandom"] }
 k256.workspace = true
 clap.workspace = true
 colored.workspace = true

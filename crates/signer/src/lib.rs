@@ -40,3 +40,5 @@ pub use signer_svm as svm;
 pub use signer_ton as ton;
 #[cfg(feature = "tron")]
 pub use signer_tron as tron;
+#[cfg(feature = "xrpl")]
+pub use signer_xrpl as xrpl;
