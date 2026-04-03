@@ -45,7 +45,7 @@ impl TonCommand {
                 let result = SignOutput {
                     chain: "ton",
                     operation: "Ed25519",
-                    address: None,
+                    address: Some(signer.address()),
                     signature: hex::encode(&out.signature),
                     recovery_id: None,
                     public_key: Some(signer.public_key_hex()),
@@ -60,7 +60,7 @@ impl TonCommand {
                 let result = SignOutput {
                     chain: "ton",
                     operation: "transaction",
-                    address: None,
+                    address: Some(signer.address()),
                     signature: hex::encode(&out.signature),
                     recovery_id: None,
                     public_key: None,
@@ -72,7 +72,7 @@ impl TonCommand {
                 let signer = Signer::from_hex(&key)?;
                 let result = AddressOutput {
                     chain: "ton",
-                    address: None,
+                    address: Some(signer.address()),
                     public_key: signer.public_key_hex(),
                 };
                 output::render_address(&result, json)?;

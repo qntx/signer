@@ -52,7 +52,7 @@ impl CosmosCommand {
                 let result = SignOutput {
                     chain: "cosmos",
                     operation: "raw hash",
-                    address: None,
+                    address: Some(signer.address()),
                     signature: hex::encode(&out.signature),
                     recovery_id: out.recovery_id,
                     public_key: None,
@@ -66,7 +66,7 @@ impl CosmosCommand {
                 let result = SignOutput {
                     chain: "cosmos",
                     operation: "message (SHA-256)",
-                    address: None,
+                    address: Some(signer.address()),
                     signature: hex::encode(&out.signature),
                     recovery_id: out.recovery_id,
                     public_key: Some(hex::encode(signer.public_key_bytes())),
@@ -80,7 +80,7 @@ impl CosmosCommand {
                 let result = SignOutput {
                     chain: "cosmos",
                     operation: "transaction",
-                    address: None,
+                    address: Some(signer.address()),
                     signature: hex::encode(&out.signature),
                     recovery_id: out.recovery_id,
                     public_key: None,
@@ -92,7 +92,7 @@ impl CosmosCommand {
                 let signer = Signer::from_hex(&key)?;
                 let result = AddressOutput {
                     chain: "cosmos",
-                    address: None,
+                    address: Some(signer.address()),
                     public_key: hex::encode(signer.public_key_bytes()),
                 };
                 output::render_address(&result, json)?;

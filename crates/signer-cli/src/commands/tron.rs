@@ -52,7 +52,7 @@ impl TronCommand {
                 let result = SignOutput {
                     chain: "tron",
                     operation: "raw hash",
-                    address: None,
+                    address: Some(signer.address()),
                     signature: hex::encode(&out.signature),
                     recovery_id: out.recovery_id,
                     public_key: None,
@@ -66,7 +66,7 @@ impl TronCommand {
                 let result = SignOutput {
                     chain: "tron",
                     operation: "TRON Signed Message",
-                    address: None,
+                    address: Some(signer.address()),
                     signature: hex::encode(&out.signature),
                     recovery_id: out.recovery_id,
                     public_key: None,
@@ -80,7 +80,7 @@ impl TronCommand {
                 let result = SignOutput {
                     chain: "tron",
                     operation: "transaction",
-                    address: None,
+                    address: Some(signer.address()),
                     signature: hex::encode(&out.signature),
                     recovery_id: out.recovery_id,
                     public_key: None,
@@ -92,7 +92,7 @@ impl TronCommand {
                 let signer = Signer::from_hex(&key)?;
                 let result = AddressOutput {
                     chain: "tron",
-                    address: None,
+                    address: Some(signer.address()),
                     public_key: super::secp256k1_pubkey_hex(signer.signing_key()),
                 };
                 output::render_address(&result, json)?;

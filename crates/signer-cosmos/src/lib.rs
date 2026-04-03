@@ -13,8 +13,8 @@ use alloc::{format, string::String, vec::Vec};
 
 mod error;
 
-pub use error::Error;
 use bech32::{Bech32, Hrp};
+pub use error::Error;
 use k256::ecdsa::SigningKey;
 use ripemd::{Digest as RipemdDigest, Ripemd160};
 use sha2::{Digest, Sha256};

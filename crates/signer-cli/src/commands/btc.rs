@@ -53,7 +53,7 @@ impl BtcCommand {
                 let result = SignOutput {
                     chain: "bitcoin",
                     operation: "raw hash",
-                    address: None,
+                    address: Some(signer.address()),
                     signature: hex::encode(&out.signature),
                     recovery_id: out.recovery_id,
                     public_key: None,
@@ -67,7 +67,7 @@ impl BtcCommand {
                 let result = SignOutput {
                     chain: "bitcoin",
                     operation: "Bitcoin Signed Message",
-                    address: None,
+                    address: Some(signer.address()),
                     signature: hex::encode(&out.signature),
                     recovery_id: out.recovery_id,
                     public_key: Some(hex::encode(signer.public_key_bytes())),
@@ -82,7 +82,7 @@ impl BtcCommand {
                 let result = SignOutput {
                     chain: "bitcoin",
                     operation: "transaction",
-                    address: None,
+                    address: Some(signer.address()),
                     signature: hex::encode(&out.signature),
                     recovery_id: out.recovery_id,
                     public_key: None,
@@ -94,7 +94,7 @@ impl BtcCommand {
                 let signer = Signer::from_hex(&key)?;
                 let result = AddressOutput {
                     chain: "bitcoin",
-                    address: None,
+                    address: Some(signer.address()),
                     public_key: hex::encode(signer.public_key_bytes()),
                 };
                 output::render_address(&result, json)?;
