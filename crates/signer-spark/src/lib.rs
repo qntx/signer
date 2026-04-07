@@ -1,7 +1,7 @@
 //! Spark (Bitcoin L2) transaction signer built on [`k256`] and [`sha2`].
 //!
 //! Provides secp256k1 ECDSA signing for Spark transactions.
-//! Address derivation is handled by [`kobe-spark`].
+//! Address derivation is handled by `kobe-spark`.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 

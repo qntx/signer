@@ -3,7 +3,7 @@
 //! Provides secp256k1 ECDSA signing for XRPL transactions using the
 //! SHA-512-half hash algorithm and DER-encoded signatures.
 //!
-//! Address derivation is handled by [`kobe-xrpl`].
+//! Address derivation is handled by `kobe-xrpl`.
 //!
 //! ## Signing algorithm
 //!

@@ -1,7 +1,7 @@
 //! TON transaction signer built on [`ed25519_dalek`].
 //!
 //! Provides Ed25519 signing for TON transactions and messages.
-//! Address derivation is handled by [`kobe-ton`].
+//! Address derivation is handled by `kobe-ton`.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 

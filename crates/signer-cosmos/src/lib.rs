@@ -1,7 +1,7 @@
 //! Cosmos transaction signer built on [`k256`] and [`sha2`].
 //!
 //! Provides secp256k1 ECDSA signing for Cosmos SDK transactions.
-//! Address derivation is handled by [`kobe-cosmos`].
+//! Address derivation is handled by `kobe-cosmos`.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 

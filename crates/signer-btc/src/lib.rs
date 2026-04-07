@@ -3,7 +3,7 @@
 //! Provides secp256k1 ECDSA signing for Bitcoin sighash preimages
 //! and BIP-322 / legacy message signing.
 //!
-//! **Address derivation is handled by [`kobe-btc`] — this crate is signing only.**
+//! **Address derivation is handled by `kobe-btc` — this crate is signing only.**
 //!
 //! # Examples
 //!

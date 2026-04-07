@@ -4,7 +4,7 @@
 //! transaction/message signing. The wire signature format is
 //! `flag(0x00) || sig(64) || pubkey(32)` (97 bytes).
 //!
-//! Address derivation is handled by [`kobe-sui`].
+//! Address derivation is handled by `kobe-sui`.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 

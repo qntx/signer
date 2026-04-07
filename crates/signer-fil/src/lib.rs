@@ -1,7 +1,7 @@
 //! Filecoin transaction signer built on [`k256`] and [`blake2`].
 //!
 //! Provides secp256k1 ECDSA signing with Blake2b-256 hashing for Filecoin.
-//! Address derivation is handled by [`kobe-fil`].
+//! Address derivation is handled by `kobe-fil`.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 

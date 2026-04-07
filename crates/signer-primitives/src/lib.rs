@@ -3,14 +3,14 @@
 //! This crate defines the [`Sign`] trait that all chain-specific signer crates
 //! implement, plus shared types like [`SignOutput`] and [`SignError`].
 //!
-//! Mirrors the role of [`kobe-core`] for derivation — this is the equivalent
+//! Mirrors the role of `kobe-core` for derivation — this is the equivalent
 //! for signing.
 //!
 //! # Design
 //!
 //! - **Stateful signers** — each `Signer` holds its private key internally.
 //! - **`Send + Sync`** — signers are safe to share across threads and async runtimes.
-//! - **No address derivation** — that's [`kobe`]'s responsibility.
+//! - **No address derivation** — that's `kobe`'s responsibility.
 //! - **Associated error type** — matches kobe's `Derive` trait pattern.
 //! - **[`SignExt`]** — blanket extension trait (like kobe's `DeriveExt`).
 

@@ -1,7 +1,7 @@
 //! TRON transaction signer built on [`k256`] and [`sha3`].
 //!
 //! Provides secp256k1 ECDSA signing for TRON transactions and messages.
-//! Address derivation is handled by [`kobe-tron`].
+//! Address derivation is handled by `kobe-tron`.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
