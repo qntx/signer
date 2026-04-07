@@ -159,21 +159,7 @@ impl Signer {
     }
 }
 
-impl Sign for Signer {
-    type Error = SignError;
-
-    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
-        Self::sign_hash(self, hash)
-    }
-
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        Self::sign_message(self, message)
-    }
-
-    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
-        Self::sign_transaction(self, tx_bytes)
-    }
-}
+signer_primitives::impl_sign_delegate!();
 
 #[cfg(feature = "kobe")]
 impl Signer {

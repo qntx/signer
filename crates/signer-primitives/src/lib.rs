@@ -21,6 +21,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 
 mod error;
+mod macros;
 
 pub use error::SignError;
 
