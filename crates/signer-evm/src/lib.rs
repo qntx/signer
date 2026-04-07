@@ -143,9 +143,7 @@ impl Signer {
             .sign_prehash_recoverable(hash)
             .map_err(|e| SignError::SigningFailed(e.to_string()))?;
 
-        let mut out = Vec::with_capacity(65);
-        out.extend_from_slice(&sig.r().to_bytes());
-        out.extend_from_slice(&sig.s().to_bytes());
+        let mut out = sig.to_bytes().to_vec();
         out.push(rid.to_byte());
         Ok(SignOutput::secp256k1(out, rid.to_byte()))
     }

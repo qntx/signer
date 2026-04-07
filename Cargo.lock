@@ -1268,7 +1268,7 @@ dependencies = [
 
 [[package]]
 name = "signer"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "signer-aptos",
  "signer-btc",
@@ -1286,7 +1286,7 @@ dependencies = [
 
 [[package]]
 name = "signer-aptos"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "ed25519-dalek",
  "getrandom",
@@ -1299,7 +1299,7 @@ dependencies = [
 
 [[package]]
 name = "signer-btc"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "bs58",
  "getrandom",
@@ -1315,7 +1315,7 @@ dependencies = [
 
 [[package]]
 name = "signer-cli"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "clap",
  "colored",
@@ -1338,7 +1338,7 @@ dependencies = [
 
 [[package]]
 name = "signer-cosmos"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "bech32",
  "getrandom",
@@ -1354,7 +1354,7 @@ dependencies = [
 
 [[package]]
 name = "signer-evm"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "getrandom",
  "hex",
@@ -1369,7 +1369,7 @@ dependencies = [
 
 [[package]]
 name = "signer-fil"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "blake2",
  "getrandom",
@@ -1383,14 +1383,14 @@ dependencies = [
 
 [[package]]
 name = "signer-primitives"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "signer-spark"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "bs58",
  "getrandom",
@@ -1406,7 +1406,7 @@ dependencies = [
 
 [[package]]
 name = "signer-sui"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "blake2",
  "ed25519-dalek",
@@ -1420,7 +1420,7 @@ dependencies = [
 
 [[package]]
 name = "signer-svm"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "bs58",
  "ed25519-dalek",
@@ -1434,7 +1434,7 @@ dependencies = [
 
 [[package]]
 name = "signer-ton"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "ed25519-dalek",
  "getrandom",
@@ -1447,7 +1447,7 @@ dependencies = [
 
 [[package]]
 name = "signer-tron"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "bs58",
  "getrandom",
@@ -1463,7 +1463,7 @@ dependencies = [
 
 [[package]]
 name = "signer-xrpl"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "bs58",
  "getrandom",

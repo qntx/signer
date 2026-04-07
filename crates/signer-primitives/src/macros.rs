@@ -1,10 +1,10 @@
-/// Defines a chain-specific `SignError` enum with the standard five signing
-/// error variants, a `Hex` variant for hex-decoding errors, and `From` impls
-/// for both `hex::FromHexError` and [`SignError`](crate::SignError).
+/// Defines a chain-specific `SignError` enum.
 ///
-/// Extra chain-specific variants can be appended after a `;` separator.
-/// Each must carry its own doc-comment and `#[error(...)]` attribute;
-/// additional `From` impls for those variants must be written by the caller.
+/// Generates the standard five signing error variants, a `Hex` variant for
+/// hex-decoding errors, and `From` impls for both `hex::FromHexError` and
+/// [`SignError`](crate::SignError). Extra chain-specific variants can be
+/// appended after a `;` separator; additional `From` impls for those must
+/// be written by the caller.
 ///
 /// # Examples
 ///
@@ -77,10 +77,10 @@ macro_rules! define_sign_error {
     };
 }
 
-/// Implements the [`Sign`](crate::Sign) trait for `Signer` by delegating each
-/// required method to the corresponding inherent method on `Self`.
+/// Implements [`Sign`](crate::Sign) for `Signer` via delegation.
 ///
-/// Additional trait method overrides can be appended inside the invocation.
+/// Delegates `sign_hash`, `sign_message`, and `sign_transaction` to the
+/// corresponding inherent methods. Additional overrides can be appended.
 ///
 /// # Examples
 ///

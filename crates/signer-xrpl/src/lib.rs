@@ -208,20 +208,12 @@ const ACCOUNT_VERSION: u8 = 0x00;
 
 /// Hash160: SHA-256 then RIPEMD-160.
 fn hash160(data: &[u8]) -> [u8; 20] {
-    let sha = Sha256::digest(data);
-    let ripe = Ripemd160::digest(sha);
-    let mut out = [0u8; 20];
-    out.copy_from_slice(&ripe);
-    out
+    Ripemd160::digest(Sha256::digest(data)).into()
 }
 
 /// Double SHA-256 (used for checksum).
 fn double_sha256(data: &[u8]) -> [u8; 32] {
-    let first = Sha256::digest(data);
-    let second = Sha256::digest(first);
-    let mut out = [0u8; 32];
-    out.copy_from_slice(&second);
-    out
+    Sha256::digest(Sha256::digest(data)).into()
 }
 
 /// Encode a compressed public key as an XRPL classic `r`-address.

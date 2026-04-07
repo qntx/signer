@@ -84,11 +84,11 @@ impl SignOutput {
 ///
 /// # Example
 ///
-/// ```ignore
-/// use signer_primitives::Sign;
+/// ```
+/// use signer_primitives::{Sign, SignOutput};
 ///
-/// fn sign_with_any(s: &impl Sign, msg: &[u8]) -> signer_primitives::SignOutput {
-///     s.sign_message(msg).unwrap()
+/// fn sign_with_any<S: Sign>(signer: &S, msg: &[u8]) -> SignOutput {
+///     signer.sign_message(msg).unwrap()
 /// }
 /// ```
 pub trait Sign: Send + Sync {

@@ -158,12 +158,7 @@ impl Sign for Signer {
 
 /// Compute SHA3-256.
 fn sha3_256(data: &[u8]) -> [u8; 32] {
-    let mut hasher = sha3::Sha3_256::new();
-    hasher.update(data);
-    let result = hasher.finalize();
-    let mut out = [0u8; 32];
-    out.copy_from_slice(&result);
-    out
+    sha3::Sha3_256::digest(data).into()
 }
 
 /// Build the Aptos transaction signing message.
