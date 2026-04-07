@@ -65,7 +65,7 @@ impl Signer {
     #[allow(clippy::expect_used, reason = "getrandom failure is unrecoverable")]
     pub fn random() -> Self {
         let mut bytes = [0u8; 32];
-        getrandom::getrandom(&mut bytes).expect("getrandom failed");
+        getrandom::fill(&mut bytes).expect("getrandom failed");
         let signer = Self::from_bytes(&bytes);
         bytes.fill(0);
         signer

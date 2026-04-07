@@ -99,7 +99,7 @@ impl Signer {
     pub fn random() -> Self {
         use zeroize::Zeroize as _;
         let mut bytes = [0u8; 32];
-        getrandom::getrandom(&mut bytes).expect("getrandom failed");
+        getrandom::fill(&mut bytes).expect("getrandom failed");
         let key = SigningKey::from_slice(&bytes).expect("invalid random key");
         bytes.zeroize();
         Self { key }

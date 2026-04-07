@@ -50,23 +50,23 @@ colored = "3.1.1"
 serde = { version = "1", features = ["derive"] }
 
 # Random
-getrandom = { version = "0.2", default-features = false }
+getrandom = { version = "0.4", default-features = false }
 
 # Utilities
 zeroize = { version = "1.8.2", default-features = false, features = ["derive"] }
 thiserror = { version = "2.0.18", default-features = false }
 
 # Kobe (optional bridge)
-kobe-btc = { version = "0.7", default-features = false, features = ["std"] }
-kobe-evm = { version = "0.7", default-features = false, features = ["std"] }
-kobe-svm = { version = "0.7", default-features = false, features = ["std"] }
-kobe-cosmos = { version = "0.7", default-features = false, features = ["std"] }
-kobe-tron = { version = "0.7", default-features = false, features = ["std"] }
-kobe-spark = { version = "0.7", default-features = false, features = ["std"] }
-kobe-fil = { version = "0.7", default-features = false, features = ["std"] }
-kobe-ton = { version = "0.7", default-features = false, features = ["std"] }
-kobe-sui = { version = "0.7", default-features = false, features = ["std"] }
-kobe-xrpl = { version = "0.7", default-features = false, features = ["std"] }
+kobe-btc = { version = "0.8", default-features = false, features = ["std"] }
+kobe-evm = { version = "0.8", default-features = false, features = ["std"] }
+kobe-svm = { version = "0.8", default-features = false, features = ["std"] }
+kobe-cosmos = { version = "0.8", default-features = false, features = ["std"] }
+kobe-tron = { version = "0.8", default-features = false, features = ["std"] }
+kobe-spark = { version = "0.8", default-features = false, features = ["std"] }
+kobe-fil = { version = "0.8", default-features = false, features = ["std"] }
+kobe-ton = { version = "0.8", default-features = false, features = ["std"] }
+kobe-sui = { version = "0.8", default-features = false, features = ["std"] }
+kobe-xrpl = { version = "0.8", default-features = false, features = ["std"] }
 
 [profile.release]
 codegen-units = 1
