@@ -8,7 +8,7 @@ use crate::output::{self, AddressOutput, SignOutput};
 
 /// Cosmos signing operations.
 #[derive(Args)]
-pub struct CosmosCommand {
+pub(crate) struct CosmosCommand {
     #[command(subcommand)]
     command: CosmosSubcommand,
 }
@@ -44,7 +44,7 @@ enum CosmosSubcommand {
 }
 
 impl CosmosCommand {
-    pub fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
         match self.command {
             CosmosSubcommand::SignHash { key, hash } => {
                 let signer = Signer::from_hex(&key)?;

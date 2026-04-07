@@ -8,7 +8,7 @@ use crate::output::{self, AddressOutput, SignOutput};
 
 /// TON signing operations.
 #[derive(Args)]
-pub struct TonCommand {
+pub(crate) struct TonCommand {
     #[command(subcommand)]
     command: TonSubcommand,
 }
@@ -37,7 +37,7 @@ enum TonSubcommand {
 }
 
 impl TonCommand {
-    pub fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
         match self.command {
             TonSubcommand::Sign { key, message } => {
                 let signer = Signer::from_hex(&key)?;

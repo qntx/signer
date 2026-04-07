@@ -8,7 +8,7 @@ use crate::output::{self, AddressOutput, SignOutput};
 
 /// Filecoin signing operations.
 #[derive(Args)]
-pub struct FilCommand {
+pub(crate) struct FilCommand {
     #[command(subcommand)]
     command: FilSubcommand,
 }
@@ -44,7 +44,7 @@ enum FilSubcommand {
 }
 
 impl FilCommand {
-    pub fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
         match self.command {
             FilSubcommand::SignHash { key, hash } => {
                 let signer = Signer::from_hex(&key)?;

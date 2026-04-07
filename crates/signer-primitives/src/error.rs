@@ -4,7 +4,7 @@ use alloc::string::String;
 
 /// Errors from signing operations.
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
+pub enum SignError {
     /// Private key is invalid or out of range.
     #[error("invalid key: {0}")]
     InvalidKey(String),

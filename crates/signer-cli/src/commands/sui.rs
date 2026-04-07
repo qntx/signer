@@ -8,7 +8,7 @@ use crate::output::{self, AddressOutput, SignOutput};
 
 /// Sui signing operations.
 #[derive(Args)]
-pub struct SuiCommand {
+pub(crate) struct SuiCommand {
     #[command(subcommand)]
     command: SuiSubcommand,
 }
@@ -37,7 +37,7 @@ enum SuiSubcommand {
 }
 
 impl SuiCommand {
-    pub fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
         match self.command {
             SuiSubcommand::SignMessage { key, message } => {
                 let signer = Signer::from_hex(&key)?;

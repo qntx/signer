@@ -14,7 +14,7 @@ use alloc::{format, string::String, vec::Vec};
 mod error;
 
 use bech32::{Bech32, Hrp};
-pub use error::Error;
+pub use error::SignError;
 use k256::ecdsa::SigningKey;
 use ripemd::{Digest as _, Ripemd160};
 use sha2::{Digest, Sha256};
@@ -44,8 +44,9 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the bytes are not a valid secp256k1 scalar.
-    pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, Error> {
-        let key = SigningKey::from_slice(bytes).map_err(|e| Error::InvalidKey(e.to_string()))?;
+    pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
+        let key =
+            SigningKey::from_slice(bytes).map_err(|e| SignError::InvalidKey(e.to_string()))?;
         Ok(Self { key })
     }
 
@@ -54,21 +55,32 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the hex is invalid or the key is out of range.
-    pub fn from_hex(hex_str: &str) -> Result<Self, Error> {
+    pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
         let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
         let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
-            Error::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
+            SignError::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
         })?;
         Self::from_bytes(&bytes)
     }
 
     /// Generate a random signer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the OS random number generator fails.
     #[cfg(feature = "getrandom")]
     #[must_use]
+    #[allow(
+        clippy::expect_used,
+        reason = "getrandom failure is unrecoverable; secp256k1 rejection has p ≈ 2⁻¹²⁸"
+    )]
     pub fn random() -> Self {
-        Self {
-            key: SigningKey::random(&mut rand_core::OsRng),
-        }
+        use zeroize::Zeroize as _;
+        let mut bytes = [0u8; 32];
+        getrandom::getrandom(&mut bytes).expect("getrandom failed");
+        let key = SigningKey::from_slice(&bytes).expect("invalid random key");
+        bytes.zeroize();
+        Self { key }
     }
 
     /// Cosmos address with `cosmos1` prefix (bech32-encoded RIPEMD160(SHA256(pubkey))).
@@ -82,6 +94,10 @@ impl Signer {
         let sha = Sha256::digest(&pubkey);
         let hash160 = Ripemd160::digest(sha);
         let hrp = Hrp::parse_unchecked("cosmos");
+        #[allow(
+            clippy::expect_used,
+            reason = "HRP and hash160 are always valid bech32 inputs"
+        )]
         bech32::encode::<Bech32>(hrp, &hash160).expect("valid bech32")
     }
 
@@ -106,9 +122,9 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if `hash` is not 32 bytes or signing fails.
-    pub fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
+    pub fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
         if hash.len() != 32 {
-            return Err(Error::InvalidMessage(format!(
+            return Err(SignError::InvalidMessage(format!(
                 "expected 32-byte hash, got {}",
                 hash.len()
             )));
@@ -116,7 +132,7 @@ impl Signer {
         let (sig, rid) = self
             .key
             .sign_prehash_recoverable(hash)
-            .map_err(|e| Error::SigningFailed(e.to_string()))?;
+            .map_err(|e| SignError::SigningFailed(e.to_string()))?;
         let mut out = sig.to_bytes().to_vec();
         out.push(rid.to_byte());
         Ok(SignOutput::secp256k1(out, rid.to_byte()))
@@ -127,7 +143,7 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if signing fails.
-    pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
+    pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
         let hash = Sha256::digest(tx_bytes);
         self.sign_hash(&hash)
     }
@@ -137,24 +153,24 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if signing fails.
-    pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
+    pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         let hash = Sha256::digest(message);
         self.sign_hash(&hash)
     }
 }
 
 impl Sign for Signer {
-    type Error = Error;
+    type Error = SignError;
 
-    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
+    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
         Self::sign_hash(self, hash)
     }
 
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         Self::sign_message(self, message)
     }
 
-    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
+    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
         Self::sign_transaction(self, tx_bytes)
     }
 }
@@ -166,12 +182,16 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the private key is invalid.
-    pub fn from_derived(account: &kobe_cosmos::DerivedAccount) -> Result<Self, Error> {
+    pub fn from_derived(account: &kobe_cosmos::DerivedAccount) -> Result<Self, SignError> {
         Self::from_hex(&account.private_key)
     }
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::indexing_slicing,
+    reason = "test assertions use indexing for clarity"
+)]
 mod tests {
     use k256::ecdsa::signature::hazmat::PrehashVerifier;
 

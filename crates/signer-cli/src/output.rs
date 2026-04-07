@@ -1,4 +1,7 @@
-#![allow(clippy::print_stdout)]
+#![allow(
+    clippy::print_stdout,
+    reason = "output module intentionally prints to stdout"
+)]
 //! Structured output types and unified rendering.
 //!
 //! These types serve as the single source of truth for both JSON and

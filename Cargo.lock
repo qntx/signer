@@ -492,7 +492,6 @@ checksum = "70e796c081cee67dc755e1a36a0a172b897fab85fc3f6bc48307991f64e4eca9"
 dependencies = [
  "curve25519-dalek",
  "ed25519",
- "rand_core 0.6.4",
  "serde",
  "sha2",
  "subtle",
@@ -1145,7 +1144,7 @@ dependencies = [
 
 [[package]]
 name = "signer"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "signer-btc",
  "signer-cosmos",
@@ -1162,13 +1161,13 @@ dependencies = [
 
 [[package]]
 name = "signer-btc"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "bs58",
+ "getrandom",
  "hex",
  "k256",
  "kobe-btc",
- "rand_core 0.6.4",
  "ripemd 0.2.0",
  "sha2",
  "signer-primitives",
@@ -1178,9 +1177,8 @@ dependencies = [
 
 [[package]]
 name = "signer-cli"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
- "bs58",
  "clap",
  "colored",
  "hex",
@@ -1201,13 +1199,13 @@ dependencies = [
 
 [[package]]
 name = "signer-cosmos"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "bech32",
+ "getrandom",
  "hex",
  "k256",
  "kobe-cosmos",
- "rand_core 0.6.4",
  "ripemd 0.2.0",
  "sha2",
  "signer-primitives",
@@ -1217,12 +1215,12 @@ dependencies = [
 
 [[package]]
 name = "signer-evm"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
+ "getrandom",
  "hex",
  "k256",
  "kobe-evm",
- "rand_core 0.6.4",
  "serde_json",
  "sha3",
  "signer-primitives",
@@ -1232,13 +1230,13 @@ dependencies = [
 
 [[package]]
 name = "signer-fil"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "blake2",
+ "getrandom",
  "hex",
  "k256",
  "kobe-fil",
- "rand_core 0.6.4",
  "signer-primitives",
  "thiserror",
  "zeroize",
@@ -1246,20 +1244,20 @@ dependencies = [
 
 [[package]]
 name = "signer-primitives"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "signer-spark"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "bs58",
+ "getrandom",
  "hex",
  "k256",
  "kobe-spark",
- "rand_core 0.6.4",
  "ripemd 0.2.0",
  "sha2",
  "signer-primitives",
@@ -1269,13 +1267,13 @@ dependencies = [
 
 [[package]]
 name = "signer-sui"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "blake2",
  "ed25519-dalek",
+ "getrandom",
  "hex",
  "kobe-sui",
- "rand_core 0.6.4",
  "signer-primitives",
  "thiserror",
  "zeroize",
@@ -1283,13 +1281,13 @@ dependencies = [
 
 [[package]]
 name = "signer-svm"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "bs58",
  "ed25519-dalek",
+ "getrandom",
  "hex",
  "kobe-svm",
- "rand_core 0.6.4",
  "signer-primitives",
  "thiserror",
  "zeroize",
@@ -1297,12 +1295,12 @@ dependencies = [
 
 [[package]]
 name = "signer-ton"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "ed25519-dalek",
+ "getrandom",
  "hex",
  "kobe-ton",
- "rand_core 0.6.4",
  "signer-primitives",
  "thiserror",
  "zeroize",
@@ -1310,13 +1308,13 @@ dependencies = [
 
 [[package]]
 name = "signer-tron"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "bs58",
+ "getrandom",
  "hex",
  "k256",
  "kobe-tron",
- "rand_core 0.6.4",
  "sha2",
  "sha3",
  "signer-primitives",
@@ -1326,13 +1324,13 @@ dependencies = [
 
 [[package]]
 name = "signer-xrpl"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "bs58",
+ "getrandom",
  "hex",
  "k256",
  "kobe-xrpl",
- "rand_core 0.6.4",
  "ripemd 0.2.0",
  "sha2",
  "signer-primitives",

@@ -2,7 +2,8 @@
     clippy::print_stdout,
     clippy::print_stderr,
     clippy::missing_docs_in_private_items,
-    missing_docs
+    missing_docs,
+    reason = "CLI binary intentionally uses stdout/stderr and does not require doc comments"
 )]
 //! Signer — multi-chain transaction signing CLI.
 
@@ -12,20 +13,25 @@ pub mod output;
 use clap::Parser;
 use commands::{Cli, Commands};
 
-fn main() {
+fn main() -> std::process::ExitCode {
     let cli = Cli::parse();
     let json = cli.json;
 
     if let Err(e) = run(cli) {
         if json {
-            let _ = output::print_json(&output::ErrorOutput {
+            if output::print_json(&output::ErrorOutput {
                 error: e.to_string(),
-            });
+            })
+            .is_err()
+            {
+                eprintln!("Error: {e}");
+            }
         } else {
             eprintln!("Error: {e}");
         }
-        std::process::exit(1);
+        return std::process::ExitCode::FAILURE;
     }
+    std::process::ExitCode::SUCCESS
 }
 
 fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {

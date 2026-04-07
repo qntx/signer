@@ -29,7 +29,7 @@ pub use signer_evm as evm;
 #[cfg(feature = "fil")]
 pub use signer_fil as fil;
 pub use signer_primitives as core;
-pub use signer_primitives::{Sign, SignExt, SignOutput};
+pub use signer_primitives::{Sign, SignError, SignExt, SignOutput};
 #[cfg(feature = "spark")]
 pub use signer_spark as spark;
 #[cfg(feature = "sui")]

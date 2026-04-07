@@ -15,7 +15,7 @@ mod error;
 
 pub use ed25519_dalek::{self, Signature};
 use ed25519_dalek::{Signer as _, SigningKey, Verifier};
-pub use error::Error;
+pub use error::SignError;
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 use zeroize::Zeroizing;
 
@@ -48,10 +48,10 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the hex is invalid or not 32 bytes.
-    pub fn from_hex(hex_str: &str) -> Result<Self, Error> {
+    pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
         let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
         let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
-            Error::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
+            SignError::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
         })?;
         Ok(Self::from_bytes(&bytes))
     }
@@ -63,12 +63,16 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the Base58 is invalid or not 64 bytes.
-    pub fn from_keypair_base58(b58: &str) -> Result<Self, Error> {
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "length is checked to be exactly 64 before slicing"
+    )]
+    pub fn from_keypair_base58(b58: &str) -> Result<Self, SignError> {
         let decoded = bs58::decode(b58)
             .into_vec()
-            .map_err(|e| Error::InvalidKeypair(e.to_string()))?;
+            .map_err(|e| SignError::InvalidKeypair(e.to_string()))?;
         if decoded.len() != 64 {
-            return Err(Error::InvalidKeypair(format!(
+            return Err(SignError::InvalidKeypair(format!(
                 "expected 64 bytes, got {}",
                 decoded.len()
             )));
@@ -81,12 +85,16 @@ impl Signer {
     }
 
     /// Generate a random signer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the OS random number generator fails.
     #[cfg(feature = "getrandom")]
     #[must_use]
+    #[allow(clippy::expect_used, reason = "getrandom failure is unrecoverable")]
     pub fn random() -> Self {
-        use rand_core::{OsRng, RngCore};
         let mut bytes = [0u8; 32];
-        OsRng.fill_bytes(&mut bytes);
+        getrandom::getrandom(&mut bytes).expect("getrandom failed");
         let signer = Self::from_bytes(&bytes);
         bytes.fill(0);
         signer
@@ -127,7 +135,7 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the signature is invalid.
-    pub fn verify(&self, msg: &[u8], signature: &Signature) -> Result<(), Error> {
+    pub fn verify(&self, msg: &[u8], signature: &Signature) -> Result<(), SignError> {
         self.key.verifying_key().verify(msg, signature)?;
         Ok(())
     }
@@ -151,14 +159,17 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the transaction is empty or malformed.
-    pub fn extract_signable_bytes(tx_bytes: &[u8]) -> Result<&[u8], Error> {
+    #[allow(clippy::indexing_slicing, reason = "bounds are checked before slicing")]
+    pub fn extract_signable_bytes(tx_bytes: &[u8]) -> Result<&[u8], SignError> {
         if tx_bytes.is_empty() {
-            return Err(Error::InvalidTransaction("empty transaction".into()));
+            return Err(SignError::InvalidTransaction("empty transaction".into()));
         }
         let (num_sigs, header_len) = decode_compact_u16(tx_bytes)?;
         let msg_start = header_len + num_sigs * 64;
         if tx_bytes.len() <= msg_start {
-            return Err(Error::InvalidTransaction("transaction too short".into()));
+            return Err(SignError::InvalidTransaction(
+                "transaction too short".into(),
+            ));
         }
         Ok(&tx_bytes[msg_start..])
     }
@@ -168,19 +179,22 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the transaction is empty or has no signature slots.
+    #[allow(clippy::indexing_slicing, reason = "bounds are checked before slicing")]
     pub fn encode_signed_transaction(
         tx_bytes: &[u8],
         signature: &Signature,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Result<Vec<u8>, SignError> {
         if tx_bytes.is_empty() {
-            return Err(Error::InvalidTransaction("empty transaction".into()));
+            return Err(SignError::InvalidTransaction("empty transaction".into()));
         }
         let (num_sigs, header_len) = decode_compact_u16(tx_bytes)?;
         if num_sigs == 0 {
-            return Err(Error::InvalidTransaction("no signature slots".into()));
+            return Err(SignError::InvalidTransaction("no signature slots".into()));
         }
         if tx_bytes.len() < header_len + num_sigs * 64 {
-            return Err(Error::InvalidTransaction("transaction too short".into()));
+            return Err(SignError::InvalidTransaction(
+                "transaction too short".into(),
+            ));
         }
         let mut signed = tx_bytes.to_vec();
         signed[header_len..header_len + 64].copy_from_slice(&signature.to_bytes());
@@ -189,22 +203,22 @@ impl Signer {
 }
 
 impl Sign for Signer {
-    type Error = Error;
+    type Error = SignError;
 
-    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
+    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
         let sig = self.key.sign(hash);
         Ok(SignOutput::ed25519(sig.to_bytes().to_vec()))
     }
 
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         self.sign_hash(message)
     }
 
-    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
+    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
         self.sign_hash(tx_bytes)
     }
 
-    fn extract_signable_bytes<'a>(&self, tx_bytes: &'a [u8]) -> Result<&'a [u8], Error> {
+    fn extract_signable_bytes<'a>(&self, tx_bytes: &'a [u8]) -> Result<&'a [u8], SignError> {
         Self::extract_signable_bytes(tx_bytes)
     }
 
@@ -212,9 +226,9 @@ impl Sign for Signer {
         &self,
         tx_bytes: &[u8],
         signature: &SignOutput,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Result<Vec<u8>, SignError> {
         let sig = Signature::from_slice(&signature.signature)
-            .map_err(|e| Error::InvalidTransaction(e.to_string()))?;
+            .map_err(|e| SignError::InvalidTransaction(e.to_string()))?;
         Self::encode_signed_transaction(tx_bytes, &sig)
     }
 }
@@ -226,17 +240,17 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the private key is invalid.
-    pub fn from_derived(derived: &kobe_svm::DerivedAddress) -> Result<Self, Error> {
+    pub fn from_derived(derived: &kobe_svm::DerivedAddress) -> Result<Self, SignError> {
         Self::from_hex(&derived.private_key_hex)
     }
 }
 
-fn decode_compact_u16(data: &[u8]) -> Result<(usize, usize), Error> {
+fn decode_compact_u16(data: &[u8]) -> Result<(usize, usize), SignError> {
     let mut value: usize = 0;
     let mut shift: u32 = 0;
     for (i, &byte) in data.iter().enumerate() {
         if i >= 3 {
-            return Err(Error::InvalidTransaction(
+            return Err(SignError::InvalidTransaction(
                 "compact-u16 exceeds 3 bytes".into(),
             ));
         }
@@ -246,10 +260,16 @@ fn decode_compact_u16(data: &[u8]) -> Result<(usize, usize), Error> {
         }
         shift += 7;
     }
-    Err(Error::InvalidTransaction("truncated compact-u16".into()))
+    Err(SignError::InvalidTransaction(
+        "truncated compact-u16".into(),
+    ))
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::indexing_slicing,
+    reason = "test assertions use indexing for clarity"
+)]
 mod tests {
     use super::*;
 

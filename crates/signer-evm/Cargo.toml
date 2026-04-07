@@ -10,13 +10,13 @@ description = "EVM transaction signer — EIP-191, EIP-712, typed transaction si
 default = ["std"]
 std = ["alloc", "signer-primitives/std", "zeroize/std"]
 alloc = ["signer-primitives/alloc", "zeroize/alloc"]
-getrandom = ["rand_core/getrandom"]
+getrandom = ["dep:getrandom"]
 kobe = ["dep:kobe-evm"]
 
 [dependencies]
 signer-primitives.workspace = true
 k256.workspace = true
-rand_core.workspace = true
+getrandom = { workspace = true, optional = true }
 sha3.workspace = true
 hex.workspace = true
 serde_json.workspace = true

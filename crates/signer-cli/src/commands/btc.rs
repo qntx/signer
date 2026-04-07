@@ -8,7 +8,7 @@ use crate::output::{self, AddressOutput, SignOutput};
 
 /// Bitcoin signing operations.
 #[derive(Args)]
-pub struct BtcCommand {
+pub(crate) struct BtcCommand {
     #[command(subcommand)]
     command: BtcSubcommand,
 }
@@ -44,7 +44,7 @@ enum BtcSubcommand {
 }
 
 impl BtcCommand {
-    pub fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
         match self.command {
             BtcSubcommand::SignHash { key, hash } => {
                 let signer = Signer::from_hex(&key)?;

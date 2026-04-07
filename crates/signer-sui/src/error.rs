@@ -4,7 +4,7 @@ use alloc::string::String;
 
 /// Errors from Sui signing operations.
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
+pub enum SignError {
     /// Private key is invalid.
     #[error("invalid key: {0}")]
     InvalidKey(String),
@@ -28,26 +28,26 @@ pub enum Error {
     Hex(hex::FromHexError),
 }
 
-impl From<hex::FromHexError> for Error {
+impl From<hex::FromHexError> for SignError {
     fn from(e: hex::FromHexError) -> Self {
         Self::Hex(e)
     }
 }
 
-impl From<ed25519_dalek::SignatureError> for Error {
+impl From<ed25519_dalek::SignatureError> for SignError {
     fn from(e: ed25519_dalek::SignatureError) -> Self {
         Self::VerifyFailed(e)
     }
 }
 
-impl From<signer_primitives::Error> for Error {
-    fn from(e: signer_primitives::Error) -> Self {
+impl From<signer_primitives::SignError> for SignError {
+    fn from(e: signer_primitives::SignError) -> Self {
         match e {
-            signer_primitives::Error::InvalidKey(m) => Self::InvalidKey(m),
-            signer_primitives::Error::InvalidMessage(m) => Self::InvalidMessage(m),
-            signer_primitives::Error::SigningFailed(m) => Self::SigningFailed(m),
-            signer_primitives::Error::InvalidSignature(m) => Self::InvalidSignature(m),
-            signer_primitives::Error::InvalidTransaction(m) => Self::InvalidTransaction(m),
+            signer_primitives::SignError::InvalidKey(m) => Self::InvalidKey(m),
+            signer_primitives::SignError::InvalidMessage(m) => Self::InvalidMessage(m),
+            signer_primitives::SignError::SigningFailed(m) => Self::SigningFailed(m),
+            signer_primitives::SignError::InvalidSignature(m) => Self::InvalidSignature(m),
+            signer_primitives::SignError::InvalidTransaction(m) => Self::InvalidTransaction(m),
         }
     }
 }

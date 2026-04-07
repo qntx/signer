@@ -27,7 +27,6 @@ signer-xrpl = { workspace = true, features = ["std", "getrandom"] }
 clap.workspace = true
 colored.workspace = true
 hex = { workspace = true, features = ["std"] }
-bs58 = { workspace = true, features = ["std"] }
 serde.workspace = true
 serde_json = { workspace = true, features = ["std"] }
 

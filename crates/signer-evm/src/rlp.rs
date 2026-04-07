@@ -7,7 +7,11 @@ use alloc::{vec, vec::Vec};
 
 /// RLP-encode a byte string.
 #[must_use]
-pub fn encode_bytes(data: &[u8]) -> Vec<u8> {
+#[allow(
+    clippy::indexing_slicing,
+    reason = "single-element check guards the index"
+)]
+pub(crate) fn encode_bytes(data: &[u8]) -> Vec<u8> {
     if data.len() == 1 && data[0] < 0x80 {
         return data.to_vec();
     }
@@ -18,7 +22,7 @@ pub fn encode_bytes(data: &[u8]) -> Vec<u8> {
 
 /// RLP-encode a list from already-encoded concatenated items.
 #[must_use]
-pub fn encode_list(items: &[u8]) -> Vec<u8> {
+pub(crate) fn encode_list(items: &[u8]) -> Vec<u8> {
     let mut out = encode_length(items.len(), 0xc0);
     out.extend_from_slice(items);
     out
@@ -26,7 +30,11 @@ pub fn encode_list(items: &[u8]) -> Vec<u8> {
 
 /// Strip leading zeros from a big-endian scalar.
 #[must_use]
-pub fn strip_leading_zeros(data: &[u8]) -> &[u8] {
+#[allow(
+    clippy::indexing_slicing,
+    reason = "start is bounded by data.len() via unwrap_or"
+)]
+pub(crate) fn strip_leading_zeros(data: &[u8]) -> &[u8] {
     let start = data.iter().position(|&b| b != 0).unwrap_or(data.len());
     &data[start..]
 }
@@ -35,7 +43,11 @@ pub fn strip_leading_zeros(data: &[u8]) -> &[u8] {
 ///
 /// Input:  `type_byte || RLP([…fields])`
 /// Output: `type_byte || RLP([…fields, v, r, s])`
-pub fn encode_signed_typed_tx(
+#[allow(
+    clippy::indexing_slicing,
+    reason = "bounds are checked before every slice operation"
+)]
+pub(crate) fn encode_signed_typed_tx(
     unsigned_tx: &[u8],
     v: u8,
     r: &[u8; 32],
@@ -71,7 +83,10 @@ pub fn encode_signed_typed_tx(
     Ok(result)
 }
 
-#[allow(clippy::cast_possible_truncation)] // guarded: len < 56 and len_bytes.len() <= 8
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "guarded: len < 56 and len_bytes.len() <= 8"
+)]
 fn encode_length(len: usize, offset: u8) -> Vec<u8> {
     if len < 56 {
         vec![offset + len as u8]
@@ -83,6 +98,10 @@ fn encode_length(len: usize, offset: u8) -> Vec<u8> {
     }
 }
 
+#[allow(
+    clippy::indexing_slicing,
+    reason = "start is bounded by bytes.len() via position/unwrap_or"
+)]
 fn be_bytes(val: usize) -> Vec<u8> {
     if val == 0 {
         return vec![0];
@@ -95,6 +114,10 @@ fn be_bytes(val: usize) -> Vec<u8> {
     bytes[start..].to_vec()
 }
 
+#[allow(
+    clippy::indexing_slicing,
+    reason = "emptiness checked first; length validated before each slice"
+)]
 fn decode_length(data: &[u8]) -> Result<(usize, usize), &'static str> {
     if data.is_empty() {
         return Err("empty input");
@@ -126,6 +149,10 @@ fn read_be(bytes: &[u8]) -> usize {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::indexing_slicing,
+    reason = "test assertions use indexing for clarity"
+)]
 mod tests {
     use super::*;
 

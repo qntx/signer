@@ -26,7 +26,7 @@ use alloc::{format, string::String, vec::Vec};
 
 mod error;
 
-pub use error::Error;
+pub use error::SignError;
 use k256::ecdsa::SigningKey;
 use ripemd::{Digest as _, Ripemd160};
 use sha2::{Digest, Sha256};
@@ -56,8 +56,9 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the bytes are not a valid secp256k1 scalar.
-    pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, Error> {
-        let key = SigningKey::from_slice(bytes).map_err(|e| Error::InvalidKey(e.to_string()))?;
+    pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
+        let key =
+            SigningKey::from_slice(bytes).map_err(|e| SignError::InvalidKey(e.to_string()))?;
         Ok(Self { key })
     }
 
@@ -66,27 +67,42 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the hex is invalid or the key is out of range.
-    pub fn from_hex(hex_str: &str) -> Result<Self, Error> {
+    pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
         let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
         let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
-            Error::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
+            SignError::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
         })?;
         Self::from_bytes(&bytes)
     }
 
     /// Generate a random signer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the OS random number generator fails.
     #[cfg(feature = "getrandom")]
     #[must_use]
+    #[allow(
+        clippy::expect_used,
+        reason = "getrandom failure is unrecoverable; secp256k1 rejection has p ≈ 2⁻¹²⁸"
+    )]
     pub fn random() -> Self {
-        Self {
-            key: SigningKey::random(&mut rand_core::OsRng),
-        }
+        use zeroize::Zeroize as _;
+        let mut bytes = [0u8; 32];
+        getrandom::getrandom(&mut bytes).expect("getrandom failed");
+        let key = SigningKey::from_slice(&bytes).expect("invalid random key");
+        bytes.zeroize();
+        Self { key }
     }
 
     /// Bitcoin P2PKH address (legacy, starts with `1`).
     ///
     /// Computed as `Base58Check(0x00 || RIPEMD160(SHA256(compressed_pubkey)))`.
     #[must_use]
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "SHA-256 output is always 32 bytes, slicing first 4 is safe"
+    )]
     pub fn address(&self) -> String {
         let pubkey = self.public_key_bytes();
         let sha = Sha256::digest(&pubkey);
@@ -120,9 +136,9 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if `hash` is not 32 bytes or the signing primitive fails.
-    pub fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
+    pub fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
         if hash.len() != 32 {
-            return Err(Error::InvalidMessage(format!(
+            return Err(SignError::InvalidMessage(format!(
                 "expected 32-byte hash, got {}",
                 hash.len()
             )));
@@ -130,7 +146,7 @@ impl Signer {
         let (sig, rid) = self
             .key
             .sign_prehash_recoverable(hash)
-            .map_err(|e| Error::SigningFailed(e.to_string()))?;
+            .map_err(|e| SignError::SigningFailed(e.to_string()))?;
 
         let mut out = sig.to_bytes().to_vec();
         out.push(rid.to_byte());
@@ -142,7 +158,7 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the signing primitive fails.
-    pub fn sign_transaction(&self, sighash_preimage: &[u8]) -> Result<SignOutput, Error> {
+    pub fn sign_transaction(&self, sighash_preimage: &[u8]) -> Result<SignOutput, SignError> {
         let hash = Sha256::digest(Sha256::digest(sighash_preimage));
         self.sign_hash(&hash)
     }
@@ -154,7 +170,7 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the signing primitive fails.
-    pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
+    pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         let prefix = b"\x18Bitcoin Signed Message:\n";
         let mut data = Vec::with_capacity(prefix.len() + 9 + message.len());
         data.extend_from_slice(prefix);
@@ -166,17 +182,17 @@ impl Signer {
 }
 
 impl Sign for Signer {
-    type Error = Error;
+    type Error = SignError;
 
-    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
+    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
         Self::sign_hash(self, hash)
     }
 
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         Self::sign_message(self, message)
     }
 
-    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
+    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
         Self::sign_transaction(self, tx_bytes)
     }
 }
@@ -188,12 +204,15 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the private key is invalid.
-    pub fn from_derived(addr: &kobe_btc::DerivedAddress) -> Result<Self, Error> {
+    pub fn from_derived(addr: &kobe_btc::DerivedAddress) -> Result<Self, SignError> {
         Self::from_hex(&addr.private_key_hex)
     }
 }
 
-#[allow(clippy::cast_possible_truncation)]
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "values are range-checked before each cast"
+)]
 fn encode_compact_size(buf: &mut Vec<u8>, n: usize) {
     if n < 253 {
         buf.push(n as u8);
@@ -210,6 +229,10 @@ fn encode_compact_size(buf: &mut Vec<u8>, n: usize) {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::indexing_slicing,
+    reason = "test assertions use indexing for clarity"
+)]
 mod tests {
     use k256::ecdsa::signature::hazmat::PrehashVerifier;
 
@@ -272,7 +295,10 @@ mod tests {
 
         let mut data = Vec::new();
         data.extend_from_slice(b"\x18Bitcoin Signed Message:\n");
-        #[allow(clippy::cast_possible_truncation)]
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "test message is short, len fits in u8"
+        )]
         data.push(msg.len() as u8);
         data.extend_from_slice(msg);
         let expected = Sha256::digest(Sha256::digest(&data));

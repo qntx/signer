@@ -15,7 +15,7 @@ mod error;
 
 use blake2::digest::consts::{U4, U20, U32};
 use blake2::{Blake2b, Digest};
-pub use error::Error;
+pub use error::SignError;
 use k256::ecdsa::SigningKey;
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 use zeroize::ZeroizeOnDrop;
@@ -47,8 +47,9 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the bytes are not a valid secp256k1 scalar.
-    pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, Error> {
-        let key = SigningKey::from_slice(bytes).map_err(|e| Error::InvalidKey(e.to_string()))?;
+    pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
+        let key =
+            SigningKey::from_slice(bytes).map_err(|e| SignError::InvalidKey(e.to_string()))?;
         Ok(Self { key })
     }
 
@@ -57,21 +58,32 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the hex is invalid or the key is out of range.
-    pub fn from_hex(hex_str: &str) -> Result<Self, Error> {
+    pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
         let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
         let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
-            Error::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
+            SignError::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
         })?;
         Self::from_bytes(&bytes)
     }
 
     /// Generate a random signer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the OS random number generator fails.
     #[cfg(feature = "getrandom")]
     #[must_use]
+    #[allow(
+        clippy::expect_used,
+        reason = "getrandom failure is unrecoverable; secp256k1 rejection has p ≈ 2⁻¹²⁸"
+    )]
     pub fn random() -> Self {
-        Self {
-            key: SigningKey::random(&mut rand_core::OsRng),
-        }
+        use zeroize::Zeroize as _;
+        let mut bytes = [0u8; 32];
+        getrandom::getrandom(&mut bytes).expect("getrandom failed");
+        let key = SigningKey::from_slice(&bytes).expect("invalid random key");
+        bytes.zeroize();
+        Self { key }
     }
 
     /// Filecoin protocol-1 (secp256k1) address (`f1...`).
@@ -114,9 +126,9 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if `hash` is not 32 bytes or signing fails.
-    pub fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
+    pub fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
         if hash.len() != 32 {
-            return Err(Error::InvalidMessage(format!(
+            return Err(SignError::InvalidMessage(format!(
                 "expected 32-byte hash, got {}",
                 hash.len()
             )));
@@ -124,7 +136,7 @@ impl Signer {
         let (sig, rid) = self
             .key
             .sign_prehash_recoverable(hash)
-            .map_err(|e| Error::SigningFailed(e.to_string()))?;
+            .map_err(|e| SignError::SigningFailed(e.to_string()))?;
         let mut out = sig.to_bytes().to_vec();
         out.push(rid.to_byte());
         Ok(SignOutput::secp256k1(out, rid.to_byte()))
@@ -135,7 +147,7 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if signing fails.
-    pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
+    pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
         let hash = Blake2b256::digest(tx_bytes);
         self.sign_hash(&hash)
     }
@@ -145,29 +157,33 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if signing fails.
-    pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
+    pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         let hash = Blake2b256::digest(message);
         self.sign_hash(&hash)
     }
 }
 
 impl Sign for Signer {
-    type Error = Error;
+    type Error = SignError;
 
-    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
+    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
         Self::sign_hash(self, hash)
     }
 
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         Self::sign_message(self, message)
     }
 
-    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
+    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
         Self::sign_transaction(self, tx_bytes)
     }
 }
 
 /// RFC 4648 base32 lowercase encoding without padding.
+#[allow(
+    clippy::indexing_slicing,
+    reason = "idx is masked with 0x1F, always < 32 = ALPHABET.len()"
+)]
 fn base32_lower_encode(data: &[u8]) -> String {
     const ALPHABET: &[u8; 32] = b"abcdefghijklmnopqrstuvwxyz234567";
     let mut out = String::with_capacity((data.len() * 8).div_ceil(5));
@@ -178,13 +194,19 @@ fn base32_lower_encode(data: &[u8]) -> String {
         bits += 8;
         while bits >= 5 {
             bits -= 5;
-            #[allow(clippy::cast_possible_truncation)]
+            #[allow(
+                clippy::cast_possible_truncation,
+                reason = "masked with 0x1F, always <= 31"
+            )]
             let idx = ((buffer >> bits) & 0x1F) as usize;
             out.push(ALPHABET[idx] as char);
         }
     }
     if bits > 0 {
-        #[allow(clippy::cast_possible_truncation)]
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "masked with 0x1F, always <= 31"
+        )]
         let idx = ((buffer << (5 - bits)) & 0x1F) as usize;
         out.push(ALPHABET[idx] as char);
     }
@@ -198,12 +220,16 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the private key is invalid.
-    pub fn from_derived(account: &kobe_fil::DerivedAccount) -> Result<Self, Error> {
+    pub fn from_derived(account: &kobe_fil::DerivedAccount) -> Result<Self, SignError> {
         Self::from_hex(&account.private_key)
     }
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::indexing_slicing,
+    reason = "test assertions use indexing for clarity"
+)]
 mod tests {
     use k256::ecdsa::signature::hazmat::PrehashVerifier;
 

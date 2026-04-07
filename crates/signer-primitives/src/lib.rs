@@ -1,7 +1,7 @@
 //! Unified signing trait and types for multi-chain transaction signers.
 //!
 //! This crate defines the [`Sign`] trait that all chain-specific signer crates
-//! implement, plus shared types like [`SignOutput`] and [`Error`].
+//! implement, plus shared types like [`SignOutput`] and [`SignError`].
 //!
 //! Mirrors the role of [`kobe-core`] for derivation — this is the equivalent
 //! for signing.
@@ -22,7 +22,7 @@ use alloc::vec::Vec;
 
 mod error;
 
-pub use error::Error;
+pub use error::SignError;
 
 /// Output of a signing operation.
 ///
@@ -92,7 +92,7 @@ impl SignOutput {
 /// ```
 pub trait Sign: Send + Sync {
     /// The error type returned by signing operations.
-    type Error: core::fmt::Debug + core::fmt::Display + From<Error> + Send + Sync;
+    type Error: core::fmt::Debug + core::fmt::Display + From<SignError> + Send + Sync;
 
     /// Sign a pre-hashed digest.
     ///
@@ -156,7 +156,10 @@ pub trait Sign: Send + Sync {
         _tx_bytes: &[u8],
         _signature: &SignOutput,
     ) -> Result<Vec<u8>, Self::Error> {
-        Err(Error::InvalidTransaction("encode_signed_transaction not implemented".into()).into())
+        Err(
+            SignError::InvalidTransaction("encode_signed_transaction not implemented".into())
+                .into(),
+        )
     }
 }
 

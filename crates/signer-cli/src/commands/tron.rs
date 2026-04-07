@@ -8,7 +8,7 @@ use crate::output::{self, AddressOutput, SignOutput};
 
 /// Tron signing operations.
 #[derive(Args)]
-pub struct TronCommand {
+pub(crate) struct TronCommand {
     #[command(subcommand)]
     command: TronSubcommand,
 }
@@ -44,7 +44,7 @@ enum TronSubcommand {
 }
 
 impl TronCommand {
-    pub fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
         match self.command {
             TronSubcommand::SignHash { key, hash } => {
                 let signer = Signer::from_hex(&key)?;

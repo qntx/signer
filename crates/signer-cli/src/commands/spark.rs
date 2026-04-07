@@ -8,7 +8,7 @@ use crate::output::{self, AddressOutput, SignOutput};
 
 /// Spark signing operations.
 #[derive(Args)]
-pub struct SparkCommand {
+pub(crate) struct SparkCommand {
     #[command(subcommand)]
     command: SparkSubcommand,
 }
@@ -44,7 +44,7 @@ enum SparkSubcommand {
 }
 
 impl SparkCommand {
-    pub fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
         match self.command {
             SparkSubcommand::SignHash { key, hash } => {
                 let signer = Signer::from_hex(&key)?;

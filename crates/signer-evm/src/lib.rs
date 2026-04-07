@@ -27,7 +27,7 @@ mod eip712;
 mod error;
 mod rlp;
 
-pub use error::Error;
+pub use error::SignError;
 use k256::ecdsa::SigningKey;
 use sha3::{Digest, Keccak256};
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
@@ -56,8 +56,9 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the bytes are not a valid secp256k1 scalar.
-    pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, Error> {
-        let key = SigningKey::from_slice(bytes).map_err(|e| Error::InvalidKey(e.to_string()))?;
+    pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
+        let key =
+            SigningKey::from_slice(bytes).map_err(|e| SignError::InvalidKey(e.to_string()))?;
         Ok(Self { key })
     }
 
@@ -66,25 +67,40 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the hex is invalid or the key is out of range.
-    pub fn from_hex(hex_str: &str) -> Result<Self, Error> {
+    pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
         let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
         let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
-            Error::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
+            SignError::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
         })?;
         Self::from_bytes(&bytes)
     }
 
     /// Generate a random signer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the OS random number generator fails.
     #[cfg(feature = "getrandom")]
     #[must_use]
+    #[allow(
+        clippy::expect_used,
+        reason = "getrandom failure is unrecoverable; secp256k1 rejection has p ≈ 2⁻¹²⁸"
+    )]
     pub fn random() -> Self {
-        Self {
-            key: SigningKey::random(&mut rand_core::OsRng),
-        }
+        use zeroize::Zeroize as _;
+        let mut bytes = [0u8; 32];
+        getrandom::getrandom(&mut bytes).expect("getrandom failed");
+        let key = SigningKey::from_slice(&bytes).expect("invalid random key");
+        bytes.zeroize();
+        Self { key }
     }
 
     /// Ethereum address derived from this signing key (EIP-55 checksummed).
     #[must_use]
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "uncompressed pubkey is always 65B, Keccak256 is always 32B"
+    )]
     pub fn address(&self) -> String {
         let vk = self.key.verifying_key();
         let pk = vk.to_encoded_point(false);
@@ -115,9 +131,9 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if `hash` is not exactly 32 bytes.
-    pub fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
+    pub fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
         if hash.len() != 32 {
-            return Err(Error::InvalidMessage(format!(
+            return Err(SignError::InvalidMessage(format!(
                 "expected 32-byte hash, got {}",
                 hash.len()
             )));
@@ -125,7 +141,7 @@ impl Signer {
         let (sig, rid) = self
             .key
             .sign_prehash_recoverable(hash)
-            .map_err(|e| Error::SigningFailed(e.to_string()))?;
+            .map_err(|e| SignError::SigningFailed(e.to_string()))?;
 
         let mut out = Vec::with_capacity(65);
         out.extend_from_slice(&sig.r().to_bytes());
@@ -139,7 +155,11 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if signing fails.
-    pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "signature is always 65 bytes from sign_hash"
+    )]
+    pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         let prefix = format!("\x19Ethereum Signed Message:\n{}", message.len());
         let mut data = Vec::with_capacity(prefix.len() + message.len());
         data.extend_from_slice(prefix.as_bytes());
@@ -158,7 +178,11 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the JSON is malformed or signing fails.
-    pub fn sign_typed_data(&self, typed_data_json: &str) -> Result<SignOutput, Error> {
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "signature is always 65 bytes from sign_hash"
+    )]
+    pub fn sign_typed_data(&self, typed_data_json: &str) -> Result<SignOutput, SignError> {
         let hash = eip712::hash_typed_data_json(typed_data_json)?;
         let mut out = self.sign_hash(&hash)?;
         out.signature[64] += 27;
@@ -172,7 +196,7 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the transaction bytes are malformed.
-    pub fn sign_transaction(&self, unsigned_tx: &[u8]) -> Result<SignOutput, Error> {
+    pub fn sign_transaction(&self, unsigned_tx: &[u8]) -> Result<SignOutput, SignError> {
         let hash = Keccak256::digest(unsigned_tx);
         self.sign_hash(&hash)
     }
@@ -182,37 +206,43 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the unsigned tx or signature is malformed.
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "signature length is checked to be exactly 65 before slicing"
+    )]
     pub fn encode_signed_transaction(
         unsigned_tx: &[u8],
         signature: &[u8],
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Result<Vec<u8>, SignError> {
         if signature.len() != 65 {
-            return Err(Error::InvalidSignature("expected 65-byte signature".into()));
+            return Err(SignError::InvalidSignature(
+                "expected 65-byte signature".into(),
+            ));
         }
         let v = signature[64];
         let r: [u8; 32] = signature[..32]
             .try_into()
-            .map_err(|_| Error::InvalidSignature("bad r component".into()))?;
+            .map_err(|_| SignError::InvalidSignature("bad r component".into()))?;
         let s: [u8; 32] = signature[32..64]
             .try_into()
-            .map_err(|_| Error::InvalidSignature("bad s component".into()))?;
+            .map_err(|_| SignError::InvalidSignature("bad s component".into()))?;
         rlp::encode_signed_typed_tx(unsigned_tx, v, &r, &s)
-            .map_err(|e| Error::InvalidTransaction(String::from(e)))
+            .map_err(|e| SignError::InvalidTransaction(String::from(e)))
     }
 }
 
 impl Sign for Signer {
-    type Error = Error;
+    type Error = SignError;
 
-    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
+    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
         Self::sign_hash(self, hash)
     }
 
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         Self::sign_message(self, message)
     }
 
-    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
+    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
         Self::sign_transaction(self, tx_bytes)
     }
 
@@ -220,7 +250,7 @@ impl Sign for Signer {
         &self,
         tx_bytes: &[u8],
         signature: &SignOutput,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Result<Vec<u8>, SignError> {
         Self::encode_signed_transaction(tx_bytes, &signature.signature)
     }
 }
@@ -232,7 +262,7 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the private key is invalid.
-    pub fn from_derived(account: &kobe_evm::DerivedAccount) -> Result<Self, Error> {
+    pub fn from_derived(account: &kobe_evm::DerivedAccount) -> Result<Self, SignError> {
         Self::from_hex(&account.private_key)
     }
 }
@@ -260,6 +290,10 @@ fn eip55_checksum(addr_hex: &str) -> String {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::indexing_slicing,
+    reason = "test assertions use indexing for clarity"
+)]
 mod tests {
     use k256::ecdsa::signature::hazmat::PrehashVerifier;
 

@@ -8,7 +8,7 @@ use crate::output::{self, AddressOutput, SignOutput};
 
 /// Solana signing operations.
 #[derive(Args)]
-pub struct SvmCommand {
+pub(crate) struct SvmCommand {
     #[command(subcommand)]
     command: SvmSubcommand,
 }
@@ -51,7 +51,7 @@ fn load_signer(key: &str) -> Result<Signer, Box<dyn std::error::Error>> {
 }
 
 impl SvmCommand {
-    pub fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
         match self.command {
             SvmSubcommand::Sign { key, message, hex } => {
                 let signer = load_signer(&key)?;

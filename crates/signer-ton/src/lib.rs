@@ -9,11 +9,13 @@ extern crate alloc;
 
 use alloc::{format, string::String, vec::Vec};
 
+use zeroize as _;
+
 mod error;
 
 pub use ed25519_dalek::{self, Signature};
 use ed25519_dalek::{Signer as _, SigningKey, Verifier};
-pub use error::Error;
+pub use error::SignError;
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 
 /// TON transaction signer.
@@ -45,21 +47,25 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the hex is invalid or not 32 bytes.
-    pub fn from_hex(hex_str: &str) -> Result<Self, Error> {
+    pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
         let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
         let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
-            Error::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
+            SignError::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
         })?;
         Ok(Self::from_bytes(&bytes))
     }
 
     /// Generate a random signer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the OS random number generator fails.
     #[cfg(feature = "getrandom")]
     #[must_use]
+    #[allow(clippy::expect_used, reason = "getrandom failure is unrecoverable")]
     pub fn random() -> Self {
-        use rand_core::{OsRng, RngCore};
         let mut bytes = [0u8; 32];
-        OsRng.fill_bytes(&mut bytes);
+        getrandom::getrandom(&mut bytes).expect("getrandom failed");
         let signer = Self::from_bytes(&bytes);
         bytes.fill(0);
         signer
@@ -98,25 +104,25 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the signature is invalid.
-    pub fn verify(&self, message: &[u8], signature: &Signature) -> Result<(), Error> {
+    pub fn verify(&self, message: &[u8], signature: &Signature) -> Result<(), SignError> {
         self.key.verifying_key().verify(message, signature)?;
         Ok(())
     }
 }
 
 impl Sign for Signer {
-    type Error = Error;
+    type Error = SignError;
 
-    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
+    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
         let sig = self.key.sign(hash);
         Ok(SignOutput::ed25519(sig.to_bytes().to_vec()))
     }
 
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         self.sign_hash(message)
     }
 
-    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
+    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
         self.sign_hash(tx_bytes)
     }
 }
@@ -128,7 +134,7 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the private key is invalid.
-    pub fn from_derived(account: &kobe_ton::DerivedAccount) -> Result<Self, Error> {
+    pub fn from_derived(account: &kobe_ton::DerivedAccount) -> Result<Self, SignError> {
         Self::from_hex(&account.private_key)
     }
 }

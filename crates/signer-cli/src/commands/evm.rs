@@ -8,7 +8,7 @@ use crate::output::{self, AddressOutput, SignOutput};
 
 /// EVM signing operations.
 #[derive(Args)]
-pub struct EvmCommand {
+pub(crate) struct EvmCommand {
     #[command(subcommand)]
     command: EvmSubcommand,
 }
@@ -51,7 +51,7 @@ enum EvmSubcommand {
 }
 
 impl EvmCommand {
-    pub fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
         match self.command {
             EvmSubcommand::SignMessage { key, message } => {
                 let signer = Signer::from_hex(&key)?;

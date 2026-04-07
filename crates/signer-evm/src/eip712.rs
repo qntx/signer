@@ -1,5 +1,7 @@
 //! EIP-712 typed structured data hashing.
 
+#[cfg(not(feature = "std"))]
+use alloc::borrow::ToOwned;
 use alloc::collections::{BTreeMap, BTreeSet};
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
@@ -7,28 +9,28 @@ use alloc::{format, string::String, vec::Vec};
 
 use sha3::{Digest, Keccak256};
 
-use crate::Error;
+use crate::SignError;
 
 /// Compute the EIP-712 hash from a JSON string.
 ///
 /// Returns the 32-byte digest: `keccak256("\x19\x01" || domainSeparator || structHash)`.
-pub fn hash_typed_data_json(json: &str) -> Result<[u8; 32], Error> {
+pub(crate) fn hash_typed_data_json(json: &str) -> Result<[u8; 32], SignError> {
     let v: serde_json::Value =
-        serde_json::from_str(json).map_err(|e| Error::InvalidMessage(e.to_string()))?;
+        serde_json::from_str(json).map_err(|e| SignError::InvalidMessage(e.to_string()))?;
 
     let types_val = v
         .get("types")
-        .ok_or_else(|| Error::InvalidMessage("missing 'types'".into()))?;
+        .ok_or_else(|| SignError::InvalidMessage("missing 'types'".into()))?;
     let primary_type = v
         .get("primaryType")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| Error::InvalidMessage("missing 'primaryType'".into()))?;
+        .ok_or_else(|| SignError::InvalidMessage("missing 'primaryType'".into()))?;
     let domain = v
         .get("domain")
-        .ok_or_else(|| Error::InvalidMessage("missing 'domain'".into()))?;
+        .ok_or_else(|| SignError::InvalidMessage("missing 'domain'".into()))?;
     let message = v
         .get("message")
-        .ok_or_else(|| Error::InvalidMessage("missing 'message'".into()))?;
+        .ok_or_else(|| SignError::InvalidMessage("missing 'message'".into()))?;
 
     let types = parse_types(types_val)?;
 
@@ -44,26 +46,26 @@ pub fn hash_typed_data_json(json: &str) -> Result<[u8; 32], Error> {
 
 type TypeDefs = BTreeMap<String, Vec<(String, String)>>; // name → [(field_name, field_type)]
 
-fn parse_types(val: &serde_json::Value) -> Result<TypeDefs, Error> {
+fn parse_types(val: &serde_json::Value) -> Result<TypeDefs, SignError> {
     let obj = val
         .as_object()
-        .ok_or_else(|| Error::InvalidMessage("'types' must be object".into()))?;
+        .ok_or_else(|| SignError::InvalidMessage("'types' must be object".into()))?;
     let mut types = BTreeMap::new();
     for (name, fields) in obj {
         let arr = fields
             .as_array()
-            .ok_or_else(|| Error::InvalidMessage(format!("{name}: expected array")))?;
+            .ok_or_else(|| SignError::InvalidMessage(format!("{name}: expected array")))?;
         let mut parsed = Vec::new();
         for f in arr {
             let n = f
                 .get("name")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| Error::InvalidMessage("field missing 'name'".into()))?;
+                .ok_or_else(|| SignError::InvalidMessage("field missing 'name'".into()))?;
             let t = f
                 .get("type")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| Error::InvalidMessage("field missing 'type'".into()))?;
-            parsed.push((n.to_string(), t.to_string()));
+                .ok_or_else(|| SignError::InvalidMessage("field missing 'type'".into()))?;
+            parsed.push((n.to_owned(), t.to_owned()));
         }
         types.insert(name.clone(), parsed);
     }
@@ -74,7 +76,7 @@ fn hash_struct(
     type_name: &str,
     data: &serde_json::Value,
     types: &TypeDefs,
-) -> Result<[u8; 32], Error> {
+) -> Result<[u8; 32], SignError> {
     let th = type_hash(type_name, types)?;
     let encoded = encode_data(type_name, data, types)?;
     let mut buf = Vec::with_capacity(32 + encoded.len());
@@ -83,15 +85,15 @@ fn hash_struct(
     Ok(Keccak256::digest(&buf).into())
 }
 
-fn type_hash(type_name: &str, types: &TypeDefs) -> Result<[u8; 32], Error> {
+fn type_hash(type_name: &str, types: &TypeDefs) -> Result<[u8; 32], SignError> {
     let s = encode_type(type_name, types)?;
     Ok(Keccak256::digest(s.as_bytes()).into())
 }
 
-fn encode_type(type_name: &str, types: &TypeDefs) -> Result<String, Error> {
+fn encode_type(type_name: &str, types: &TypeDefs) -> Result<String, SignError> {
     let fields = types
         .get(type_name)
-        .ok_or_else(|| Error::InvalidMessage(format!("unknown type: {type_name}")))?;
+        .ok_or_else(|| SignError::InvalidMessage(format!("unknown type: {type_name}")))?;
     let mut deps = BTreeSet::new();
     collect_deps(type_name, types, &mut deps);
     deps.remove(type_name);
@@ -115,7 +117,7 @@ fn collect_deps(type_name: &str, types: &TypeDefs, out: &mut BTreeSet<String>) {
         for (_, t) in fields {
             let base = base_type(t);
             if types.contains_key(base) && !out.contains(base) {
-                out.insert(base.to_string());
+                out.insert(base.to_owned());
                 collect_deps(base, types, out);
             }
         }
@@ -130,13 +132,13 @@ fn encode_data(
     type_name: &str,
     data: &serde_json::Value,
     types: &TypeDefs,
-) -> Result<Vec<u8>, Error> {
+) -> Result<Vec<u8>, SignError> {
     let fields = types
         .get(type_name)
-        .ok_or_else(|| Error::InvalidMessage(format!("unknown type: {type_name}")))?;
+        .ok_or_else(|| SignError::InvalidMessage(format!("unknown type: {type_name}")))?;
     let obj = data
         .as_object()
-        .ok_or_else(|| Error::InvalidMessage(format!("expected object for {type_name}")))?;
+        .ok_or_else(|| SignError::InvalidMessage(format!("expected object for {type_name}")))?;
 
     let mut out = Vec::new();
     for (name, type_str) in fields {
@@ -150,12 +152,12 @@ fn encode_value(
     type_name: &str,
     value: &serde_json::Value,
     types: &TypeDefs,
-) -> Result<[u8; 32], Error> {
+) -> Result<[u8; 32], SignError> {
     if type_name.ends_with(']') {
         let base = base_type(type_name);
         let arr = value
             .as_array()
-            .ok_or_else(|| Error::InvalidMessage(format!("expected array for {type_name}")))?;
+            .ok_or_else(|| SignError::InvalidMessage(format!("expected array for {type_name}")))?;
         let mut inner = Vec::new();
         for item in arr {
             inner.extend_from_slice(&encode_value(base, item, types)?);
@@ -168,19 +170,26 @@ fn encode_value(
     encode_atomic(type_name, value)
 }
 
-#[allow(clippy::many_single_char_names)]
-fn encode_atomic(ty: &str, value: &serde_json::Value) -> Result<[u8; 32], Error> {
+#[allow(
+    clippy::many_single_char_names,
+    reason = "EIP-712 spec uses short names: w, b, n, t, s"
+)]
+#[allow(
+    clippy::indexing_slicing,
+    reason = "all slices are bounded by prior validation or fixed-size outputs"
+)]
+fn encode_atomic(ty: &str, value: &serde_json::Value) -> Result<[u8; 32], SignError> {
     let mut w = [0u8; 32];
     match ty {
         "address" => {
             let s = value
                 .as_str()
-                .ok_or_else(|| Error::InvalidMessage("address must be string".into()))?;
+                .ok_or_else(|| SignError::InvalidMessage("address must be string".into()))?;
             let s = s.strip_prefix("0x").unwrap_or(s);
-            let b =
-                hex::decode(s).map_err(|e| Error::InvalidMessage(format!("bad address: {e}")))?;
+            let b = hex::decode(s)
+                .map_err(|e| SignError::InvalidMessage(format!("bad address: {e}")))?;
             if b.len() != 20 {
-                return Err(Error::InvalidMessage(format!(
+                return Err(SignError::InvalidMessage(format!(
                     "address: expected 20 bytes, got {}",
                     b.len()
                 )));
@@ -197,31 +206,35 @@ fn encode_atomic(ty: &str, value: &serde_json::Value) -> Result<[u8; 32], Error>
         "string" => {
             let s = value
                 .as_str()
-                .ok_or_else(|| Error::InvalidMessage("string must be string".into()))?;
+                .ok_or_else(|| SignError::InvalidMessage("string must be string".into()))?;
             Ok(Keccak256::digest(s.as_bytes()).into())
         }
         "bytes" => {
             let s = value
                 .as_str()
-                .ok_or_else(|| Error::InvalidMessage("bytes must be hex string".into()))?;
+                .ok_or_else(|| SignError::InvalidMessage("bytes must be hex string".into()))?;
             let s = s.strip_prefix("0x").unwrap_or(s);
-            let b = hex::decode(s).map_err(|e| Error::InvalidMessage(format!("bad bytes: {e}")))?;
+            let b =
+                hex::decode(s).map_err(|e| SignError::InvalidMessage(format!("bad bytes: {e}")))?;
             Ok(Keccak256::digest(&b).into())
         }
         t if t.starts_with("bytes") => {
             let n: usize = t[5..]
                 .parse()
-                .map_err(|_| Error::InvalidMessage(format!("invalid type: {t}")))?;
+                .map_err(|_| SignError::InvalidMessage(format!("invalid type: {t}")))?;
             if !(1..=32).contains(&n) {
-                return Err(Error::InvalidMessage("bytesN: N must be 1..32".to_string()));
+                return Err(SignError::InvalidMessage(
+                    "bytesN: N must be 1..32".to_owned(),
+                ));
             }
             let s = value
                 .as_str()
-                .ok_or_else(|| Error::InvalidMessage(format!("{t} must be hex string")))?;
+                .ok_or_else(|| SignError::InvalidMessage(format!("{t} must be hex string")))?;
             let s = s.strip_prefix("0x").unwrap_or(s);
-            let b = hex::decode(s).map_err(|e| Error::InvalidMessage(format!("bad {t}: {e}")))?;
+            let b =
+                hex::decode(s).map_err(|e| SignError::InvalidMessage(format!("bad {t}: {e}")))?;
             if b.len() != n {
-                return Err(Error::InvalidMessage(format!(
+                return Err(SignError::InvalidMessage(format!(
                     "{t}: expected {n} bytes, got {}",
                     b.len()
                 )));
@@ -232,9 +245,9 @@ fn encode_atomic(ty: &str, value: &serde_json::Value) -> Result<[u8; 32], Error>
         t if t.starts_with("uint") => {
             let bits: usize = t[4..]
                 .parse()
-                .map_err(|_| Error::InvalidMessage(format!("invalid type: {t}")))?;
+                .map_err(|_| SignError::InvalidMessage(format!("invalid type: {t}")))?;
             if bits == 0 || bits > 256 || !bits.is_multiple_of(8) {
-                return Err(Error::InvalidMessage(format!("bad uint width: {bits}")));
+                return Err(SignError::InvalidMessage(format!("bad uint width: {bits}")));
             }
             let b = parse_uint(value)?;
             let len = b.len().min(32);
@@ -244,37 +257,46 @@ fn encode_atomic(ty: &str, value: &serde_json::Value) -> Result<[u8; 32], Error>
         t if t.starts_with("int") => {
             let bits: usize = t[3..]
                 .parse()
-                .map_err(|_| Error::InvalidMessage(format!("invalid type: {t}")))?;
+                .map_err(|_| SignError::InvalidMessage(format!("invalid type: {t}")))?;
             if bits == 0 || bits > 256 || !bits.is_multiple_of(8) {
-                return Err(Error::InvalidMessage(format!("bad int width: {bits}")));
+                return Err(SignError::InvalidMessage(format!("bad int width: {bits}")));
             }
             parse_int(value)
         }
-        _ => Err(Error::InvalidMessage(format!(
+        _ => Err(SignError::InvalidMessage(format!(
             "unsupported EIP-712 type: {ty}"
         ))),
     }
 }
 
-fn parse_uint(value: &serde_json::Value) -> Result<Vec<u8>, Error> {
+#[allow(
+    clippy::indexing_slicing,
+    reason = "byte slices from to_be_bytes() have known fixed sizes"
+)]
+fn parse_uint(value: &serde_json::Value) -> Result<Vec<u8>, SignError> {
     if let Some(n) = value.as_u64() {
         return Ok(n.to_be_bytes().to_vec());
     }
     if let Some(s) = value.as_str() {
         if let Some(h) = s.strip_prefix("0x") {
-            return hex::decode(h).map_err(|e| Error::InvalidMessage(format!("bad uint hex: {e}")));
+            return hex::decode(h)
+                .map_err(|e| SignError::InvalidMessage(format!("bad uint hex: {e}")));
         }
-        let n: u128 = s
-            .parse()
-            .map_err(|_| Error::InvalidMessage(format!("uint '{s}' out of range; use 0x hex")))?;
+        let n: u128 = s.parse().map_err(|_| {
+            SignError::InvalidMessage(format!("uint '{s}' out of range; use 0x hex"))
+        })?;
         return Ok(n.to_be_bytes().to_vec());
     }
-    Err(Error::InvalidMessage(
+    Err(SignError::InvalidMessage(
         "uint must be number or string".into(),
     ))
 }
 
-fn parse_int(value: &serde_json::Value) -> Result<[u8; 32], Error> {
+#[allow(
+    clippy::indexing_slicing,
+    reason = "byte slices from to_be_bytes() and hex::decode have known sizes"
+)]
+fn parse_int(value: &serde_json::Value) -> Result<[u8; 32], SignError> {
     let mut w = [0u8; 32];
     if let Some(n) = value.as_i64() {
         let fill = if n < 0 { 0xff } else { 0x00 };
@@ -284,26 +306,28 @@ fn parse_int(value: &serde_json::Value) -> Result<[u8; 32], Error> {
     }
     if let Some(s) = value.as_str() {
         if let Some(h) = s.strip_prefix("0x") {
-            let b =
-                hex::decode(h).map_err(|e| Error::InvalidMessage(format!("bad int hex: {e}")))?;
+            let b = hex::decode(h)
+                .map_err(|e| SignError::InvalidMessage(format!("bad int hex: {e}")))?;
             w[32 - b.len()..].copy_from_slice(&b);
             return Ok(w);
         }
         if let Some(neg) = s.strip_prefix('-') {
             let n: u128 = neg
                 .parse()
-                .map_err(|e| Error::InvalidMessage(format!("bad int: {e}")))?;
+                .map_err(|e| SignError::InvalidMessage(format!("bad int: {e}")))?;
             w[16..].copy_from_slice(&n.to_be_bytes());
             negate_twos_complement(&mut w);
             return Ok(w);
         }
         let n: u128 = s
             .parse()
-            .map_err(|e| Error::InvalidMessage(format!("bad int: {e}")))?;
+            .map_err(|e| SignError::InvalidMessage(format!("bad int: {e}")))?;
         w[16..].copy_from_slice(&n.to_be_bytes());
         return Ok(w);
     }
-    Err(Error::InvalidMessage("int must be number or string".into()))
+    Err(SignError::InvalidMessage(
+        "int must be number or string".into(),
+    ))
 }
 
 fn negate_twos_complement(bytes: &mut [u8; 32]) {

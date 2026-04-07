@@ -12,13 +12,15 @@ extern crate alloc;
 
 use alloc::{format, string::String, vec::Vec};
 
+use zeroize as _;
+
 mod error;
 
 use blake2::Blake2bVar;
 use blake2::digest::{Update, VariableOutput};
 pub use ed25519_dalek::{self, Signature};
 use ed25519_dalek::{Signer as _, SigningKey, Verifier};
-pub use error::Error;
+pub use error::SignError;
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 
 /// Ed25519 signature scheme flag used by Sui.
@@ -59,21 +61,25 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the hex is invalid or not 32 bytes.
-    pub fn from_hex(hex_str: &str) -> Result<Self, Error> {
+    pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
         let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
         let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
-            Error::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
+            SignError::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
         })?;
         Ok(Self::from_bytes(&bytes))
     }
 
     /// Generate a random signer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the OS random number generator fails.
     #[cfg(feature = "getrandom")]
     #[must_use]
+    #[allow(clippy::expect_used, reason = "getrandom failure is unrecoverable")]
     pub fn random() -> Self {
-        use rand_core::{OsRng, RngCore};
         let mut bytes = [0u8; 32];
-        OsRng.fill_bytes(&mut bytes);
+        getrandom::getrandom(&mut bytes).expect("getrandom failed");
         let signer = Self::from_bytes(&bytes);
         bytes.fill(0);
         signer
@@ -128,7 +134,7 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the signature is invalid.
-    pub fn verify(&self, message: &[u8], signature: &Signature) -> Result<(), Error> {
+    pub fn verify(&self, message: &[u8], signature: &Signature) -> Result<(), SignError> {
         self.key.verifying_key().verify(message, signature)?;
         Ok(())
     }
@@ -145,9 +151,9 @@ impl Signer {
 }
 
 impl Sign for Signer {
-    type Error = Error;
+    type Error = SignError;
 
-    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Error> {
+    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
         let sig = self.key.sign(hash);
         let pubkey = self.key.verifying_key().as_bytes().to_vec();
         Ok(SignOutput::ed25519_with_pubkey(
@@ -156,7 +162,7 @@ impl Sign for Signer {
         ))
     }
 
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Error> {
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         let sig = self.sign_message_intent(message);
         let pubkey = self.key.verifying_key().as_bytes().to_vec();
         Ok(SignOutput::ed25519_with_pubkey(
@@ -165,7 +171,7 @@ impl Sign for Signer {
         ))
     }
 
-    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Error> {
+    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
         let sig = self.sign_transaction_intent(tx_bytes);
         let pubkey = self.key.verifying_key().as_bytes().to_vec();
         Ok(SignOutput::ed25519_with_pubkey(
@@ -182,12 +188,16 @@ impl Signer {
     /// # Errors
     ///
     /// Returns an error if the private key is invalid.
-    pub fn from_derived(account: &kobe_sui::DerivedAccount) -> Result<Self, Error> {
+    pub fn from_derived(account: &kobe_sui::DerivedAccount) -> Result<Self, SignError> {
         Self::from_hex(&account.private_key)
     }
 }
 
 /// BLAKE2b-256 hash.
+#[allow(
+    clippy::expect_used,
+    reason = "32 is always a valid BLAKE2b output size"
+)]
 fn blake2b_256(data: &[u8]) -> [u8; 32] {
     let mut hasher = Blake2bVar::new(32).expect("valid output size");
     hasher.update(data);
@@ -197,6 +207,10 @@ fn blake2b_256(data: &[u8]) -> [u8; 32] {
 }
 
 /// Compute intent message hash: `BLAKE2b-256(intent_prefix || data)`.
+#[allow(
+    clippy::expect_used,
+    reason = "32 is always a valid BLAKE2b output size"
+)]
 fn intent_hash(intent: [u8; 3], data: &[u8]) -> [u8; 32] {
     let mut hasher = Blake2bVar::new(32).expect("valid output size");
     hasher.update(&intent);
@@ -211,7 +225,10 @@ fn bcs_serialize_bytes(data: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(5 + data.len());
     let mut len = data.len();
     loop {
-        #[allow(clippy::cast_possible_truncation)] // guarded: & 0x7F always fits u8
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "masked with 0x7F, always fits u8"
+        )]
         let mut byte = (len & 0x7F) as u8;
         len >>= 7;
         if len > 0 {
@@ -227,6 +244,10 @@ fn bcs_serialize_bytes(data: &[u8]) -> Vec<u8> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::indexing_slicing,
+    reason = "test assertions use indexing for clarity"
+)]
 mod tests {
     use super::*;
 
@@ -315,18 +336,18 @@ mod tests {
 
     #[test]
     fn bcs_uleb128_encoding() {
-        let bcs = bcs_serialize_bytes(b"hi");
-        assert_eq!(bcs[0], 2);
-        assert_eq!(&bcs[1..], b"hi");
+        let bcs_short = bcs_serialize_bytes(b"hi");
+        assert_eq!(bcs_short[0], 2);
+        assert_eq!(&bcs_short[1..], b"hi");
 
         let data = vec![0xAA; 200];
-        let bcs = bcs_serialize_bytes(&data);
-        assert_eq!(bcs[0], 0xC8);
-        assert_eq!(bcs[1], 0x01);
-        assert_eq!(&bcs[2..], data.as_slice());
+        let bcs_long = bcs_serialize_bytes(&data);
+        assert_eq!(bcs_long[0], 0xC8);
+        assert_eq!(bcs_long[1], 0x01);
+        assert_eq!(&bcs_long[2..], data.as_slice());
 
-        let bcs = bcs_serialize_bytes(b"");
-        assert_eq!(bcs, vec![0]);
+        let bcs_empty = bcs_serialize_bytes(b"");
+        assert_eq!(bcs_empty, vec![0]);
     }
 
     #[test]

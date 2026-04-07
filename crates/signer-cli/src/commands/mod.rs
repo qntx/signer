@@ -11,20 +11,20 @@ mod ton;
 mod tron;
 mod xrpl;
 
-pub use btc::BtcCommand;
+pub(crate) use btc::BtcCommand;
 use clap::{Parser, Subcommand};
-pub use cosmos::CosmosCommand;
-pub use evm::EvmCommand;
-pub use fil::FilCommand;
-pub use spark::SparkCommand;
-pub use sui::SuiCommand;
-pub use svm::SvmCommand;
-pub use ton::TonCommand;
-pub use tron::TronCommand;
-pub use xrpl::XrplCommand;
+pub(crate) use cosmos::CosmosCommand;
+pub(crate) use evm::EvmCommand;
+pub(crate) use fil::FilCommand;
+pub(crate) use spark::SparkCommand;
+pub(crate) use sui::SuiCommand;
+pub(crate) use svm::SvmCommand;
+pub(crate) use ton::TonCommand;
+pub(crate) use tron::TronCommand;
+pub(crate) use xrpl::XrplCommand;
 
 /// Parse a hex string (with optional 0x prefix) into a 32-byte array.
-pub fn parse_hex32(input: &str) -> Result<[u8; 32], Box<dyn std::error::Error>> {
+pub(crate) fn parse_hex32(input: &str) -> Result<[u8; 32], Box<dyn std::error::Error>> {
     let s = input.strip_prefix("0x").unwrap_or(input);
     let bytes = hex::decode(s)?;
     bytes
@@ -33,7 +33,7 @@ pub fn parse_hex32(input: &str) -> Result<[u8; 32], Box<dyn std::error::Error>> 
 }
 
 /// Parse a hex string (with optional 0x prefix) into bytes.
-pub fn parse_hex(input: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+pub(crate) fn parse_hex(input: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let s = input.strip_prefix("0x").unwrap_or(input);
     Ok(hex::decode(s)?)
 }
@@ -43,7 +43,7 @@ pub fn parse_hex(input: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 #[command(name = "signer")]
 #[command(version, about, long_about = None)]
 #[command(propagate_version = true)]
-pub struct Cli {
+pub(crate) struct Cli {
     /// Output results in JSON format for programmatic/agent consumption.
     #[arg(long, global = true)]
     pub json: bool,
@@ -54,7 +54,7 @@ pub struct Cli {
 
 /// Available chain commands.
 #[derive(Subcommand)]
-pub enum Commands {
+pub(crate) enum Commands {
     /// Ethereum / EVM signing operations.
     #[command(name = "evm", alias = "eth", alias = "ethereum")]
     Evm(EvmCommand),

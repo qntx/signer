@@ -8,7 +8,7 @@ use crate::output::{self, AddressOutput, SignOutput};
 
 /// XRP Ledger signing operations.
 #[derive(Args)]
-pub struct XrplCommand {
+pub(crate) struct XrplCommand {
     #[command(subcommand)]
     command: XrplSubcommand,
 }
@@ -37,7 +37,7 @@ enum XrplSubcommand {
 }
 
 impl XrplCommand {
-    pub fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
         match self.command {
             XrplSubcommand::SignHash { key, hash } => {
                 let signer = Signer::from_hex(&key)?;
