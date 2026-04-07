@@ -24,6 +24,7 @@ signer-fil = { workspace = true, features = ["std", "getrandom"] }
 signer-ton = { workspace = true, features = ["std", "getrandom"] }
 signer-sui = { workspace = true, features = ["std", "getrandom"] }
 signer-xrpl = { workspace = true, features = ["std", "getrandom"] }
+signer-aptos = { workspace = true, features = ["std", "getrandom"] }
 clap.workspace = true
 colored.workspace = true
 hex = { workspace = true, features = ["std"] }

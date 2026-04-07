@@ -1,8 +1,8 @@
 ---
 name: signer
 description: >-
-  Multi-chain transaction signing CLI tool for 10 chains: Ethereum, Bitcoin,
-  Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, and XRP Ledger. Use when the user asks
+  Multi-chain transaction signing CLI tool for 11 chains: Ethereum, Bitcoin,
+  Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, and Aptos. Use when the user asks
   to sign messages, sign hashes, sign transactions, or look up addresses/public
   keys from private keys. Supports JSON output via --json flag for
   programmatic/agent consumption.
@@ -10,7 +10,7 @@ description: >-
 
 # Signer CLI — Multi-Chain Transaction Signing Tool
 
-`signer` is a single binary CLI for cryptographic signing operations across **10 chains**: Ethereum, Bitcoin, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, and XRP Ledger. It uses lightweight, battle-tested cryptographic libraries (k256, ed25519-dalek, sha2, sha3, blake2).
+`signer` is a single binary CLI for cryptographic signing operations across **11 chains**: Ethereum, Bitcoin, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, and Aptos. It uses lightweight, battle-tested cryptographic libraries (k256, ed25519-dalek, sha2, sha3, blake2).
 
 ## Installation
 
@@ -62,6 +62,7 @@ The `--json` flag is **global** and must appear **before** the chain subcommand.
 | Filecoin   | `fil`    | `filecoin`        |
 | Spark      | `spark`  | —                 |
 | XRP Ledger | `xrpl`   | `xrp`, `ripple`   |
+| Aptos      | `aptos`  | `apt`             |
 
 ### Subcommands per chain
 
@@ -74,11 +75,11 @@ The `--json` flag is **global** and must appear **before** the chain subcommand.
 | `sign-tx`      | Sign transaction bytes (chain-specific hashing) |
 | `address`      | Show address and/or public key                  |
 
-#### Ed25519 chains (svm, sui, ton)
+#### Ed25519 chains (svm, sui, ton, aptos)
 
 | Subcommand     | Description                                     |
 | -------------- | ----------------------------------------------- |
-| `sign`         | Sign a message (SVM, TON)                       |
+| `sign`         | Sign a message (SVM, TON, Aptos)                |
 | `sign-message` | Sign a message with intent (SUI)                |
 | `sign-tx`      | Sign transaction bytes                          |
 | `address`      | Show address and/or public key                  |
@@ -113,6 +114,7 @@ The `--json` flag is **global** and must appear **before** the chain subcommand.
 | Filecoin   | Blake2b-256                                    | Blake2b-256          |
 | Spark      | double-SHA256                                  | double-SHA256        |
 | XRP Ledger | Not supported (no canonical message standard)  | SHA-512-half + DER   |
+| Aptos      | Ed25519 direct                                 | SHA3-256 domain prefix + Ed25519 |
 
 ## Usage Examples
 
@@ -211,6 +213,19 @@ signer ton sign-tx -k "9d61b19d..." -t "b5ee9c72..."
 signer ton address -k "9d61b19d..."
 ```
 
+### Aptos
+
+```bash
+# Sign a message (raw Ed25519)
+signer aptos sign -k "9d61b19d..." -m "Hello, Aptos!"
+
+# Sign BCS-serialized RawTransaction (with APTOS:: domain prefix)
+signer aptos sign-tx -k "9d61b19d..." -t "0000..."
+
+# Show Aptos address (SHA3-256 derived)
+signer aptos address -k "9d61b19d..."
+```
+
 ## JSON Output Schemas
 
 Always use `--json` for programmatic consumption.
@@ -262,7 +277,7 @@ All errors in JSON mode return exit code 1 with:
 | EVM                      | `0x`-prefixed or plain 64-char hex                       |
 | BTC, Cosmos, Tron, etc.  | 64-char hex (32 bytes)                                   |
 | SVM                      | 64-char hex or Base58 keypair (64 bytes: secret+public)  |
-| SUI, TON                 | 64-char hex (Ed25519 secret key)                         |
+| SUI, TON, Aptos          | 64-char hex (Ed25519 secret key)                         |
 | XRP Ledger               | 64-char hex (32 bytes secp256k1 key)                     |
 
 ## Agent Best Practices

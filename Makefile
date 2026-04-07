@@ -26,6 +26,7 @@ check-no-std:
 	cargo check -p signer-ton --no-default-features --features alloc
 	cargo check -p signer-sui --no-default-features --features alloc
 	cargo check -p signer-xrpl --no-default-features --features alloc
+	cargo check -p signer-aptos --no-default-features --features alloc
 	cargo check -p signer --no-default-features --features alloc
 
 # Update dependencies to their latest compatible versions

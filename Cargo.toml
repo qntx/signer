@@ -5,6 +5,7 @@ members = [
     "crates/signer-cosmos", "crates/signer-tron", "crates/signer-spark",
     "crates/signer-fil", "crates/signer-ton", "crates/signer-sui",
     "crates/signer-xrpl",
+    "crates/signer-aptos",
     "crates/signer-cli",
 ]
 default-members = ["crates/signer"]
@@ -29,6 +30,7 @@ signer-fil = { version = "0.6", path = "crates/signer-fil", default-features = f
 signer-ton = { version = "0.6", path = "crates/signer-ton", default-features = false }
 signer-sui = { version = "0.6", path = "crates/signer-sui", default-features = false }
 signer-xrpl = { version = "0.6", path = "crates/signer-xrpl", default-features = false }
+signer-aptos = { version = "0.6", path = "crates/signer-aptos", default-features = false }
 
 # Cryptography (versions aligned with kobe)
 k256 = { version = "0.13.4", default-features = false, features = ["ecdsa", "arithmetic"] }

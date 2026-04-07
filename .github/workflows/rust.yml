@@ -71,6 +71,8 @@ jobs:
         run: cargo check -p signer-sui --target thumbv7m-none-eabi --no-default-features --features alloc
       - name: signer-xrpl (no_std)
         run: cargo check -p signer-xrpl --target thumbv7m-none-eabi --no-default-features --features alloc
+      - name: signer-aptos (no_std)
+        run: cargo check -p signer-aptos --target thumbv7m-none-eabi --no-default-features --features alloc
       - name: signer (no_std)
         run: cargo check -p signer --target thumbv7m-none-eabi --no-default-features --features alloc
       - name: signer (no_std + all chains)

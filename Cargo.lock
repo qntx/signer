@@ -1270,6 +1270,7 @@ dependencies = [
 name = "signer"
 version = "0.6.0"
 dependencies = [
+ "signer-aptos",
  "signer-btc",
  "signer-cosmos",
  "signer-evm",
@@ -1281,6 +1282,19 @@ dependencies = [
  "signer-ton",
  "signer-tron",
  "signer-xrpl",
+]
+
+[[package]]
+name = "signer-aptos"
+version = "0.6.0"
+dependencies = [
+ "ed25519-dalek",
+ "getrandom",
+ "hex",
+ "sha3 0.10.8",
+ "signer-primitives",
+ "thiserror",
+ "zeroize",
 ]
 
 [[package]]
@@ -1308,6 +1322,7 @@ dependencies = [
  "hex",
  "serde",
  "serde_json",
+ "signer-aptos",
  "signer-btc",
  "signer-cosmos",
  "signer-evm",
