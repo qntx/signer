@@ -1,0 +1,229 @@
+//! Reusable BIP-340 Taproot Schnorr signing primitive for secp256k1.
+//!
+//! Wraps [`k256::schnorr::SigningKey`] and exposes the shared boilerplate
+//! (key loading, x-only public-key extraction, deterministic signing) that
+//! every Schnorr-based chain needs. Chain crates (e.g. `signer-nostr`)
+//! compose this into their own `Signer` newtype and layer the chain-specific
+//! address encoding and transaction semantics on top.
+
+#[cfg(not(feature = "std"))]
+use alloc::string::ToString;
+use alloc::{format, string::String, vec::Vec};
+
+use k256::schnorr::{Signature, SigningKey, VerifyingKey};
+use zeroize::{ZeroizeOnDrop, Zeroizing};
+
+use crate::{SignError, SignOutput};
+
+/// Shared BIP-340 Taproot Schnorr signer over secp256k1.
+///
+/// Produces 64-byte Schnorr signatures as specified in
+/// [BIP-340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki),
+/// used by Bitcoin Taproot, Nostr ([NIP-01](https://nips.nostr.com/1)), and
+/// related protocols.
+///
+/// Both [`sign`](Self::sign) and [`verify`](Self::verify) operate on the
+/// **raw message bytes** (no implicit hashing). Signing is deterministic
+/// (auxiliary randomness is all zero).
+///
+/// Public keys are 32-byte *x-only* values (the parity byte is stripped).
+/// Private keys are stored verbatim; note that the inner [`SigningKey`]
+/// may internally negate the scalar per BIP-340 when the resulting y
+/// coordinate is odd, but [`to_bytes`](Self::to_bytes) always returns the
+/// original bytes supplied at construction time (matching NIP-06 / `nsec`
+/// semantics).
+///
+/// Both the inner `SigningKey` and the stored raw bytes are zeroized on drop.
+///
+/// # Example
+///
+/// ```
+/// use signer_primitives::SchnorrSigner;
+///
+/// // NIP-06 test vector 1.
+/// let signer = SchnorrSigner::from_hex(
+///     "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a",
+/// )?;
+/// assert_eq!(
+///     signer.xonly_public_key_hex(),
+///     "17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917",
+/// );
+///
+/// let msg = b"hello, nostr";
+/// let out = signer.sign(msg)?;
+/// assert_eq!(out.signature.len(), 64);
+/// assert!(out.recovery_id.is_none());
+/// signer.verify(msg, &out.signature)?;
+/// # Ok::<_, signer_primitives::SignError>(())
+/// ```
+pub struct SchnorrSigner {
+    key: SigningKey,
+    raw_bytes: Zeroizing<[u8; 32]>,
+}
+
+impl core::fmt::Debug for SchnorrSigner {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("SchnorrSigner")
+            .field("key", &"[REDACTED]")
+            .finish()
+    }
+}
+
+impl ZeroizeOnDrop for SchnorrSigner {}
+
+impl SchnorrSigner {
+    /// Create from a raw 32-byte private key.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SignError::InvalidKey`] if the bytes are not a valid
+    /// secp256k1 scalar (zero or ≥ curve order).
+    pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
+        let key = SigningKey::from_bytes(bytes.as_slice())
+            .map_err(|e| SignError::InvalidKey(e.to_string()))?;
+        Ok(Self {
+            key,
+            raw_bytes: Zeroizing::new(*bytes),
+        })
+    }
+
+    /// Create from a hex-encoded private key (with or without `0x` prefix).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SignError::InvalidKey`] if the hex is malformed, not 32
+    /// bytes long, or not a valid secp256k1 scalar.
+    pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
+        let stripped = hex_str.strip_prefix("0x").unwrap_or(hex_str);
+        let decoded = hex::decode(stripped).map_err(|e| SignError::InvalidKey(e.to_string()))?;
+        let bytes: [u8; 32] = decoded.try_into().map_err(|v: Vec<u8>| {
+            SignError::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
+        })?;
+        Self::from_bytes(&bytes)
+    }
+
+    /// Generate a random signer using OS-provided entropy.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the OS random number generator fails or produces an
+    /// out-of-range scalar (probability ≈ 2⁻¹²⁸, cryptographically negligible).
+    #[cfg(feature = "getrandom")]
+    #[must_use]
+    #[allow(
+        clippy::expect_used,
+        reason = "getrandom failure is unrecoverable; secp256k1 rejection has p ≈ 2⁻¹²⁸"
+    )]
+    pub fn random() -> Self {
+        let mut bytes = Zeroizing::new([0u8; 32]);
+        getrandom::fill(&mut *bytes).expect("getrandom failed");
+        let key = SigningKey::from_bytes(bytes.as_slice()).expect("invalid random key");
+        Self {
+            key,
+            raw_bytes: bytes,
+        }
+    }
+
+    /// Expose the inner [`SigningKey`].
+    #[must_use]
+    pub const fn signing_key(&self) -> &SigningKey {
+        &self.key
+    }
+
+    /// Expose the [`VerifyingKey`].
+    #[must_use]
+    pub fn verifying_key(&self) -> &VerifyingKey {
+        self.key.verifying_key()
+    }
+
+    /// Serialize the 32-byte private key as big-endian bytes.
+    ///
+    /// Returns the **original** bytes supplied to [`from_bytes`](Self::from_bytes)
+    /// (or generated by [`random`](Self::random)), *before* any BIP-340
+    /// internal negation. This matches [NIP-06](https://nips.nostr.com/6)
+    /// and the `nsec` bech32 encoding expectation.
+    ///
+    /// Callers that intend to drop the returned value should wrap it in
+    /// [`zeroize::Zeroizing`] to scrub the secret material.
+    #[must_use]
+    pub fn to_bytes(&self) -> [u8; 32] {
+        *self.raw_bytes
+    }
+
+    /// 32-byte BIP-340 x-only public key (parity byte stripped).
+    #[must_use]
+    pub fn xonly_public_key(&self) -> [u8; 32] {
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&self.key.verifying_key().to_bytes());
+        out
+    }
+
+    /// Hex-encoded x-only public key (64 lowercase characters).
+    #[must_use]
+    pub fn xonly_public_key_hex(&self) -> String {
+        hex::encode(self.xonly_public_key())
+    }
+
+    /// Sign `message` bytes directly with BIP-340 Schnorr (deterministic).
+    ///
+    /// The message is used verbatim as the `m` input of BIP-340 — **no**
+    /// implicit SHA-256 is applied. This matches the NIP-01 convention where
+    /// the signer receives the precomputed 32-byte `event.id`, but also
+    /// accepts arbitrary-length payloads.
+    ///
+    /// The returned [`SignOutput`] carries the 64-byte signature and the
+    /// signer's 32-byte x-only public key (`recovery_id` is always `None`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SignError::SigningFailed`] if the underlying primitive fails.
+    pub fn sign(&self, message: &[u8]) -> Result<SignOutput, SignError> {
+        let sig = self
+            .key
+            .sign_raw(message, &[0u8; 32])
+            .map_err(|e| SignError::SigningFailed(e.to_string()))?;
+        Ok(self.output(sig))
+    }
+
+    /// Sign a 32-byte digest (e.g. a NIP-01 `event.id`).
+    ///
+    /// Convenience wrapper over [`sign`](Self::sign) that enforces the
+    /// 32-byte length up front. Semantically equivalent to `sign(digest)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SignError::InvalidMessage`] if `digest` is not 32 bytes, or
+    /// [`SignError::SigningFailed`] if the primitive fails.
+    pub fn sign_prehash(&self, digest: &[u8]) -> Result<SignOutput, SignError> {
+        if digest.len() != 32 {
+            return Err(SignError::InvalidMessage(format!(
+                "expected 32-byte digest, got {}",
+                digest.len()
+            )));
+        }
+        self.sign(digest)
+    }
+
+    /// Verify a BIP-340 Schnorr signature against `message`.
+    ///
+    /// The message is used verbatim (no implicit SHA-256), matching
+    /// [`sign`](Self::sign). Use this to round-trip signatures produced by
+    /// this signer.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SignError::InvalidSignature`] if `signature` is not 64 bytes,
+    /// not a valid encoding, or fails BIP-340 verification against `message`.
+    pub fn verify(&self, message: &[u8], signature: &[u8]) -> Result<(), SignError> {
+        let sig = Signature::try_from(signature)
+            .map_err(|e| SignError::InvalidSignature(e.to_string()))?;
+        self.key
+            .verifying_key()
+            .verify_raw(message, &sig)
+            .map_err(|e| SignError::InvalidSignature(e.to_string()))
+    }
+
+    fn output(&self, sig: Signature) -> SignOutput {
+        SignOutput::schnorr(sig.to_bytes().to_vec(), self.xonly_public_key().to_vec())
+    }
+}

@@ -1,0 +1,32 @@
+[package]
+name = "signer-nostr"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Nostr transaction signer — BIP-340 Schnorr signing, NIP-01/NIP-19 bech32."
+keywords = ["crypto", "signer", "nostr", "schnorr", "bip340"]
+categories = ["cryptography::cryptocurrencies"]
+
+[features]
+default = ["std"]
+std = ["alloc", "signer-primitives/std", "zeroize/std", "bech32/std"]
+alloc = ["signer-primitives/alloc", "zeroize/alloc"]
+getrandom = ["signer-primitives/getrandom"]
+kobe = ["dep:kobe-nostr"]
+
+[dependencies]
+signer-primitives = { workspace = true, features = ["schnorr"] }
+sha2.workspace = true
+bech32.workspace = true
+zeroize.workspace = true
+thiserror.workspace = true
+
+kobe-nostr = { workspace = true, optional = true }
+
+[dev-dependencies]
+hex.workspace = true
+signer-primitives = { workspace = true, features = ["testing"] }
+
+[lints]
+workspace = true

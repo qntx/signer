@@ -19,9 +19,9 @@
 [rust-badge]: https://img.shields.io/badge/rust-edition%202024-orange.svg
 [rust-url]: https://doc.rust-lang.org/edition-guide/
 
-**Modular, `no_std`-compatible Rust toolkit for multi-chain transaction signing — 11 chains, zero hand-written cryptography.**
+**Modular, `no_std`-compatible Rust toolkit for multi-chain transaction signing — 12 chains, zero hand-written cryptography.**
 
-Signer provides thin, secure wrappers around battle-tested cryptographic libraries ([k256](https://docs.rs/k256) for secp256k1, [ed25519-dalek](https://docs.rs/ed25519-dalek) for Ed25519), exposing a unified `Sign` trait across Bitcoin, Ethereum, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, and Aptos. All library crates compile under `no_std + alloc` and zeroize sensitive material on drop.
+Signer provides thin, secure wrappers around battle-tested cryptographic libraries ([k256](https://docs.rs/k256) for secp256k1 ECDSA and BIP-340 Schnorr, [ed25519-dalek](https://docs.rs/ed25519-dalek) for Ed25519), exposing a unified `Sign` trait across Bitcoin, Ethereum, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, Aptos, and Nostr. All library crates compile under `no_std + alloc` and zeroize sensitive material on drop.
 
 <p align="center">
   <img src="demo.gif" alt="Signer CLI Demo"/>
@@ -63,6 +63,10 @@ signer svm sign -k "9d61b19d..." -m "Hello, Solana!"
 
 # Sui — BLAKE2b intent signing
 signer sui sign-tx -k "9d61b19d..." -t "0000..."
+
+# Nostr — BIP-340 Schnorr, accepts hex or NIP-19 nsec
+signer nostr sign-hash -k "nsec10allq0g..." -x "5e6ea04f..."
+signer nostr address  -k "7f7ff03d..."   # prints npub1… and x-only pubkey
 
 # Show address / public key
 signer evm address -k "0x4c0883a6..."
@@ -111,8 +115,8 @@ println!("Address: {}", signer.address());
 
 ## Design
 
-- **11 chains** — Ethereum, Bitcoin, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, Aptos
-- **Zero hand-rolled crypto** — secp256k1 via [k256](https://docs.rs/k256), Ed25519 via [ed25519-dalek](https://docs.rs/ed25519-dalek)
+- **12 chains** — Ethereum, Bitcoin, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, Aptos, Nostr
+- **Zero hand-rolled crypto** — secp256k1 ECDSA & BIP-340 Schnorr via [k256](https://docs.rs/k256), Ed25519 via [ed25519-dalek](https://docs.rs/ed25519-dalek)
 - **Unified trait** — `Sign` trait with `sign_hash`, `sign_message`, `sign_transaction` across all chains
 - **`no_std` + `alloc`** — All library crates compile without `std`; embedded / WASM ready
 - **Security hardened** — `ZeroizeOnDrop`, `Debug` redacted (`[REDACTED]`), `Clone` removed, `Send + Sync`

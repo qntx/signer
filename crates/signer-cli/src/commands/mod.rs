@@ -5,6 +5,7 @@ mod btc;
 mod cosmos;
 mod evm;
 mod fil;
+mod nostr;
 mod spark;
 mod sui;
 mod svm;
@@ -18,6 +19,7 @@ use clap::{Parser, Subcommand};
 pub(crate) use cosmos::CosmosCommand;
 pub(crate) use evm::EvmCommand;
 pub(crate) use fil::FilCommand;
+pub(crate) use nostr::NostrCommand;
 pub(crate) use spark::SparkCommand;
 pub(crate) use sui::SuiCommand;
 pub(crate) use svm::SvmCommand;
@@ -100,4 +102,8 @@ pub(crate) enum Commands {
     /// XRP Ledger signing operations.
     #[command(name = "xrpl", alias = "xrp", alias = "ripple")]
     Xrpl(XrplCommand),
+
+    /// Nostr signing operations (BIP-340 Schnorr, NIP-01/NIP-19).
+    #[command(name = "nostr")]
+    Nostr(NostrCommand),
 }

@@ -30,6 +30,8 @@ pub use signer_cosmos as cosmos;
 pub use signer_evm as evm;
 #[cfg(feature = "fil")]
 pub use signer_fil as fil;
+#[cfg(feature = "nostr")]
+pub use signer_nostr as nostr;
 pub use signer_primitives as primitives;
 pub use signer_primitives::{Sign, SignError, SignExt, SignOutput};
 #[cfg(feature = "spark")]

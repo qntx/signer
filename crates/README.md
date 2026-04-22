@@ -15,28 +15,30 @@
 | **[`signer-spark`](signer-spark/)** | [![crates.io][signer-spark-crate]][signer-spark-crate-url] [![docs.rs][signer-spark-doc]][signer-spark-doc-url] | Spark — secp256k1 + double-SHA256 (Bitcoin L2) |
 | **[`signer-xrpl`](signer-xrpl/)** | [![crates.io][signer-xrpl-crate]][signer-xrpl-crate-url] [![docs.rs][signer-xrpl-doc]][signer-xrpl-doc-url] | XRP Ledger — secp256k1 + SHA-512-half + DER |
 | **[`signer-aptos`](signer-aptos/)** | [![crates.io][signer-aptos-crate]][signer-aptos-crate-url] [![docs.rs][signer-aptos-doc]][signer-aptos-doc-url] | Aptos — Ed25519 + SHA3-256 domain-separated signing |
-| **[`signer-cli`](signer-cli/)** | [![crates.io][signer-cli-crate]][signer-cli-crate-url] | CLI — sign, inspect keys across all 11 chains |
+| **[`signer-nostr`](signer-nostr/)** | [![crates.io][signer-nostr-crate]][signer-nostr-crate-url] [![docs.rs][signer-nostr-doc]][signer-nostr-doc-url] | Nostr — BIP-340 Schnorr (NIP-01) + NIP-19 `nsec`/`npub` bech32 |
+| **[`signer-cli`](signer-cli/)** | [![crates.io][signer-cli-crate]][signer-cli-crate-url] | CLI — sign, inspect keys across all 12 chains |
 
 ## Dependency Graph
 
 ```text
 signer-cli
-  └── signer-{evm,btc,svm,cosmos,tron,sui,ton,fil,spark,xrpl,aptos}
+  └── signer-{evm,btc,svm,cosmos,tron,sui,ton,fil,spark,xrpl,aptos,nostr}
         └── signer-primitives (Sign trait, SignOutput)
 
 signer (umbrella)
   ├── signer-primitives
-  ├── signer-evm    ── k256 + sha3 (Keccak-256)
-  ├── signer-btc    ── k256 + sha2 (double-SHA256)
+  ├── signer-evm    ── k256 (ECDSA)  + sha3  (Keccak-256)
+  ├── signer-btc    ── k256 (ECDSA)  + sha2  (double-SHA256)
   ├── signer-svm    ── ed25519-dalek (Ed25519)
-  ├── signer-cosmos ── k256 + sha2
-  ├── signer-tron   ── k256 + sha3 + sha2
+  ├── signer-cosmos ── k256 (ECDSA)  + sha2
+  ├── signer-tron   ── k256 (ECDSA)  + sha3  + sha2
   ├── signer-sui    ── ed25519-dalek + blake2 (BLAKE2b intent)
   ├── signer-ton    ── ed25519-dalek
-  ├── signer-fil    ── k256 + blake2
-  ├── signer-spark  ── k256 + sha2
-  ├── signer-xrpl   ── k256 + sha2 (SHA-512-half)
-  └── signer-aptos  ── ed25519-dalek + sha3 (SHA3-256)
+  ├── signer-fil    ── k256 (ECDSA)  + blake2
+  ├── signer-spark  ── k256 (ECDSA)  + sha2
+  ├── signer-xrpl   ── k256 (ECDSA)  + sha2  (SHA-512-half)
+  ├── signer-aptos  ── ed25519-dalek + sha3  (SHA3-256)
+  └── signer-nostr  ── k256 (BIP-340 Schnorr) + sha2 + bech32 (NIP-19)
 ```
 
 ## Feature Flags
@@ -48,7 +50,7 @@ The umbrella `signer` crate provides fine-grained feature control:
 | `std` | ✅ | Enable standard library (implies `alloc`) |
 | `alloc` | | Enable `alloc` crate for `no_std` environments |
 | `getrandom` | | Enable `Signer::random()` via OS-provided CSPRNG |
-| `all-chains` | | Enable all 11 chain signers |
+| `all-chains` | | Enable all 12 chain signers |
 | `btc` | ✅ | Bitcoin signer |
 | `evm` | ✅ | Ethereum signer |
 | `svm` | ✅ | Solana signer |
@@ -60,20 +62,23 @@ The umbrella `signer` crate provides fine-grained feature control:
 | `sui` | ✅ | Sui signer |
 | `xrpl` | ✅ | XRP Ledger signer |
 | `aptos` | ✅ | Aptos signer |
+| `nostr` | ✅ | Nostr signer (BIP-340 Schnorr + NIP-19 bech32) |
 | `kobe` | | Enable [kobe](https://github.com/qntx/kobe) HD wallet bridging for all chains |
 
 ## Cryptography Libraries
 
-| Curve | Library | Chains |
+| Curve / scheme | Library | Chains |
 | --- | --- | --- |
-| secp256k1 | [k256](https://docs.rs/k256) 0.13 | EVM, BTC, Cosmos, Tron, Spark, Filecoin, XRPL |
+| secp256k1 ECDSA | [k256](https://docs.rs/k256) 0.13 | EVM, BTC, Cosmos, Tron, Spark, Filecoin, XRPL |
+| secp256k1 BIP-340 Schnorr | [k256](https://docs.rs/k256) 0.13 (`schnorr` feature) | Nostr |
 | Ed25519 | [ed25519-dalek](https://docs.rs/ed25519-dalek) 2.2 | Solana, Sui, TON, Aptos |
 
 | Hash | Library | Chains |
 | --- | --- | --- |
-| SHA-256 / SHA-512 | [sha2](https://docs.rs/sha2) 0.10 | BTC, Cosmos, Tron, Spark, Sui, XRPL |
+| SHA-256 / SHA-512 | [sha2](https://docs.rs/sha2) 0.10 | BTC, Cosmos, Tron, Spark, Sui, XRPL, Nostr |
 | Keccak-256 / SHA3-256 | [sha3](https://docs.rs/sha3) 0.10 | EVM, Tron, Sui, Aptos |
 | BLAKE2b-256 | [blake2](https://docs.rs/blake2) 0.10 | Filecoin, Sui |
+| bech32 (NIP-19) | [bech32](https://docs.rs/bech32) 0.11 | Cosmos, Nostr |
 
 [signer-crate]: https://img.shields.io/crates/v/signer.svg
 [signer-crate-url]: https://crates.io/crates/signer
@@ -129,3 +134,7 @@ The umbrella `signer` crate provides fine-grained feature control:
 [signer-aptos-crate-url]: https://crates.io/crates/signer-aptos
 [signer-aptos-doc]: https://img.shields.io/docsrs/signer-aptos.svg
 [signer-aptos-doc-url]: https://docs.rs/signer-aptos
+[signer-nostr-crate]: https://img.shields.io/crates/v/signer-nostr.svg
+[signer-nostr-crate-url]: https://crates.io/crates/signer-nostr
+[signer-nostr-doc]: https://img.shields.io/docsrs/signer-nostr.svg
+[signer-nostr-doc-url]: https://docs.rs/signer-nostr

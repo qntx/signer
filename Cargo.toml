@@ -6,31 +6,33 @@ members = [
     "crates/signer-fil", "crates/signer-ton", "crates/signer-sui",
     "crates/signer-xrpl",
     "crates/signer-aptos",
+    "crates/signer-nostr",
     "crates/signer-cli",
 ]
 default-members = ["crates/signer"]
 resolver = "3"
 
 [workspace.package]
-version = "0.6.1"
+version = "0.7.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/qntx/signer"
 description = "Lightweight multi-chain transaction signer."
 
 [workspace.dependencies]
-signer-primitives = { version = "0.6", path = "crates/signer-primitives", default-features = false }
-signer-btc = { version = "0.6", path = "crates/signer-btc", default-features = false }
-signer-evm = { version = "0.6", path = "crates/signer-evm", default-features = false }
-signer-svm = { version = "0.6", path = "crates/signer-svm", default-features = false }
-signer-cosmos = { version = "0.6", path = "crates/signer-cosmos", default-features = false }
-signer-tron = { version = "0.6", path = "crates/signer-tron", default-features = false }
-signer-spark = { version = "0.6", path = "crates/signer-spark", default-features = false }
-signer-fil = { version = "0.6", path = "crates/signer-fil", default-features = false }
-signer-ton = { version = "0.6", path = "crates/signer-ton", default-features = false }
-signer-sui = { version = "0.6", path = "crates/signer-sui", default-features = false }
-signer-xrpl = { version = "0.6", path = "crates/signer-xrpl", default-features = false }
-signer-aptos = { version = "0.6", path = "crates/signer-aptos", default-features = false }
+signer-primitives = { version = "0.7", path = "crates/signer-primitives", default-features = false }
+signer-btc = { version = "0.7", path = "crates/signer-btc", default-features = false }
+signer-evm = { version = "0.7", path = "crates/signer-evm", default-features = false }
+signer-svm = { version = "0.7", path = "crates/signer-svm", default-features = false }
+signer-cosmos = { version = "0.7", path = "crates/signer-cosmos", default-features = false }
+signer-tron = { version = "0.7", path = "crates/signer-tron", default-features = false }
+signer-spark = { version = "0.7", path = "crates/signer-spark", default-features = false }
+signer-fil = { version = "0.7", path = "crates/signer-fil", default-features = false }
+signer-ton = { version = "0.7", path = "crates/signer-ton", default-features = false }
+signer-sui = { version = "0.7", path = "crates/signer-sui", default-features = false }
+signer-xrpl = { version = "0.7", path = "crates/signer-xrpl", default-features = false }
+signer-aptos = { version = "0.7", path = "crates/signer-aptos", default-features = false }
+signer-nostr = { version = "0.7", path = "crates/signer-nostr", default-features = false }
 
 # Cryptography (versions aligned with kobe)
 k256 = { version = "0.13.4", default-features = false, features = ["ecdsa", "arithmetic"] }
@@ -69,6 +71,7 @@ kobe-fil = { version = "0.8", default-features = false, features = ["std"] }
 kobe-ton = { version = "0.8", default-features = false, features = ["std"] }
 kobe-sui = { version = "0.8", default-features = false, features = ["std"] }
 kobe-xrpl = { version = "0.8", default-features = false, features = ["std"] }
+kobe-nostr = { version = "0.8", default-features = false, features = ["std"] }
 
 [profile.release]
 codegen-units = 1

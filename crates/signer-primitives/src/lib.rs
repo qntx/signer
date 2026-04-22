@@ -24,6 +24,8 @@ use alloc::{string::String, vec::Vec};
 mod ed25519;
 mod error;
 mod macros;
+#[cfg(feature = "schnorr")]
+mod schnorr;
 #[cfg(feature = "secp256k1")]
 mod secp256k1;
 #[cfg(feature = "testing")]
@@ -32,6 +34,8 @@ pub mod testing;
 #[cfg(feature = "ed25519")]
 pub use ed25519::Ed25519Signer;
 pub use error::SignError;
+#[cfg(feature = "schnorr")]
+pub use schnorr::SchnorrSigner;
 #[cfg(feature = "secp256k1")]
 pub use secp256k1::Secp256k1Signer;
 
@@ -86,6 +90,19 @@ impl SignOutput {
             signature,
             recovery_id: None,
             public_key: Some(public_key),
+        }
+    }
+
+    /// Create a BIP-340 Schnorr sign output (64 bytes) with x-only public key attached.
+    ///
+    /// Used by chains like Nostr (NIP-01) and Bitcoin Taproot. The attached
+    /// `xonly_public_key` is always 32 bytes.
+    #[must_use]
+    pub const fn schnorr(signature: Vec<u8>, xonly_public_key: Vec<u8>) -> Self {
+        Self {
+            signature,
+            recovery_id: None,
+            public_key: Some(xonly_public_key),
         }
     }
 

@@ -19,15 +19,17 @@ signer-ton = { workspace = true, optional = true }
 signer-sui = { workspace = true, optional = true }
 signer-xrpl = { workspace = true, optional = true }
 signer-aptos = { workspace = true, optional = true }
+signer-nostr = { workspace = true, optional = true }
 
 [features]
-default = ["std", "btc", "evm", "svm", "cosmos", "tron", "spark", "fil", "ton", "sui", "xrpl", "aptos"]
+default = ["std", "btc", "evm", "svm", "cosmos", "tron", "spark", "fil", "ton", "sui", "xrpl", "aptos", "nostr"]
 std = ["alloc", "signer-primitives/std",
     "signer-btc?/std", "signer-evm?/std", "signer-svm?/std",
     "signer-cosmos?/std", "signer-tron?/std", "signer-spark?/std",
     "signer-fil?/std", "signer-ton?/std", "signer-sui?/std",
     "signer-xrpl?/std",
     "signer-aptos?/std",
+    "signer-nostr?/std",
 ]
 alloc = ["signer-primitives/alloc",
     "signer-btc?/alloc", "signer-evm?/alloc", "signer-svm?/alloc",
@@ -35,6 +37,7 @@ alloc = ["signer-primitives/alloc",
     "signer-fil?/alloc", "signer-ton?/alloc", "signer-sui?/alloc",
     "signer-xrpl?/alloc",
     "signer-aptos?/alloc",
+    "signer-nostr?/alloc",
 ]
 getrandom = [
     "signer-btc?/getrandom", "signer-evm?/getrandom", "signer-svm?/getrandom",
@@ -42,6 +45,7 @@ getrandom = [
     "signer-fil?/getrandom", "signer-ton?/getrandom", "signer-sui?/getrandom",
     "signer-xrpl?/getrandom",
     "signer-aptos?/getrandom",
+    "signer-nostr?/getrandom",
 ]
 btc = ["dep:signer-btc"]
 evm = ["dep:signer-evm"]
@@ -54,12 +58,14 @@ ton = ["dep:signer-ton"]
 sui = ["dep:signer-sui"]
 xrpl = ["dep:signer-xrpl"]
 aptos = ["dep:signer-aptos"]
-all-chains = ["btc", "evm", "svm", "cosmos", "tron", "spark", "fil", "ton", "sui", "xrpl", "aptos"]
+nostr = ["dep:signer-nostr"]
+all-chains = ["btc", "evm", "svm", "cosmos", "tron", "spark", "fil", "ton", "sui", "xrpl", "aptos", "nostr"]
 kobe = [
     "signer-btc?/kobe", "signer-evm?/kobe", "signer-svm?/kobe",
     "signer-cosmos?/kobe", "signer-tron?/kobe", "signer-spark?/kobe",
     "signer-fil?/kobe", "signer-ton?/kobe", "signer-sui?/kobe",
     "signer-xrpl?/kobe",
+    "signer-nostr?/kobe",
 ]
 
 [lints]

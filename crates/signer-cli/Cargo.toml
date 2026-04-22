@@ -25,11 +25,13 @@ signer-ton = { workspace = true, features = ["std", "getrandom"] }
 signer-sui = { workspace = true, features = ["std", "getrandom"] }
 signer-xrpl = { workspace = true, features = ["std", "getrandom"] }
 signer-aptos = { workspace = true, features = ["std", "getrandom"] }
+signer-nostr = { workspace = true, features = ["std", "getrandom"] }
 clap.workspace = true
 colored.workspace = true
 hex = { workspace = true, features = ["std"] }
 serde.workspace = true
 serde_json = { workspace = true, features = ["std"] }
+sha2.workspace = true
 
 [lints]
 workspace = true
