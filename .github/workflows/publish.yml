@@ -1,0 +1,13 @@
+name: Publish to crates.io
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+jobs:
+  publish:
+    uses: qntx/workflows/.github/workflows/publish-crates.yml@main
+    with:
+      packages: "signer-primitives signer-btc signer-evm signer-svm signer-cosmos signer-tron signer-spark signer-fil signer-ton signer-sui signer-xrpl signer-aptos signer signer-cli"
+    secrets:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
