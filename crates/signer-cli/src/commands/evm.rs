@@ -4,7 +4,9 @@ use clap::{Args, Subcommand};
 use signer_evm::Signer;
 
 use super::{parse_hex, parse_hex32};
-use crate::output::{self, AddressOutput, SignOutput};
+use crate::output::{self, CliResult};
+
+const CHAIN: &str = "ethereum";
 
 /// EVM signing operations.
 #[derive(Args)]
@@ -51,62 +53,43 @@ enum EvmSubcommand {
 }
 
 impl EvmCommand {
-    pub(crate) fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn execute(self, json: bool) -> CliResult {
         match self.command {
             EvmSubcommand::SignMessage { key, message } => {
                 let signer = Signer::from_hex(&key)?;
                 let out = signer.sign_message(message.as_bytes())?;
-                let result = SignOutput {
-                    chain: "ethereum",
-                    operation: "EIP-191 personal_sign",
-                    address: Some(signer.address()),
-                    signature: hex::encode(&out.signature),
-                    recovery_id: out.recovery_id,
-                    public_key: None,
-                    message: Some(message),
-                };
-                output::render_sign(&result, json)?;
+                output::sign(CHAIN, "EIP-191 personal_sign")
+                    .address(signer.address())
+                    .signature(&out.signature)
+                    .recovery_id(out.recovery_id)
+                    .message(message)
+                    .render(json)
             }
             EvmSubcommand::SignHash { key, hash } => {
                 let signer = Signer::from_hex(&key)?;
-                let hash_bytes = parse_hex32(&hash)?;
-                let out = signer.sign_hash(&hash_bytes)?;
-                let result = SignOutput {
-                    chain: "ethereum",
-                    operation: "raw hash",
-                    address: Some(signer.address()),
-                    signature: hex::encode(&out.signature),
-                    recovery_id: out.recovery_id,
-                    public_key: None,
-                    message: Some(hash),
-                };
-                output::render_sign(&result, json)?;
+                let out = signer.sign_hash(&parse_hex32(&hash)?)?;
+                output::sign(CHAIN, "raw hash")
+                    .address(signer.address())
+                    .signature(&out.signature)
+                    .recovery_id(out.recovery_id)
+                    .message(hash)
+                    .render(json)
             }
             EvmSubcommand::SignTx { key, tx } => {
                 let signer = Signer::from_hex(&key)?;
-                let tx_bytes = parse_hex(&tx)?;
-                let out = signer.sign_transaction(&tx_bytes)?;
-                let result = SignOutput {
-                    chain: "ethereum",
-                    operation: "transaction",
-                    address: Some(signer.address()),
-                    signature: hex::encode(&out.signature),
-                    recovery_id: out.recovery_id,
-                    public_key: None,
-                    message: None,
-                };
-                output::render_sign(&result, json)?;
+                let out = signer.sign_transaction(&parse_hex(&tx)?)?;
+                output::sign(CHAIN, "transaction")
+                    .address(signer.address())
+                    .signature(&out.signature)
+                    .recovery_id(out.recovery_id)
+                    .render(json)
             }
             EvmSubcommand::Address { key } => {
                 let signer = Signer::from_hex(&key)?;
-                let result = AddressOutput {
-                    chain: "ethereum",
-                    address: Some(signer.address()),
-                    public_key: hex::encode(signer.public_key_bytes()),
-                };
-                output::render_address(&result, json)?;
+                output::address(CHAIN, &signer.public_key_bytes())
+                    .address(signer.address())
+                    .render(json)
             }
         }
-        Ok(())
     }
 }

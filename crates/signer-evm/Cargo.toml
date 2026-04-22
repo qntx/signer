@@ -23,7 +23,7 @@ thiserror.workspace = true
 kobe-evm = { workspace = true, optional = true }
 
 [dev-dependencies]
-k256.workspace = true
+signer-primitives = { workspace = true, features = ["testing"] }
 
 [lints]
 workspace = true

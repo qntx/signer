@@ -3,8 +3,10 @@
 use clap::{Args, Subcommand};
 use signer_xrpl::Signer;
 
-use super::parse_hex32;
-use crate::output::{self, AddressOutput, SignOutput};
+use super::{parse_hex, parse_hex32};
+use crate::output::{self, CliResult};
+
+const CHAIN: &str = "xrpl";
 
 /// XRP Ledger signing operations.
 #[derive(Args)]
@@ -37,46 +39,31 @@ enum XrplSubcommand {
 }
 
 impl XrplCommand {
-    pub(crate) fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn execute(self, json: bool) -> CliResult {
         match self.command {
             XrplSubcommand::SignHash { key, hash } => {
                 let signer = Signer::from_hex(&key)?;
                 let out = signer.sign_hash(&parse_hex32(&hash)?)?;
-                let result = SignOutput {
-                    chain: "xrpl",
-                    operation: "raw hash (DER)",
-                    address: Some(signer.address()),
-                    signature: hex::encode(&out.signature),
-                    recovery_id: out.recovery_id,
-                    public_key: None,
-                    message: Some(hash),
-                };
-                output::render_sign(&result, json)?;
+                output::sign(CHAIN, "raw hash (DER)")
+                    .address(signer.address())
+                    .signature(&out.signature)
+                    .message(hash)
+                    .render(json)
             }
             XrplSubcommand::SignTx { key, tx } => {
                 let signer = Signer::from_hex(&key)?;
-                let out = signer.sign_transaction(&super::parse_hex(&tx)?)?;
-                let result = SignOutput {
-                    chain: "xrpl",
-                    operation: "transaction (SHA-512-half + DER)",
-                    address: Some(signer.address()),
-                    signature: hex::encode(&out.signature),
-                    recovery_id: out.recovery_id,
-                    public_key: None,
-                    message: None,
-                };
-                output::render_sign(&result, json)?;
+                let out = signer.sign_transaction(&parse_hex(&tx)?)?;
+                output::sign(CHAIN, "transaction (SHA-512-half + DER)")
+                    .address(signer.address())
+                    .signature(&out.signature)
+                    .render(json)
             }
             XrplSubcommand::Address { key } => {
                 let signer = Signer::from_hex(&key)?;
-                let result = AddressOutput {
-                    chain: "xrpl",
-                    address: Some(signer.address()),
-                    public_key: hex::encode(signer.public_key_bytes()),
-                };
-                output::render_address(&result, json)?;
+                output::address(CHAIN, &signer.public_key_bytes())
+                    .address(signer.address())
+                    .render(json)
             }
         }
-        Ok(())
     }
 }

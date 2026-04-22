@@ -4,7 +4,10 @@ use clap::{Args, Subcommand};
 use signer_primitives::Sign;
 use signer_svm::Signer;
 
-use crate::output::{self, AddressOutput, SignOutput};
+use super::parse_hex;
+use crate::output::{self, CliResult};
+
+const CHAIN: &str = "solana";
 
 /// Solana signing operations.
 #[derive(Args)]
@@ -51,52 +54,37 @@ fn load_signer(key: &str) -> Result<Signer, Box<dyn std::error::Error>> {
 }
 
 impl SvmCommand {
-    pub(crate) fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn execute(self, json: bool) -> CliResult {
         match self.command {
             SvmSubcommand::Sign { key, message, hex } => {
                 let signer = load_signer(&key)?;
                 let msg_bytes = if hex {
-                    super::parse_hex(&message)?
+                    parse_hex(&message)?
                 } else {
                     message.as_bytes().to_vec()
                 };
                 let out = signer.sign_message(&msg_bytes)?;
-                let result = SignOutput {
-                    chain: "solana",
-                    operation: "Ed25519",
-                    address: Some(signer.address()),
-                    signature: hex::encode(&out.signature),
-                    recovery_id: None,
-                    public_key: Some(hex::encode(signer.public_key_bytes())),
-                    message: Some(message),
-                };
-                output::render_sign(&result, json)?;
+                output::sign(CHAIN, "Ed25519")
+                    .address(signer.address())
+                    .signature(&out.signature)
+                    .public_key_bytes(&signer.public_key_bytes())
+                    .message(message)
+                    .render(json)
             }
             SvmSubcommand::SignTx { key, tx } => {
                 let signer = load_signer(&key)?;
-                let tx_bytes = super::parse_hex(&tx)?;
-                let out = signer.sign_transaction(&tx_bytes)?;
-                let result = SignOutput {
-                    chain: "solana",
-                    operation: "transaction",
-                    address: Some(signer.address()),
-                    signature: hex::encode(&out.signature),
-                    recovery_id: None,
-                    public_key: None,
-                    message: None,
-                };
-                output::render_sign(&result, json)?;
+                let out = signer.sign_transaction(&parse_hex(&tx)?)?;
+                output::sign(CHAIN, "transaction")
+                    .address(signer.address())
+                    .signature(&out.signature)
+                    .render(json)
             }
             SvmSubcommand::Address { key } => {
                 let signer = load_signer(&key)?;
-                let result = AddressOutput {
-                    chain: "solana",
-                    address: Some(signer.address()),
-                    public_key: hex::encode(signer.public_key_bytes()),
-                };
-                output::render_address(&result, json)?;
+                output::address(CHAIN, &signer.public_key_bytes())
+                    .address(signer.address())
+                    .render(json)
             }
         }
-        Ok(())
     }
 }

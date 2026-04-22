@@ -3,8 +3,10 @@
 use clap::{Args, Subcommand};
 use signer_tron::Signer;
 
-use super::parse_hex32;
-use crate::output::{self, AddressOutput, SignOutput};
+use super::{parse_hex, parse_hex32};
+use crate::output::{self, CliResult};
+
+const CHAIN: &str = "tron";
 
 /// Tron signing operations.
 #[derive(Args)]
@@ -44,60 +46,43 @@ enum TronSubcommand {
 }
 
 impl TronCommand {
-    pub(crate) fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn execute(self, json: bool) -> CliResult {
         match self.command {
             TronSubcommand::SignHash { key, hash } => {
                 let signer = Signer::from_hex(&key)?;
                 let out = signer.sign_hash(&parse_hex32(&hash)?)?;
-                let result = SignOutput {
-                    chain: "tron",
-                    operation: "raw hash",
-                    address: Some(signer.address()),
-                    signature: hex::encode(&out.signature),
-                    recovery_id: out.recovery_id,
-                    public_key: None,
-                    message: Some(hash),
-                };
-                output::render_sign(&result, json)?;
+                output::sign(CHAIN, "raw hash")
+                    .address(signer.address())
+                    .signature(&out.signature)
+                    .recovery_id(out.recovery_id)
+                    .message(hash)
+                    .render(json)
             }
             TronSubcommand::SignMessage { key, message } => {
                 let signer = Signer::from_hex(&key)?;
                 let out = signer.sign_message(message.as_bytes())?;
-                let result = SignOutput {
-                    chain: "tron",
-                    operation: "TRON Signed Message",
-                    address: Some(signer.address()),
-                    signature: hex::encode(&out.signature),
-                    recovery_id: out.recovery_id,
-                    public_key: None,
-                    message: Some(message),
-                };
-                output::render_sign(&result, json)?;
+                output::sign(CHAIN, "TRON Signed Message")
+                    .address(signer.address())
+                    .signature(&out.signature)
+                    .recovery_id(out.recovery_id)
+                    .message(message)
+                    .render(json)
             }
             TronSubcommand::SignTx { key, tx } => {
                 let signer = Signer::from_hex(&key)?;
-                let out = signer.sign_transaction(&super::parse_hex(&tx)?)?;
-                let result = SignOutput {
-                    chain: "tron",
-                    operation: "transaction",
-                    address: Some(signer.address()),
-                    signature: hex::encode(&out.signature),
-                    recovery_id: out.recovery_id,
-                    public_key: None,
-                    message: None,
-                };
-                output::render_sign(&result, json)?;
+                let out = signer.sign_transaction(&parse_hex(&tx)?)?;
+                output::sign(CHAIN, "transaction")
+                    .address(signer.address())
+                    .signature(&out.signature)
+                    .recovery_id(out.recovery_id)
+                    .render(json)
             }
             TronSubcommand::Address { key } => {
                 let signer = Signer::from_hex(&key)?;
-                let result = AddressOutput {
-                    chain: "tron",
-                    address: Some(signer.address()),
-                    public_key: hex::encode(signer.public_key_bytes()),
-                };
-                output::render_address(&result, json)?;
+                output::address(CHAIN, &signer.public_key_bytes())
+                    .address(signer.address())
+                    .render(json)
             }
         }
-        Ok(())
     }
 }

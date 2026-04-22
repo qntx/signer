@@ -26,12 +26,22 @@ mod error;
 mod macros;
 #[cfg(feature = "secp256k1")]
 mod secp256k1;
+#[cfg(feature = "testing")]
+pub mod testing;
 
 #[cfg(feature = "ed25519")]
 pub use ed25519::Ed25519Signer;
 pub use error::SignError;
 #[cfg(feature = "secp256k1")]
 pub use secp256k1::Secp256k1Signer;
+
+/// Internal re-exports used by exported macros. Not a stable public API.
+#[doc(hidden)]
+pub mod __private {
+    pub use alloc::string::String;
+
+    pub use hex::FromHexError;
+}
 
 /// Output of a signing operation.
 ///

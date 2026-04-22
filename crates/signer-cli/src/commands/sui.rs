@@ -4,7 +4,10 @@ use clap::{Args, Subcommand};
 use signer_primitives::Sign;
 use signer_sui::Signer;
 
-use crate::output::{self, AddressOutput, SignOutput};
+use super::parse_hex;
+use crate::output::{self, CliResult};
+
+const CHAIN: &str = "sui";
 
 /// Sui signing operations.
 #[derive(Args)]
@@ -37,47 +40,33 @@ enum SuiSubcommand {
 }
 
 impl SuiCommand {
-    pub(crate) fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn execute(self, json: bool) -> CliResult {
         match self.command {
             SuiSubcommand::SignMessage { key, message } => {
                 let signer = Signer::from_hex(&key)?;
                 let out = Sign::sign_message(&signer, message.as_bytes())?;
-                let result = SignOutput {
-                    chain: "sui",
-                    operation: "personal message (BCS + intent)",
-                    address: Some(signer.address()),
-                    signature: hex::encode(&out.signature),
-                    recovery_id: None,
-                    public_key: out.public_key.map(hex::encode),
-                    message: Some(message),
-                };
-                output::render_sign(&result, json)?;
+                output::sign(CHAIN, "personal message (BCS + intent)")
+                    .address(signer.address())
+                    .signature(&out.signature)
+                    .public_key_opt_bytes(out.public_key)
+                    .message(message)
+                    .render(json)
             }
             SuiSubcommand::SignTx { key, tx } => {
                 let signer = Signer::from_hex(&key)?;
-                let tx_bytes = super::parse_hex(&tx)?;
-                let out = Sign::sign_transaction(&signer, &tx_bytes)?;
-                let result = SignOutput {
-                    chain: "sui",
-                    operation: "transaction (intent digest)",
-                    address: Some(signer.address()),
-                    signature: hex::encode(&out.signature),
-                    recovery_id: None,
-                    public_key: out.public_key.map(hex::encode),
-                    message: None,
-                };
-                output::render_sign(&result, json)?;
+                let out = Sign::sign_transaction(&signer, &parse_hex(&tx)?)?;
+                output::sign(CHAIN, "transaction (intent digest)")
+                    .address(signer.address())
+                    .signature(&out.signature)
+                    .public_key_opt_bytes(out.public_key)
+                    .render(json)
             }
             SuiSubcommand::Address { key } => {
                 let signer = Signer::from_hex(&key)?;
-                let result = AddressOutput {
-                    chain: "sui",
-                    address: Some(signer.address()),
-                    public_key: hex::encode(signer.public_key_bytes()),
-                };
-                output::render_address(&result, json)?;
+                output::address(CHAIN, &signer.public_key_bytes())
+                    .address(signer.address())
+                    .render(json)
             }
         }
-        Ok(())
     }
 }

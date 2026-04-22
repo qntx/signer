@@ -35,30 +35,30 @@ macro_rules! define_sign_error {
         pub enum SignError {
             #[doc = "Private key is invalid."]
             #[error("invalid key: {0}")]
-            InvalidKey(alloc::string::String),
+            InvalidKey($crate::__private::String),
             #[doc = "Message format is wrong."]
             #[error("invalid message: {0}")]
-            InvalidMessage(alloc::string::String),
+            InvalidMessage($crate::__private::String),
             #[doc = "Signing primitive failed."]
             #[error("signing failed: {0}")]
-            SigningFailed(alloc::string::String),
+            SigningFailed($crate::__private::String),
             #[doc = "Signature bytes are malformed."]
             #[error("invalid signature: {0}")]
-            InvalidSignature(alloc::string::String),
+            InvalidSignature($crate::__private::String),
             #[doc = "Transaction bytes are malformed."]
             #[error("invalid transaction: {0}")]
-            InvalidTransaction(alloc::string::String),
+            InvalidTransaction($crate::__private::String),
             #[doc = "Hex decoding failed."]
             #[error("hex error: {0}")]
-            Hex(hex::FromHexError),
+            Hex($crate::__private::FromHexError),
             $(
                 $(#[$vm])*
                 $v($vt),
             )*
         }
 
-        impl From<hex::FromHexError> for SignError {
-            fn from(e: hex::FromHexError) -> Self {
+        impl From<$crate::__private::FromHexError> for SignError {
+            fn from(e: $crate::__private::FromHexError) -> Self {
                 Self::Hex(e)
             }
         }

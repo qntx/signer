@@ -13,15 +13,16 @@ default = ["std"]
 std = ["alloc", "zeroize?/std"]
 alloc = ["zeroize?/alloc"]
 getrandom = ["dep:getrandom"]
-secp256k1 = ["alloc", "dep:k256", "dep:zeroize", "dep:hex"]
-ed25519 = ["alloc", "dep:ed25519-dalek", "dep:hex"]
+secp256k1 = ["alloc", "dep:k256", "dep:zeroize"]
+ed25519 = ["alloc", "dep:ed25519-dalek"]
+testing = ["secp256k1"]
 
 [dependencies]
+hex.workspace = true
 thiserror.workspace = true
 k256 = { workspace = true, optional = true }
 ed25519-dalek = { workspace = true, optional = true }
 zeroize = { workspace = true, optional = true }
-hex = { workspace = true, optional = true }
 getrandom = { workspace = true, optional = true }
 
 [lints]

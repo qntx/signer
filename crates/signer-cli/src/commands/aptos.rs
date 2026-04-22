@@ -4,7 +4,10 @@ use clap::{Args, Subcommand};
 use signer_aptos::Signer;
 use signer_primitives::Sign;
 
-use crate::output::{self, AddressOutput, SignOutput};
+use super::parse_hex;
+use crate::output::{self, CliResult};
+
+const CHAIN: &str = "aptos";
 
 /// Aptos signing operations.
 #[derive(Args)]
@@ -37,47 +40,33 @@ enum AptosSubcommand {
 }
 
 impl AptosCommand {
-    pub(crate) fn execute(self, json: bool) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn execute(self, json: bool) -> CliResult {
         match self.command {
             AptosSubcommand::Sign { key, message } => {
                 let signer = Signer::from_hex(&key)?;
                 let out = Sign::sign_message(&signer, message.as_bytes())?;
-                let result = SignOutput {
-                    chain: "aptos",
-                    operation: "Ed25519",
-                    address: Some(signer.address()),
-                    signature: hex::encode(&out.signature),
-                    recovery_id: None,
-                    public_key: Some(signer.public_key_hex()),
-                    message: Some(message),
-                };
-                output::render_sign(&result, json)?;
+                output::sign(CHAIN, "Ed25519")
+                    .address(signer.address())
+                    .signature(&out.signature)
+                    .public_key_hex(signer.public_key_hex())
+                    .message(message)
+                    .render(json)
             }
             AptosSubcommand::SignTx { key, tx } => {
                 let signer = Signer::from_hex(&key)?;
-                let tx_bytes = super::parse_hex(&tx)?;
-                let out = Sign::sign_transaction(&signer, &tx_bytes)?;
-                let result = SignOutput {
-                    chain: "aptos",
-                    operation: "transaction",
-                    address: Some(signer.address()),
-                    signature: hex::encode(&out.signature),
-                    recovery_id: None,
-                    public_key: Some(signer.public_key_hex()),
-                    message: None,
-                };
-                output::render_sign(&result, json)?;
+                let out = Sign::sign_transaction(&signer, &parse_hex(&tx)?)?;
+                output::sign(CHAIN, "transaction")
+                    .address(signer.address())
+                    .signature(&out.signature)
+                    .public_key_hex(signer.public_key_hex())
+                    .render(json)
             }
             AptosSubcommand::Address { key } => {
                 let signer = Signer::from_hex(&key)?;
-                let result = AddressOutput {
-                    chain: "aptos",
-                    address: Some(signer.address()),
-                    public_key: hex::encode(signer.public_key_bytes()),
-                };
-                output::render_address(&result, json)?;
+                output::address(CHAIN, &signer.public_key_bytes())
+                    .address(signer.address())
+                    .render(json)
             }
         }
-        Ok(())
     }
 }

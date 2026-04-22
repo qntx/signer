@@ -1290,7 +1290,6 @@ version = "0.6.1"
 dependencies = [
  "bs58",
  "hex",
- "k256",
  "kobe-btc",
  "ripemd 0.2.0",
  "sha2 0.10.9",
@@ -1327,7 +1326,6 @@ version = "0.6.1"
 dependencies = [
  "bech32",
  "hex",
- "k256",
  "kobe-cosmos",
  "ripemd 0.2.0",
  "sha2 0.10.9",
@@ -1340,7 +1338,6 @@ name = "signer-evm"
 version = "0.6.1"
 dependencies = [
  "hex",
- "k256",
  "kobe-evm",
  "serde_json",
  "sha3 0.10.9",
@@ -1354,7 +1351,6 @@ version = "0.6.1"
 dependencies = [
  "blake2",
  "hex",
- "k256",
  "kobe-fil",
  "signer-primitives",
  "thiserror",
@@ -1378,7 +1374,6 @@ version = "0.6.1"
 dependencies = [
  "bs58",
  "hex",
- "k256",
  "kobe-spark",
  "ripemd 0.2.0",
  "sha2 0.10.9",
@@ -1428,7 +1423,6 @@ version = "0.6.1"
 dependencies = [
  "bs58",
  "hex",
- "k256",
  "kobe-tron",
  "sha2 0.10.9",
  "sha3 0.10.9",
@@ -1442,7 +1436,6 @@ version = "0.6.1"
 dependencies = [
  "bs58",
  "hex",
- "k256",
  "kobe-xrpl",
  "ripemd 0.2.0",
  "sha2 0.10.9",
