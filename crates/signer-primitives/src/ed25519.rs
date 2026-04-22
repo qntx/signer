@@ -25,11 +25,23 @@ use crate::SignError;
 /// standard 64-byte Ed25519 signatures via deterministic RFC 8032 signing.
 /// The inner [`SigningKey`] zeroizes itself on drop.
 ///
-/// Chain crates typically wrap this in a newtype:
+/// # Example
 ///
-/// ```ignore
+/// ```
 /// use signer_primitives::Ed25519Signer;
-/// pub struct Signer { inner: Ed25519Signer }
+///
+/// // RFC 8032 Test Vector 1.
+/// let signer = Ed25519Signer::from_hex(
+///     "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+/// )
+/// .unwrap();
+/// assert_eq!(
+///     signer.public_key_hex(),
+///     "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+/// );
+///
+/// let sig = signer.sign_raw(b"hello");
+/// signer.verify(b"hello", &sig).unwrap();
 /// ```
 pub struct Ed25519Signer {
     key: SigningKey,

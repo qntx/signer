@@ -18,7 +18,7 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 
 #[cfg(feature = "ed25519")]
 mod ed25519;
@@ -87,6 +87,18 @@ impl SignOutput {
             recovery_id: None,
             public_key: Some(public_key),
         }
+    }
+
+    /// Hex-encode the raw signature bytes.
+    #[must_use]
+    pub fn signature_hex(&self) -> String {
+        hex::encode(&self.signature)
+    }
+
+    /// Hex-encode the attached public key, if present.
+    #[must_use]
+    pub fn public_key_hex(&self) -> Option<String> {
+        self.public_key.as_ref().map(hex::encode)
     }
 }
 

@@ -21,11 +21,20 @@ use crate::{SignError, SignOutput};
 /// Loads a private key, exposes public-key material, and produces either
 /// 65-byte recoverable or DER-encoded signatures. Zeroized on drop.
 ///
-/// Chain crates typically wrap this in a newtype:
+/// # Example
 ///
-/// ```ignore
+/// ```
 /// use signer_primitives::Secp256k1Signer;
-/// pub struct Signer { inner: Secp256k1Signer }
+///
+/// let signer = Secp256k1Signer::from_hex(
+///     "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318",
+/// )?;
+/// assert_eq!(signer.compressed_public_key().len(), 33);
+/// assert_eq!(signer.uncompressed_public_key().len(), 65);
+///
+/// let out = signer.sign_prehash_recoverable(&[0u8; 32])?;
+/// assert_eq!(out.signature.len(), 65); // r(32) + s(32) + recovery_id(1)
+/// # Ok::<_, signer_primitives::SignError>(())
 /// ```
 pub struct Secp256k1Signer {
     key: SigningKey,
