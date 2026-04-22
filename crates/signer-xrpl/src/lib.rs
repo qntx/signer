@@ -23,31 +23,26 @@
 
 extern crate alloc;
 
-#[cfg(not(feature = "std"))]
-use alloc::string::ToString;
-use alloc::{format, string::String, vec::Vec};
+use alloc::{string::String, vec::Vec};
 
 mod error;
 
 pub use error::SignError;
-use k256::ecdsa::signature::hazmat::PrehashSigner;
-use k256::ecdsa::{Signature, SigningKey};
 use ripemd::{Digest as _, Ripemd160};
 use sha2::{Digest, Sha256, Sha512};
+use signer_primitives::Secp256k1Signer;
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
-use zeroize::ZeroizeOnDrop;
 
 /// XRPL single-signing hash prefix: `STX\0` (`0x53545800`).
 const STX_PREFIX: [u8; 4] = [0x53, 0x54, 0x58, 0x00];
 
 /// XRP Ledger transaction signer.
 ///
-/// Wraps a secp256k1 signing key. Produces DER-encoded ECDSA signatures
-/// over SHA-512-half digests, matching the XRPL signing specification.
-///
+/// Wraps a [`Secp256k1Signer`]. Produces DER-encoded ECDSA signatures over
+/// SHA-512-half digests, matching the XRPL signing specification.
 /// The inner key is zeroized on drop.
 pub struct Signer {
-    key: SigningKey,
+    inner: Secp256k1Signer,
 }
 
 impl core::fmt::Debug for Signer {
@@ -58,8 +53,6 @@ impl core::fmt::Debug for Signer {
     }
 }
 
-impl ZeroizeOnDrop for Signer {}
-
 impl Signer {
     /// Create from a raw 32-byte private key.
     ///
@@ -67,9 +60,9 @@ impl Signer {
     ///
     /// Returns an error if the bytes are not a valid secp256k1 scalar.
     pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
-        let key =
-            SigningKey::from_slice(bytes).map_err(|e| SignError::InvalidKey(e.to_string()))?;
-        Ok(Self { key })
+        Ok(Self {
+            inner: Secp256k1Signer::from_bytes(bytes)?,
+        })
     }
 
     /// Create from a hex-encoded private key (with or without `0x`).
@@ -78,11 +71,9 @@ impl Signer {
     ///
     /// Returns an error if the hex is invalid or the key is out of range.
     pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
-        let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-        let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
-            SignError::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
-        })?;
-        Self::from_bytes(&bytes)
+        Ok(Self {
+            inner: Secp256k1Signer::from_hex(hex_str)?,
+        })
     }
 
     /// Generate a random signer.
@@ -92,40 +83,23 @@ impl Signer {
     /// Panics if the OS random number generator fails.
     #[cfg(feature = "getrandom")]
     #[must_use]
-    #[allow(
-        clippy::expect_used,
-        reason = "getrandom failure is unrecoverable; secp256k1 rejection has p ≈ 2⁻¹²⁸"
-    )]
     pub fn random() -> Self {
-        use zeroize::Zeroize as _;
-        let mut bytes = [0u8; 32];
-        getrandom::fill(&mut bytes).expect("getrandom failed");
-        let key = SigningKey::from_slice(&bytes).expect("invalid random key");
-        bytes.zeroize();
-        Self { key }
+        Self {
+            inner: Secp256k1Signer::random(),
+        }
     }
 
     /// Derive the XRPL classic `r`-address from the signing key.
     #[must_use]
     pub fn address(&self) -> String {
-        let pubkey = self.public_key_bytes();
+        let pubkey = self.inner.compressed_public_key();
         encode_classic_address(&pubkey)
     }
 
     /// Compressed public key (33 bytes).
     #[must_use]
     pub fn public_key_bytes(&self) -> Vec<u8> {
-        self.key
-            .verifying_key()
-            .to_encoded_point(true)
-            .as_bytes()
-            .to_vec()
-    }
-
-    /// Expose the inner [`SigningKey`].
-    #[must_use]
-    pub const fn signing_key(&self) -> &SigningKey {
-        &self.key
+        self.inner.compressed_public_key()
     }
 
     /// Sign a 32-byte pre-hashed digest with secp256k1.
@@ -137,18 +111,7 @@ impl Signer {
     ///
     /// Returns an error if `hash` is not 32 bytes or signing fails.
     pub fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
-        let digest: [u8; 32] = hash.try_into().map_err(|_| {
-            SignError::InvalidMessage(format!("expected 32-byte hash, got {} bytes", hash.len()))
-        })?;
-        let sig: Signature = self
-            .key
-            .sign_prehash(&digest)
-            .map_err(|e| SignError::SigningFailed(e.to_string()))?;
-        Ok(SignOutput {
-            signature: sig.to_der().as_bytes().to_vec(),
-            recovery_id: None,
-            public_key: None,
-        })
+        Ok(self.inner.sign_prehash_der(hash)?)
     }
 
     /// Sign an unsigned XRPL transaction.
@@ -284,11 +247,9 @@ mod tests {
         let s = test_signer();
         let hash = sha512_half_prefixed(b"", b"verify me");
         let out = s.sign_hash(&hash).unwrap();
-        // Parse DER and verify
-        let sig = Signature::from_der(&out.signature).expect("valid DER");
-        s.signing_key()
-            .verifying_key()
-            .verify_prehash(&hash, &sig)
+        let sig = k256::ecdsa::Signature::from_der(&out.signature).expect("valid DER");
+        let vk = k256::ecdsa::VerifyingKey::from_sec1_bytes(&s.public_key_bytes()).unwrap();
+        vk.verify_prehash(&hash, &sig)
             .expect("signature must verify");
     }
 
@@ -298,14 +259,10 @@ mod tests {
         let tx = b"some serialized tx fields";
         let out = s.sign_transaction(tx).unwrap();
 
-        // Manually compute the expected hash
         let expected_hash = sha512_half_prefixed(&STX_PREFIX, tx);
-
-        // Verify signature against the expected hash
-        let sig = Signature::from_der(&out.signature).expect("valid DER");
-        s.signing_key()
-            .verifying_key()
-            .verify_prehash(&expected_hash, &sig)
+        let sig = k256::ecdsa::Signature::from_der(&out.signature).expect("valid DER");
+        let vk = k256::ecdsa::VerifyingKey::from_sec1_bytes(&s.public_key_bytes()).unwrap();
+        vk.verify_prehash(&expected_hash, &sig)
             .expect("signature must verify against STX-prefixed hash");
     }
 

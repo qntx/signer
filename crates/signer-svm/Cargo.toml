@@ -8,15 +8,14 @@ description = "Solana transaction signer — Ed25519 signing, compact-u16 tx enc
 
 [features]
 default = ["std"]
-std = ["alloc", "signer-primitives/std", "zeroize/std"]
-alloc = ["signer-primitives/alloc", "zeroize/alloc"]
-getrandom = ["dep:getrandom"]
+std = ["alloc", "signer-primitives/std"]
+alloc = ["signer-primitives/alloc"]
+getrandom = ["signer-primitives/getrandom"]
 kobe = ["dep:kobe-svm"]
 
 [dependencies]
-signer-primitives.workspace = true
+signer-primitives = { workspace = true, features = ["ed25519"] }
 ed25519-dalek.workspace = true
-getrandom = { workspace = true, optional = true }
 bs58.workspace = true
 hex.workspace = true
 zeroize.workspace = true

@@ -8,21 +8,21 @@ description = "Filecoin transaction signer — secp256k1 ECDSA + Blake2b."
 
 [features]
 default = ["std"]
-std = ["alloc", "signer-primitives/std", "zeroize/std"]
-alloc = ["signer-primitives/alloc", "zeroize/alloc"]
-getrandom = ["dep:getrandom"]
+std = ["alloc", "signer-primitives/std"]
+alloc = ["signer-primitives/alloc"]
+getrandom = ["signer-primitives/getrandom"]
 kobe = ["dep:kobe-fil"]
 
 [dependencies]
-signer-primitives.workspace = true
-k256.workspace = true
-getrandom = { workspace = true, optional = true }
+signer-primitives = { workspace = true, features = ["secp256k1"] }
 blake2.workspace = true
 hex.workspace = true
-zeroize.workspace = true
 thiserror.workspace = true
 
 kobe-fil = { workspace = true, optional = true }
+
+[dev-dependencies]
+k256.workspace = true
 
 [lints]
 workspace = true

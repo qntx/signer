@@ -10,11 +10,19 @@ categories = ["cryptography::cryptocurrencies"]
 
 [features]
 default = ["std"]
-std = ["alloc"]
-alloc = []
+std = ["alloc", "zeroize?/std"]
+alloc = ["zeroize?/alloc"]
+getrandom = ["dep:getrandom"]
+secp256k1 = ["alloc", "dep:k256", "dep:zeroize", "dep:hex"]
+ed25519 = ["alloc", "dep:ed25519-dalek", "dep:hex"]
 
 [dependencies]
 thiserror.workspace = true
+k256 = { workspace = true, optional = true }
+ed25519-dalek = { workspace = true, optional = true }
+zeroize = { workspace = true, optional = true }
+hex = { workspace = true, optional = true }
+getrandom = { workspace = true, optional = true }
 
 [lints]
 workspace = true

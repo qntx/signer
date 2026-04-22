@@ -1,31 +1,38 @@
-//! Cosmos transaction signer built on [`k256`] and [`sha2`].
+//! Cosmos transaction signer built on secp256k1 ECDSA.
 //!
-//! Provides secp256k1 ECDSA signing for Cosmos SDK transactions.
-//! Address derivation is handled by `kobe-cosmos`.
+//! Provides signing for Cosmos SDK transactions (SHA-256 + ECDSA)
+//! and bech32 `cosmos1…` address derivation.
+//!
+//! # Examples
+//!
+//! ```
+//! use signer_cosmos::Signer;
+//!
+//! let signer = Signer::random();
+//! let addr = signer.address();
+//! assert!(addr.starts_with("cosmos1"));
+//! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
-#[cfg(not(feature = "std"))]
-use alloc::string::ToString;
-use alloc::{format, string::String, vec::Vec};
+use alloc::{string::String, vec::Vec};
 
 mod error;
 
 use bech32::{Bech32, Hrp};
 pub use error::SignError;
-use k256::ecdsa::SigningKey;
 use ripemd::{Digest as _, Ripemd160};
 use sha2::{Digest, Sha256};
+use signer_primitives::Secp256k1Signer;
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
-use zeroize::ZeroizeOnDrop;
 
 /// Cosmos transaction signer.
 ///
-/// Wraps a secp256k1 signing key. The inner key is zeroized on drop.
+/// Wraps a [`Secp256k1Signer`]. The inner key is zeroized on drop.
 pub struct Signer {
-    key: SigningKey,
+    inner: Secp256k1Signer,
 }
 
 impl core::fmt::Debug for Signer {
@@ -36,8 +43,6 @@ impl core::fmt::Debug for Signer {
     }
 }
 
-impl ZeroizeOnDrop for Signer {}
-
 impl Signer {
     /// Create from a raw 32-byte private key.
     ///
@@ -45,9 +50,9 @@ impl Signer {
     ///
     /// Returns an error if the bytes are not a valid secp256k1 scalar.
     pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
-        let key =
-            SigningKey::from_slice(bytes).map_err(|e| SignError::InvalidKey(e.to_string()))?;
-        Ok(Self { key })
+        Ok(Self {
+            inner: Secp256k1Signer::from_bytes(bytes)?,
+        })
     }
 
     /// Create from a hex-encoded private key (with or without `0x`).
@@ -56,11 +61,9 @@ impl Signer {
     ///
     /// Returns an error if the hex is invalid or the key is out of range.
     pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
-        let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-        let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
-            SignError::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
-        })?;
-        Self::from_bytes(&bytes)
+        Ok(Self {
+            inner: Secp256k1Signer::from_hex(hex_str)?,
+        })
     }
 
     /// Generate a random signer.
@@ -70,27 +73,22 @@ impl Signer {
     /// Panics if the OS random number generator fails.
     #[cfg(feature = "getrandom")]
     #[must_use]
-    #[allow(
-        clippy::expect_used,
-        reason = "getrandom failure is unrecoverable; secp256k1 rejection has p ≈ 2⁻¹²⁸"
-    )]
     pub fn random() -> Self {
-        use zeroize::Zeroize as _;
-        let mut bytes = [0u8; 32];
-        getrandom::fill(&mut bytes).expect("getrandom failed");
-        let key = SigningKey::from_slice(&bytes).expect("invalid random key");
-        bytes.zeroize();
-        Self { key }
+        Self {
+            inner: Secp256k1Signer::random(),
+        }
     }
 
-    /// Cosmos address with `cosmos1` prefix (bech32-encoded RIPEMD160(SHA256(pubkey))).
+    /// Cosmos address with `cosmos1` prefix.
+    ///
+    /// Computed as `bech32(hrp="cosmos", RIPEMD160(SHA256(compressed_pubkey)))`.
     ///
     /// # Panics
     ///
     /// Panics if bech32 encoding fails (should never happen with valid input).
     #[must_use]
     pub fn address(&self) -> String {
-        let pubkey = self.public_key_bytes();
+        let pubkey = self.inner.compressed_public_key();
         let sha = Sha256::digest(&pubkey);
         let hash160 = Ripemd160::digest(sha);
         let hrp = Hrp::parse_unchecked("cosmos");
@@ -104,17 +102,7 @@ impl Signer {
     /// Compressed public key (33 bytes).
     #[must_use]
     pub fn public_key_bytes(&self) -> Vec<u8> {
-        self.key
-            .verifying_key()
-            .to_encoded_point(true)
-            .as_bytes()
-            .to_vec()
-    }
-
-    /// Expose the inner [`SigningKey`].
-    #[must_use]
-    pub const fn signing_key(&self) -> &SigningKey {
-        &self.key
+        self.inner.compressed_public_key()
     }
 
     /// Sign a 32-byte hash. Returns 65 bytes: `r(32) || s(32) || recovery_id(1)`.
@@ -123,19 +111,7 @@ impl Signer {
     ///
     /// Returns an error if `hash` is not 32 bytes or signing fails.
     pub fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
-        if hash.len() != 32 {
-            return Err(SignError::InvalidMessage(format!(
-                "expected 32-byte hash, got {}",
-                hash.len()
-            )));
-        }
-        let (sig, rid) = self
-            .key
-            .sign_prehash_recoverable(hash)
-            .map_err(|e| SignError::SigningFailed(e.to_string()))?;
-        let mut out = sig.to_bytes().to_vec();
-        out.push(rid.to_byte());
-        Ok(SignOutput::secp256k1(out, rid.to_byte()))
+        Ok(self.inner.sign_prehash_recoverable(hash)?)
     }
 
     /// Sign a Cosmos transaction (SHA-256 hash then ECDSA).
@@ -193,9 +169,8 @@ mod tests {
         let r: [u8; 32] = out.signature[..32].try_into().unwrap();
         let s_bytes: [u8; 32] = out.signature[32..64].try_into().unwrap();
         let sig = k256::ecdsa::Signature::from_scalars(r, s_bytes).unwrap();
-        s.signing_key()
-            .verifying_key()
-            .verify_prehash(hash, &sig)
+        let vk = k256::ecdsa::VerifyingKey::from_sec1_bytes(&s.public_key_bytes()).unwrap();
+        vk.verify_prehash(hash, &sig)
             .expect("signature must verify");
     }
 

@@ -19,8 +19,6 @@
 
 extern crate alloc;
 
-#[cfg(not(feature = "std"))]
-use alloc::string::ToString;
 use alloc::{format, string::String, vec::Vec};
 
 mod eip712;
@@ -28,16 +26,15 @@ mod error;
 mod rlp;
 
 pub use error::SignError;
-use k256::ecdsa::SigningKey;
 use sha3::{Digest, Keccak256};
+use signer_primitives::Secp256k1Signer;
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
-use zeroize::ZeroizeOnDrop;
 
 /// EVM transaction signer.
 ///
-/// Wraps a secp256k1 signing key. The inner key is zeroized on drop.
+/// Wraps a [`Secp256k1Signer`]. The inner key is zeroized on drop.
 pub struct Signer {
-    key: SigningKey,
+    inner: Secp256k1Signer,
 }
 
 impl core::fmt::Debug for Signer {
@@ -48,8 +45,6 @@ impl core::fmt::Debug for Signer {
     }
 }
 
-impl ZeroizeOnDrop for Signer {}
-
 impl Signer {
     /// Create a signer from a raw 32-byte private key.
     ///
@@ -57,9 +52,9 @@ impl Signer {
     ///
     /// Returns an error if the bytes are not a valid secp256k1 scalar.
     pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
-        let key =
-            SigningKey::from_slice(bytes).map_err(|e| SignError::InvalidKey(e.to_string()))?;
-        Ok(Self { key })
+        Ok(Self {
+            inner: Secp256k1Signer::from_bytes(bytes)?,
+        })
     }
 
     /// Create a signer from a hex-encoded private key (with or without `0x`).
@@ -68,11 +63,9 @@ impl Signer {
     ///
     /// Returns an error if the hex is invalid or the key is out of range.
     pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
-        let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-        let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
-            SignError::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
-        })?;
-        Self::from_bytes(&bytes)
+        Ok(Self {
+            inner: Secp256k1Signer::from_hex(hex_str)?,
+        })
     }
 
     /// Generate a random signer.
@@ -82,17 +75,10 @@ impl Signer {
     /// Panics if the OS random number generator fails.
     #[cfg(feature = "getrandom")]
     #[must_use]
-    #[allow(
-        clippy::expect_used,
-        reason = "getrandom failure is unrecoverable; secp256k1 rejection has p ≈ 2⁻¹²⁸"
-    )]
     pub fn random() -> Self {
-        use zeroize::Zeroize as _;
-        let mut bytes = [0u8; 32];
-        getrandom::fill(&mut bytes).expect("getrandom failed");
-        let key = SigningKey::from_slice(&bytes).expect("invalid random key");
-        bytes.zeroize();
-        Self { key }
+        Self {
+            inner: Secp256k1Signer::random(),
+        }
     }
 
     /// Ethereum address derived from this signing key (EIP-55 checksummed).
@@ -102,26 +88,15 @@ impl Signer {
         reason = "uncompressed pubkey is always 65B, Keccak256 is always 32B"
     )]
     pub fn address(&self) -> String {
-        let vk = self.key.verifying_key();
-        let pk = vk.to_encoded_point(false);
-        let hash = Keccak256::digest(&pk.as_bytes()[1..]);
+        let uncompressed = self.inner.uncompressed_public_key();
+        let hash = Keccak256::digest(&uncompressed[1..]);
         eip55_checksum(&hex::encode(&hash[12..]))
     }
 
     /// Compressed public key (33 bytes).
     #[must_use]
     pub fn public_key_bytes(&self) -> Vec<u8> {
-        self.key
-            .verifying_key()
-            .to_encoded_point(true)
-            .as_bytes()
-            .to_vec()
-    }
-
-    /// Expose the inner [`SigningKey`] reference.
-    #[must_use]
-    pub const fn signing_key(&self) -> &SigningKey {
-        &self.key
+        self.inner.compressed_public_key()
     }
 
     /// Sign a 32-byte hash. Returns 65 bytes: `r(32) || s(32) || v(1)`.
@@ -132,20 +107,7 @@ impl Signer {
     ///
     /// Returns an error if `hash` is not exactly 32 bytes.
     pub fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
-        if hash.len() != 32 {
-            return Err(SignError::InvalidMessage(format!(
-                "expected 32-byte hash, got {}",
-                hash.len()
-            )));
-        }
-        let (sig, rid) = self
-            .key
-            .sign_prehash_recoverable(hash)
-            .map_err(|e| SignError::SigningFailed(e.to_string()))?;
-
-        let mut out = sig.to_bytes().to_vec();
-        out.push(rid.to_byte());
-        Ok(SignOutput::secp256k1(out, rid.to_byte()))
+        Ok(self.inner.sign_prehash_recoverable(hash)?)
     }
 
     /// EIP-191 `personal_sign`. Returns 65 bytes with `v = 27 | 28`.
@@ -322,9 +284,8 @@ mod tests {
         let r: [u8; 32] = out.signature[..32].try_into().unwrap();
         let s_bytes: [u8; 32] = out.signature[32..64].try_into().unwrap();
         let sig = k256::ecdsa::Signature::from_scalars(r, s_bytes).unwrap();
-        s.signing_key()
-            .verifying_key()
-            .verify_prehash(&hash, &sig)
+        let vk = k256::ecdsa::VerifyingKey::from_sec1_bytes(&s.public_key_bytes()).unwrap();
+        vk.verify_prehash(&hash, &sig)
             .expect("signature must verify");
     }
 
@@ -347,9 +308,8 @@ mod tests {
         let r: [u8; 32] = out.signature[..32].try_into().unwrap();
         let s_bytes: [u8; 32] = out.signature[32..64].try_into().unwrap();
         let sig = k256::ecdsa::Signature::from_scalars(r, s_bytes).unwrap();
-        s.signing_key()
-            .verifying_key()
-            .verify_prehash(&hash, &sig)
+        let vk = k256::ecdsa::VerifyingKey::from_sec1_bytes(&s.public_key_bytes()).unwrap();
+        vk.verify_prehash(&hash, &sig)
             .expect("EIP-191 signature must verify");
     }
 

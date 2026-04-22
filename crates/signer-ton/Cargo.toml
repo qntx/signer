@@ -8,17 +8,15 @@ description = "TON transaction signer — Ed25519 signing."
 
 [features]
 default = ["std"]
-std = ["alloc", "signer-primitives/std", "zeroize/std"]
-alloc = ["signer-primitives/alloc", "zeroize/alloc"]
-getrandom = ["dep:getrandom"]
+std = ["alloc", "signer-primitives/std"]
+alloc = ["signer-primitives/alloc"]
+getrandom = ["signer-primitives/getrandom"]
 kobe = ["dep:kobe-ton"]
 
 [dependencies]
-signer-primitives.workspace = true
+signer-primitives = { workspace = true, features = ["ed25519"] }
 ed25519-dalek.workspace = true
-getrandom = { workspace = true, optional = true }
 hex.workspace = true
-zeroize.workspace = true
 thiserror.workspace = true
 
 kobe-ton = { workspace = true, optional = true }

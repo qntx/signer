@@ -12,15 +12,13 @@ extern crate alloc;
 
 use alloc::{format, string::String, vec::Vec};
 
-use zeroize as _;
-
 mod error;
 
 use blake2::Blake2bVar;
 use blake2::digest::{Update, VariableOutput};
 pub use ed25519_dalek::{self, Signature};
-use ed25519_dalek::{Signer as _, SigningKey, Verifier};
 pub use error::SignError;
+use signer_primitives::Ed25519Signer;
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 
 /// Ed25519 signature scheme flag used by Sui.
@@ -34,9 +32,10 @@ const MSG_INTENT: [u8; 3] = [0x03, 0x00, 0x00];
 
 /// Sui transaction signer.
 ///
-/// Wraps an Ed25519 signing key. The inner key is zeroized on drop.
+/// Wraps an [`Ed25519Signer`]. The inner key is zeroized on drop by
+/// `ed25519-dalek`.
 pub struct Signer {
-    key: SigningKey,
+    inner: Ed25519Signer,
 }
 
 impl core::fmt::Debug for Signer {
@@ -52,7 +51,7 @@ impl Signer {
     #[must_use]
     pub fn from_bytes(bytes: &[u8; 32]) -> Self {
         Self {
-            key: SigningKey::from_bytes(bytes),
+            inner: Ed25519Signer::from_bytes(bytes),
         }
     }
 
@@ -62,11 +61,9 @@ impl Signer {
     ///
     /// Returns an error if the hex is invalid or not 32 bytes.
     pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
-        let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-        let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
-            SignError::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
-        })?;
-        Ok(Self::from_bytes(&bytes))
+        Ok(Self {
+            inner: Ed25519Signer::from_hex(hex_str)?,
+        })
     }
 
     /// Generate a random signer.
@@ -76,13 +73,10 @@ impl Signer {
     /// Panics if the OS random number generator fails.
     #[cfg(feature = "getrandom")]
     #[must_use]
-    #[allow(clippy::expect_used, reason = "getrandom failure is unrecoverable")]
     pub fn random() -> Self {
-        let mut bytes = [0u8; 32];
-        getrandom::fill(&mut bytes).expect("getrandom failed");
-        let signer = Self::from_bytes(&bytes);
-        bytes.fill(0);
-        signer
+        Self {
+            inner: Ed25519Signer::random(),
+        }
     }
 
     /// Sui address: `0x` + hex(BLAKE2b-256(`0x00` || pubkey)).
@@ -90,7 +84,7 @@ impl Signer {
     pub fn address(&self) -> String {
         let mut buf = Vec::with_capacity(33);
         buf.push(ED25519_FLAG);
-        buf.extend_from_slice(self.key.verifying_key().as_bytes());
+        buf.extend_from_slice(&self.inner.public_key_bytes());
         let hash = blake2b_256(&buf);
         format!("0x{}", hex::encode(hash))
     }
@@ -98,13 +92,13 @@ impl Signer {
     /// Public key bytes (32 bytes).
     #[must_use]
     pub fn public_key_bytes(&self) -> Vec<u8> {
-        self.key.verifying_key().as_bytes().to_vec()
+        self.inner.public_key_bytes()
     }
 
     /// Sign arbitrary bytes with Ed25519 (raw, no intent prefix).
     #[must_use]
     pub fn sign_raw(&self, message: &[u8]) -> Signature {
-        self.key.sign(message)
+        self.inner.sign_raw(message)
     }
 
     /// Sign a Sui transaction with intent-based BLAKE2b-256 hashing.
@@ -114,7 +108,7 @@ impl Signer {
     #[must_use]
     pub fn sign_transaction_intent(&self, tx_bytes: &[u8]) -> Signature {
         let digest = intent_hash(TX_INTENT, tx_bytes);
-        self.key.sign(&digest)
+        self.inner.sign_raw(&digest)
     }
 
     /// Sign a personal message with intent-based BLAKE2b-256 hashing.
@@ -126,7 +120,7 @@ impl Signer {
     pub fn sign_message_intent(&self, message: &[u8]) -> Signature {
         let bcs = bcs_serialize_bytes(message);
         let digest = intent_hash(MSG_INTENT, &bcs);
-        self.key.sign(&digest)
+        self.inner.sign_raw(&digest)
     }
 
     /// Verify an Ed25519 signature.
@@ -135,7 +129,7 @@ impl Signer {
     ///
     /// Returns an error if the signature is invalid.
     pub fn verify(&self, message: &[u8], signature: &Signature) -> Result<(), SignError> {
-        self.key.verifying_key().verify(message, signature)?;
+        self.inner.verify(message, signature)?;
         Ok(())
     }
 
@@ -145,7 +139,7 @@ impl Signer {
         let mut out = Vec::with_capacity(97);
         out.push(ED25519_FLAG);
         out.extend_from_slice(&signature.to_bytes());
-        out.extend_from_slice(self.key.verifying_key().as_bytes());
+        out.extend_from_slice(&self.inner.public_key_bytes());
         out
     }
 }
@@ -154,29 +148,26 @@ impl Sign for Signer {
     type Error = SignError;
 
     fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
-        let sig = self.key.sign(hash);
-        let pubkey = self.key.verifying_key().as_bytes().to_vec();
+        let sig = self.inner.sign_raw(hash);
         Ok(SignOutput::ed25519_with_pubkey(
             sig.to_bytes().to_vec(),
-            pubkey,
+            self.inner.public_key_bytes(),
         ))
     }
 
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         let sig = self.sign_message_intent(message);
-        let pubkey = self.key.verifying_key().as_bytes().to_vec();
         Ok(SignOutput::ed25519_with_pubkey(
             sig.to_bytes().to_vec(),
-            pubkey,
+            self.inner.public_key_bytes(),
         ))
     }
 
     fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
         let sig = self.sign_transaction_intent(tx_bytes);
-        let pubkey = self.key.verifying_key().as_bytes().to_vec();
         Ok(SignOutput::ed25519_with_pubkey(
             sig.to_bytes().to_vec(),
-            pubkey,
+            self.inner.public_key_bytes(),
         ))
     }
 }

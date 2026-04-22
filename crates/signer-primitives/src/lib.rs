@@ -20,10 +20,18 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 
+#[cfg(feature = "ed25519")]
+mod ed25519;
 mod error;
 mod macros;
+#[cfg(feature = "secp256k1")]
+mod secp256k1;
 
+#[cfg(feature = "ed25519")]
+pub use ed25519::Ed25519Signer;
 pub use error::SignError;
+#[cfg(feature = "secp256k1")]
+pub use secp256k1::Secp256k1Signer;
 
 /// Output of a signing operation.
 ///

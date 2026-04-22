@@ -1,30 +1,28 @@
-//! TRON transaction signer built on [`k256`] and [`sha3`].
+//! TRON transaction signer built on secp256k1 ECDSA and Keccak-256.
 //!
-//! Provides secp256k1 ECDSA signing for TRON transactions and messages.
-//! Address derivation is handled by `kobe-tron`.
+//! Derives `T…` `Base58Check` addresses from the uncompressed public key
+//! (`0x41` prefix + `Keccak256(pk)[12..]`) and signs messages with the
+//! EVM-style `\x19TRON Signed Message:\n` prefix.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
-#[cfg(not(feature = "std"))]
-use alloc::string::ToString;
 use alloc::{format, string::String, vec::Vec};
 
 mod error;
 
 pub use error::SignError;
-use k256::ecdsa::SigningKey;
 use sha2::{Digest, Sha256};
 use sha3::Keccak256;
+use signer_primitives::Secp256k1Signer;
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
-use zeroize::ZeroizeOnDrop;
 
 /// TRON transaction signer.
 ///
-/// Wraps a secp256k1 signing key. The inner key is zeroized on drop.
+/// Wraps a [`Secp256k1Signer`]. The inner key is zeroized on drop.
 pub struct Signer {
-    key: SigningKey,
+    inner: Secp256k1Signer,
 }
 
 impl core::fmt::Debug for Signer {
@@ -35,8 +33,6 @@ impl core::fmt::Debug for Signer {
     }
 }
 
-impl ZeroizeOnDrop for Signer {}
-
 impl Signer {
     /// Create from a raw 32-byte private key.
     ///
@@ -44,9 +40,9 @@ impl Signer {
     ///
     /// Returns an error if the bytes are not a valid secp256k1 scalar.
     pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
-        let key =
-            SigningKey::from_slice(bytes).map_err(|e| SignError::InvalidKey(e.to_string()))?;
-        Ok(Self { key })
+        Ok(Self {
+            inner: Secp256k1Signer::from_bytes(bytes)?,
+        })
     }
 
     /// Create from a hex-encoded private key (with or without `0x`).
@@ -55,11 +51,9 @@ impl Signer {
     ///
     /// Returns an error if the hex is invalid or the key is out of range.
     pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
-        let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-        let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
-            SignError::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
-        })?;
-        Self::from_bytes(&bytes)
+        Ok(Self {
+            inner: Secp256k1Signer::from_hex(hex_str)?,
+        })
     }
 
     /// Generate a random signer.
@@ -69,17 +63,10 @@ impl Signer {
     /// Panics if the OS random number generator fails.
     #[cfg(feature = "getrandom")]
     #[must_use]
-    #[allow(
-        clippy::expect_used,
-        reason = "getrandom failure is unrecoverable; secp256k1 rejection has p ≈ 2⁻¹²⁸"
-    )]
     pub fn random() -> Self {
-        use zeroize::Zeroize as _;
-        let mut bytes = [0u8; 32];
-        getrandom::fill(&mut bytes).expect("getrandom failed");
-        let key = SigningKey::from_slice(&bytes).expect("invalid random key");
-        bytes.zeroize();
-        Self { key }
+        Self {
+            inner: Secp256k1Signer::random(),
+        }
     }
 
     /// TRON address (`Base58Check` with `0x41` prefix, starts with `T`).
@@ -91,9 +78,8 @@ impl Signer {
         reason = "crypto outputs have fixed sizes: uncompressed pubkey=65B, Keccak256=32B, SHA-256=32B"
     )]
     pub fn address(&self) -> String {
-        let vk = self.key.verifying_key();
-        let pk = vk.to_encoded_point(false);
-        let hash = Keccak256::digest(&pk.as_bytes()[1..]);
+        let uncompressed = self.inner.uncompressed_public_key();
+        let hash = Keccak256::digest(&uncompressed[1..]);
         let mut payload = Vec::with_capacity(25);
         payload.push(0x41);
         payload.extend_from_slice(&hash[12..]);
@@ -105,17 +91,7 @@ impl Signer {
     /// Compressed public key (33 bytes).
     #[must_use]
     pub fn public_key_bytes(&self) -> Vec<u8> {
-        self.key
-            .verifying_key()
-            .to_encoded_point(true)
-            .as_bytes()
-            .to_vec()
-    }
-
-    /// Expose the inner [`SigningKey`].
-    #[must_use]
-    pub const fn signing_key(&self) -> &SigningKey {
-        &self.key
+        self.inner.compressed_public_key()
     }
 
     /// Sign a 32-byte hash. Returns 65 bytes: `r(32) || s(32) || recovery_id(1)`.
@@ -124,19 +100,7 @@ impl Signer {
     ///
     /// Returns an error if `hash` is not 32 bytes or signing fails.
     pub fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
-        if hash.len() != 32 {
-            return Err(SignError::InvalidMessage(format!(
-                "expected 32-byte hash, got {}",
-                hash.len()
-            )));
-        }
-        let (sig, rid) = self
-            .key
-            .sign_prehash_recoverable(hash)
-            .map_err(|e| SignError::SigningFailed(e.to_string()))?;
-        let mut out = sig.to_bytes().to_vec();
-        out.push(rid.to_byte());
-        Ok(SignOutput::secp256k1(out, rid.to_byte()))
+        Ok(self.inner.sign_prehash_recoverable(hash)?)
     }
 
     /// Sign a TRON transaction (SHA-256 of the raw transaction bytes).
@@ -151,7 +115,8 @@ impl Signer {
 
     /// Sign a message with TRON message signing convention.
     ///
-    /// `hash = keccak256("\x19TRON Signed Message:\n" || len || message)`
+    /// `hash = keccak256("\x19TRON Signed Message:\n" || len || message)`.
+    /// The resulting `v` follows EVM convention: `27 + recovery_id`.
     ///
     /// # Errors
     ///
@@ -167,7 +132,6 @@ impl Signer {
         data.extend_from_slice(message);
         let hash = Keccak256::digest(&data);
         let mut out = self.sign_hash(&hash)?;
-        // TRON follows EVM convention: v = 27 + recovery_id
         out.signature[64] += 27;
         out.recovery_id = out.recovery_id.map(|r| r + 27);
         Ok(out)
@@ -208,9 +172,8 @@ mod tests {
         let r: [u8; 32] = out.signature[..32].try_into().unwrap();
         let s_bytes: [u8; 32] = out.signature[32..64].try_into().unwrap();
         let sig = k256::ecdsa::Signature::from_scalars(r, s_bytes).unwrap();
-        s.signing_key()
-            .verifying_key()
-            .verify_prehash(hash, &sig)
+        let vk = k256::ecdsa::VerifyingKey::from_sec1_bytes(&s.public_key_bytes()).unwrap();
+        vk.verify_prehash(hash, &sig)
             .expect("signature must verify");
     }
 
@@ -262,10 +225,7 @@ mod tests {
     fn from_bytes_roundtrip() {
         let bytes: [u8; 32] = hex::decode(TEST_KEY).unwrap().try_into().unwrap();
         let s = Signer::from_bytes(&bytes).unwrap();
-        assert_eq!(
-            s.signing_key().verifying_key(),
-            test_signer().signing_key().verifying_key()
-        );
+        assert_eq!(s.public_key_bytes(), test_signer().public_key_bytes());
     }
 
     #[test]

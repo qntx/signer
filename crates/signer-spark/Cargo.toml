@@ -8,23 +8,23 @@ description = "Spark (Bitcoin L2) transaction signer — secp256k1 ECDSA."
 
 [features]
 default = ["std"]
-std = ["alloc", "signer-primitives/std", "zeroize/std"]
-alloc = ["signer-primitives/alloc", "zeroize/alloc"]
-getrandom = ["dep:getrandom"]
+std = ["alloc", "signer-primitives/std"]
+alloc = ["signer-primitives/alloc"]
+getrandom = ["signer-primitives/getrandom"]
 kobe = ["dep:kobe-spark"]
 
 [dependencies]
-signer-primitives.workspace = true
-k256.workspace = true
-getrandom = { workspace = true, optional = true }
+signer-primitives = { workspace = true, features = ["secp256k1"] }
 sha2.workspace = true
 ripemd.workspace = true
 bs58.workspace = true
 hex.workspace = true
-zeroize.workspace = true
 thiserror.workspace = true
 
 kobe-spark = { workspace = true, optional = true }
+
+[dev-dependencies]
+k256.workspace = true
 
 [lints]
 workspace = true

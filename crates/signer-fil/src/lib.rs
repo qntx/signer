@@ -1,14 +1,12 @@
-//! Filecoin transaction signer built on [`k256`] and [`blake2`].
+//! Filecoin transaction signer built on secp256k1 ECDSA and `BLAKE2b`.
 //!
-//! Provides secp256k1 ECDSA signing with Blake2b-256 hashing for Filecoin.
-//! Address derivation is handled by `kobe-fil`.
+//! Uses the `f1` (protocol-1) address scheme derived from the uncompressed
+//! public key, and signs transactions with `BLAKE2b-256` + ECDSA.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
-#[cfg(not(feature = "std"))]
-use alloc::string::ToString;
 use alloc::{format, string::String, vec::Vec};
 
 mod error;
@@ -16,9 +14,8 @@ mod error;
 use blake2::digest::consts::{U4, U20, U32};
 use blake2::{Blake2b, Digest};
 pub use error::SignError;
-use k256::ecdsa::SigningKey;
+use signer_primitives::Secp256k1Signer;
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
-use zeroize::ZeroizeOnDrop;
 
 type Blake2b256 = Blake2b<U32>;
 type Blake2b160 = Blake2b<U20>;
@@ -26,9 +23,9 @@ type Blake2b4 = Blake2b<U4>;
 
 /// Filecoin transaction signer.
 ///
-/// Wraps a secp256k1 signing key. The inner key is zeroized on drop.
+/// Wraps a [`Secp256k1Signer`]. The inner key is zeroized on drop.
 pub struct Signer {
-    key: SigningKey,
+    inner: Secp256k1Signer,
 }
 
 impl core::fmt::Debug for Signer {
@@ -39,8 +36,6 @@ impl core::fmt::Debug for Signer {
     }
 }
 
-impl ZeroizeOnDrop for Signer {}
-
 impl Signer {
     /// Create from a raw 32-byte private key.
     ///
@@ -48,9 +43,9 @@ impl Signer {
     ///
     /// Returns an error if the bytes are not a valid secp256k1 scalar.
     pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
-        let key =
-            SigningKey::from_slice(bytes).map_err(|e| SignError::InvalidKey(e.to_string()))?;
-        Ok(Self { key })
+        Ok(Self {
+            inner: Secp256k1Signer::from_bytes(bytes)?,
+        })
     }
 
     /// Create from a hex-encoded private key (with or without `0x`).
@@ -59,11 +54,9 @@ impl Signer {
     ///
     /// Returns an error if the hex is invalid or the key is out of range.
     pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
-        let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-        let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
-            SignError::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
-        })?;
-        Self::from_bytes(&bytes)
+        Ok(Self {
+            inner: Secp256k1Signer::from_hex(hex_str)?,
+        })
     }
 
     /// Generate a random signer.
@@ -73,27 +66,19 @@ impl Signer {
     /// Panics if the OS random number generator fails.
     #[cfg(feature = "getrandom")]
     #[must_use]
-    #[allow(
-        clippy::expect_used,
-        reason = "getrandom failure is unrecoverable; secp256k1 rejection has p ≈ 2⁻¹²⁸"
-    )]
     pub fn random() -> Self {
-        use zeroize::Zeroize as _;
-        let mut bytes = [0u8; 32];
-        getrandom::fill(&mut bytes).expect("getrandom failed");
-        let key = SigningKey::from_slice(&bytes).expect("invalid random key");
-        bytes.zeroize();
-        Self { key }
+        Self {
+            inner: Secp256k1Signer::random(),
+        }
     }
 
-    /// Filecoin protocol-1 (secp256k1) address (`f1...`).
+    /// Filecoin protocol-1 (secp256k1) address (`f1…`).
     ///
-    /// Computed as `"f1" + base32_lower(BLAKE2b-160(pubkey) || BLAKE2b-4(0x01 || payload))`.
+    /// Computed as `"f1" + base32_lower(BLAKE2b-160(uncompressed_pubkey) || BLAKE2b-4(0x01 || payload))`.
     #[must_use]
     pub fn address(&self) -> String {
-        let vk = self.key.verifying_key();
-        let uncompressed = vk.to_encoded_point(false);
-        let payload = Blake2b160::digest(uncompressed.as_bytes());
+        let uncompressed = self.inner.uncompressed_public_key();
+        let payload = Blake2b160::digest(&uncompressed);
         let mut checksum_input = Vec::with_capacity(1 + payload.len());
         checksum_input.push(0x01); // protocol 1
         checksum_input.extend_from_slice(&payload);
@@ -108,17 +93,7 @@ impl Signer {
     /// Compressed public key (33 bytes).
     #[must_use]
     pub fn public_key_bytes(&self) -> Vec<u8> {
-        self.key
-            .verifying_key()
-            .to_encoded_point(true)
-            .as_bytes()
-            .to_vec()
-    }
-
-    /// Expose the inner [`SigningKey`].
-    #[must_use]
-    pub const fn signing_key(&self) -> &SigningKey {
-        &self.key
+        self.inner.compressed_public_key()
     }
 
     /// Sign a 32-byte hash. Returns 65 bytes: `r(32) || s(32) || recovery_id(1)`.
@@ -127,19 +102,7 @@ impl Signer {
     ///
     /// Returns an error if `hash` is not 32 bytes or signing fails.
     pub fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
-        if hash.len() != 32 {
-            return Err(SignError::InvalidMessage(format!(
-                "expected 32-byte hash, got {}",
-                hash.len()
-            )));
-        }
-        let (sig, rid) = self
-            .key
-            .sign_prehash_recoverable(hash)
-            .map_err(|e| SignError::SigningFailed(e.to_string()))?;
-        let mut out = sig.to_bytes().to_vec();
-        out.push(rid.to_byte());
-        Ok(SignOutput::secp256k1(out, rid.to_byte()))
+        Ok(self.inner.sign_prehash_recoverable(hash)?)
     }
 
     /// Sign a Filecoin transaction (Blake2b-256 hash then ECDSA).
@@ -231,9 +194,8 @@ mod tests {
         let r: [u8; 32] = out.signature[..32].try_into().unwrap();
         let s_bytes: [u8; 32] = out.signature[32..64].try_into().unwrap();
         let sig = k256::ecdsa::Signature::from_scalars(r, s_bytes).unwrap();
-        s.signing_key()
-            .verifying_key()
-            .verify_prehash(hash, &sig)
+        let vk = k256::ecdsa::VerifyingKey::from_sec1_bytes(&s.public_key_bytes()).unwrap();
+        vk.verify_prehash(hash, &sig)
             .expect("signature must verify");
     }
 
@@ -268,10 +230,7 @@ mod tests {
     fn from_bytes_roundtrip() {
         let bytes: [u8; 32] = hex::decode(TEST_KEY).unwrap().try_into().unwrap();
         let s = Signer::from_bytes(&bytes).unwrap();
-        assert_eq!(
-            s.signing_key().verifying_key(),
-            test_signer().signing_key().verifying_key()
-        );
+        assert_eq!(s.public_key_bytes(), test_signer().public_key_bytes());
     }
 
     #[test]

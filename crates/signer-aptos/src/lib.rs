@@ -13,13 +13,12 @@ extern crate alloc;
 use alloc::{format, string::String, vec::Vec};
 
 use sha3::Digest as _;
-use zeroize as _;
 
 mod error;
 
 pub use ed25519_dalek::{self, Signature};
-use ed25519_dalek::{Signer as _, SigningKey, Verifier};
 pub use error::SignError;
+use signer_primitives::Ed25519Signer;
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 
 /// Ed25519 single-key authentication scheme byte used by Aptos.
@@ -30,9 +29,10 @@ const RAW_TX_DOMAIN: &[u8] = b"APTOS::RawTransaction";
 
 /// Aptos transaction signer.
 ///
-/// Wraps an Ed25519 signing key. The inner key is zeroized on drop.
+/// Wraps an [`Ed25519Signer`]. The inner key is zeroized on drop by
+/// `ed25519-dalek`.
 pub struct Signer {
-    key: SigningKey,
+    inner: Ed25519Signer,
 }
 
 impl core::fmt::Debug for Signer {
@@ -48,7 +48,7 @@ impl Signer {
     #[must_use]
     pub fn from_bytes(bytes: &[u8; 32]) -> Self {
         Self {
-            key: SigningKey::from_bytes(bytes),
+            inner: Ed25519Signer::from_bytes(bytes),
         }
     }
 
@@ -58,11 +58,9 @@ impl Signer {
     ///
     /// Returns an error if the hex is invalid or not 32 bytes.
     pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
-        let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-        let bytes: [u8; 32] = hex::decode(hex_str)?.try_into().map_err(|v: Vec<u8>| {
-            SignError::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
-        })?;
-        Ok(Self::from_bytes(&bytes))
+        Ok(Self {
+            inner: Ed25519Signer::from_hex(hex_str)?,
+        })
     }
 
     /// Generate a random signer.
@@ -72,20 +70,16 @@ impl Signer {
     /// Panics if the OS random number generator fails.
     #[cfg(feature = "getrandom")]
     #[must_use]
-    #[allow(clippy::expect_used, reason = "getrandom failure is unrecoverable")]
     pub fn random() -> Self {
-        let mut bytes = [0u8; 32];
-        getrandom::fill(&mut bytes).expect("getrandom failed");
-        let signer = Self::from_bytes(&bytes);
-        bytes.fill(0);
-        signer
+        Self {
+            inner: Ed25519Signer::random(),
+        }
     }
 
     /// Aptos account address: `0x` + hex(`SHA3-256(pubkey || 0x00)`).
     #[must_use]
     pub fn address(&self) -> String {
-        let mut buf = Vec::with_capacity(33);
-        buf.extend_from_slice(self.key.verifying_key().as_bytes());
+        let mut buf = self.inner.public_key_bytes();
         buf.push(ED25519_SCHEME);
         let hash = sha3_256(&buf);
         format!("0x{}", hex::encode(hash))
@@ -94,19 +88,19 @@ impl Signer {
     /// Public key bytes (32 bytes).
     #[must_use]
     pub fn public_key_bytes(&self) -> Vec<u8> {
-        self.key.verifying_key().as_bytes().to_vec()
+        self.inner.public_key_bytes()
     }
 
     /// Public key in hex.
     #[must_use]
     pub fn public_key_hex(&self) -> String {
-        hex::encode(self.public_key_bytes())
+        self.inner.public_key_hex()
     }
 
     /// Sign arbitrary bytes with raw Ed25519 (no domain prefix).
     #[must_use]
     pub fn sign_raw(&self, message: &[u8]) -> Signature {
-        self.key.sign(message)
+        self.inner.sign_raw(message)
     }
 
     /// Sign a BCS-serialized `RawTransaction`.
@@ -116,7 +110,7 @@ impl Signer {
     #[must_use]
     pub fn sign_transaction_bcs(&self, bcs_raw_tx: &[u8]) -> Signature {
         let signing_msg = tx_signing_message(bcs_raw_tx);
-        self.key.sign(&signing_msg)
+        self.inner.sign_raw(&signing_msg)
     }
 
     /// Verify an Ed25519 signature.
@@ -125,7 +119,7 @@ impl Signer {
     ///
     /// Returns an error if the signature is invalid.
     pub fn verify(&self, message: &[u8], signature: &Signature) -> Result<(), SignError> {
-        self.key.verifying_key().verify(message, signature)?;
+        self.inner.verify(message, signature)?;
         Ok(())
     }
 }
@@ -134,11 +128,10 @@ impl Sign for Signer {
     type Error = SignError;
 
     fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
-        let sig = self.key.sign(hash);
-        let pubkey = self.key.verifying_key().as_bytes().to_vec();
+        let sig = self.inner.sign_raw(hash);
         Ok(SignOutput::ed25519_with_pubkey(
             sig.to_bytes().to_vec(),
-            pubkey,
+            self.inner.public_key_bytes(),
         ))
     }
 
@@ -148,10 +141,9 @@ impl Sign for Signer {
 
     fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
         let sig = self.sign_transaction_bcs(tx_bytes);
-        let pubkey = self.key.verifying_key().as_bytes().to_vec();
         Ok(SignOutput::ed25519_with_pubkey(
             sig.to_bytes().to_vec(),
-            pubkey,
+            self.inner.public_key_bytes(),
         ))
     }
 }
