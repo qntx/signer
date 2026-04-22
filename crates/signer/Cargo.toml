@@ -22,7 +22,7 @@ signer-aptos = { workspace = true, optional = true }
 signer-nostr = { workspace = true, optional = true }
 
 [features]
-default = ["std", "btc", "evm", "svm", "cosmos", "tron", "spark", "fil", "ton", "sui", "xrpl", "aptos", "nostr"]
+default = ["std", "btc", "evm", "svm"]
 std = ["alloc", "signer-primitives/std",
     "signer-btc?/std", "signer-evm?/std", "signer-svm?/std",
     "signer-cosmos?/std", "signer-tron?/std", "signer-spark?/std",
@@ -65,6 +65,7 @@ kobe = [
     "signer-cosmos?/kobe", "signer-tron?/kobe", "signer-spark?/kobe",
     "signer-fil?/kobe", "signer-ton?/kobe", "signer-sui?/kobe",
     "signer-xrpl?/kobe",
+    "signer-aptos?/kobe",
     "signer-nostr?/kobe",
 ]
 

@@ -168,8 +168,22 @@ impl Signer {
 
     /// Sign arbitrary bytes with BIP-340 Schnorr (deterministic).
     ///
-    /// Useful for off-protocol message signing; on-protocol Nostr events
-    /// should use [`sign_hash`](Self::sign_hash) with the computed event id.
+    /// # Semantic warning
+    ///
+    /// Unlike EVM (`EIP-191`), Bitcoin (`Bitcoin Signed Message`), or Tron
+    /// (`\x19TRON Signed Message:\n`) flavours, **Nostr has no canonical
+    /// "signed message" standard**. This method passes `message` straight
+    /// into BIP-340 Schnorr **without prefixing or hashing**.
+    ///
+    /// For on-protocol Nostr events, always prefer:
+    ///
+    /// - [`sign_hash`](Self::sign_hash) with the NIP-01 `event.id`
+    ///   (32-byte SHA-256 of the canonical serialization), or
+    /// - [`sign_transaction`](Self::sign_transaction) with the
+    ///   serialized event JSON — it computes `sha256(event)` for you.
+    ///
+    /// Use this method only for bespoke off-protocol challenges where both
+    /// signer and verifier agree on the exact input bytes.
     ///
     /// # Errors
     ///
@@ -211,15 +225,18 @@ signer_primitives::impl_sign_delegate!();
 impl Signer {
     /// Create from a [`kobe_nostr::DerivedAccount`].
     ///
-    /// The derived account exposes its private key as a hex string; this
-    /// helper decodes it into a live signer.
+    /// Decodes the 32-byte private key directly from the derived account's
+    /// raw bytes (no hex or bech32 round-trip).
     ///
     /// # Errors
     ///
-    /// Returns [`SignError::Bech32`] if the derived `nsec` is malformed, or
-    /// [`SignError::InvalidKey`] if the decoded bytes are not a valid scalar.
+    /// Returns [`SignError::InvalidKey`] if the derived bytes are malformed
+    /// or not a valid secp256k1 scalar.
     pub fn from_derived(account: &kobe_nostr::DerivedAccount) -> Result<Self, SignError> {
-        Self::from_nsec(account.private_key.as_str())
+        let bytes = account
+            .private_key_bytes()
+            .map_err(|e| SignError::InvalidKey(alloc::format!("{e}")))?;
+        Self::from_bytes(&bytes)
     }
 }
 

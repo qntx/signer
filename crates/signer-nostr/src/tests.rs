@@ -15,6 +15,37 @@ use sha2::{Digest as _, Sha256};
 
 use super::*;
 
+#[cfg(feature = "kobe")]
+mod kobe_integration {
+    use zeroize::Zeroizing;
+
+    use super::Signer;
+
+    /// Hand-built `DerivedAccount` using NIP-06 test vector 1 material.
+    fn tv1_derived_account() -> kobe_nostr::DerivedAccount {
+        kobe_nostr::DerivedAccount::new(
+            String::from("m/44'/1237'/0'/0/0"),
+            Zeroizing::new(String::from(
+                "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a",
+            )),
+            String::from("17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917"),
+            String::from("npub1zutzeysacnf9rru6zqwmxd54mud0k44tst6l70ja5mhv8jjumytsd2x7nu"),
+        )
+    }
+
+    #[test]
+    fn from_derived_matches_from_hex() {
+        let acct = tv1_derived_account();
+        let via_bytes = Signer::from_derived(&acct).unwrap();
+        let via_hex = Signer::from_hex(&acct.private_key).unwrap();
+        assert_eq!(via_bytes.address(), via_hex.address());
+        assert_eq!(
+            via_bytes.address(),
+            "npub1zutzeysacnf9rru6zqwmxd54mud0k44tst6l70ja5mhv8jjumytsd2x7nu"
+        );
+    }
+}
+
 /// NIP-06 test vector 1: private key hex.
 const TV1_PRIV_HEX: &str = "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a";
 /// NIP-06 test vector 1: x-only public key hex.

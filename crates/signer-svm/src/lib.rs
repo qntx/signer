@@ -237,7 +237,10 @@ impl Signer {
     ///
     /// Returns an error if the private key is invalid.
     pub fn from_derived(derived: &kobe_svm::DerivedAddress) -> Result<Self, SignError> {
-        Self::from_hex(&derived.private_key_hex)
+        let bytes = derived
+            .private_key_bytes()
+            .map_err(|e| SignError::InvalidKey(alloc::format!("{e}")))?;
+        Ok(Self::from_bytes(&bytes))
     }
 }
 

@@ -24,6 +24,7 @@ kobe-evm = { workspace = true, optional = true }
 
 [dev-dependencies]
 signer-primitives = { workspace = true, features = ["testing"] }
+zeroize.workspace = true
 
 [lints]
 workspace = true

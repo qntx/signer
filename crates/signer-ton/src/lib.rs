@@ -129,7 +129,10 @@ impl Signer {
     ///
     /// Returns an error if the private key is invalid.
     pub fn from_derived(account: &kobe_ton::DerivedAccount) -> Result<Self, SignError> {
-        Self::from_hex(&account.private_key)
+        let bytes = account
+            .private_key_bytes()
+            .map_err(|e| SignError::InvalidKey(alloc::format!("{e}")))?;
+        Ok(Self::from_bytes(&bytes))
     }
 }
 

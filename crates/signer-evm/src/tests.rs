@@ -118,3 +118,38 @@ fn debug_does_not_leak_key() {
     assert!(!debug.contains("4c0883"));
     assert!(!debug.contains("362318"));
 }
+
+#[cfg(feature = "kobe")]
+mod kobe_integration {
+    use zeroize::Zeroizing;
+
+    use super::Signer;
+
+    /// BIP-39 seed "abandon abandon ... about" at `m/44'/60'/0'/0/0`,
+    /// cross-verified with Python coincurve + keccak256 + EIP-55 (KAT from kobe-evm).
+    fn kat_derived_account() -> kobe_evm::DerivedAccount {
+        kobe_evm::DerivedAccount::new(
+            String::from("m/44'/60'/0'/0/0"),
+            Zeroizing::new(String::from(
+                "1ab42cc412b618bdea3a599e3c9bae199ebf030895b039e9db1e30dafb12b727",
+            )),
+            String::from("0237b0bb7a8288d38ed49a524b5dc98cff3eb5ca824c9f9dc0dfdb3d9cd600f299"),
+            String::from("0x9858EfFD232B4033E47d90003D41EC34EcaEda94"),
+        )
+    }
+
+    #[test]
+    fn from_derived_matches_from_hex() {
+        let acct = kat_derived_account();
+        let via_bytes = Signer::from_derived(&acct).unwrap();
+        let via_hex = Signer::from_hex(&acct.private_key).unwrap();
+        assert_eq!(via_bytes.address(), via_hex.address());
+    }
+
+    #[test]
+    fn from_derived_produces_expected_address() {
+        let acct = kat_derived_account();
+        let s = Signer::from_derived(&acct).unwrap();
+        assert_eq!(s.address(), "0x9858EfFD232B4033E47d90003D41EC34EcaEda94");
+    }
+}

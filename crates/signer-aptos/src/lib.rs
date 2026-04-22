@@ -148,6 +148,21 @@ impl Sign for Signer {
     }
 }
 
+#[cfg(feature = "kobe")]
+impl Signer {
+    /// Create a signer from a [`kobe_aptos::DerivedAccount`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SignError::InvalidKey`] if the derived bytes are malformed.
+    pub fn from_derived(account: &kobe_aptos::DerivedAccount) -> Result<Self, SignError> {
+        let bytes = account
+            .private_key_bytes()
+            .map_err(|e| SignError::InvalidKey(format!("{e}")))?;
+        Ok(Self::from_bytes(&bytes))
+    }
+}
+
 /// Compute SHA3-256.
 fn sha3_256(data: &[u8]) -> [u8; 32] {
     sha3::Sha3_256::digest(data).into()
