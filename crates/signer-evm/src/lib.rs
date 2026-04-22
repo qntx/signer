@@ -1,4 +1,4 @@
-//! EVM transaction signer built on [`k256`] and [`sha3`].
+//! EVM transaction signer built on `k256` and [`sha3`].
 //!
 //! Provides EIP-191 personal signing, EIP-712 typed data signing,
 //! and typed transaction signing with RLP encoding.
