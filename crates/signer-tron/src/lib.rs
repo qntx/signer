@@ -117,7 +117,7 @@ impl Signer {
     /// Sign a message with TRON's message-signing convention.
     ///
     /// `digest = keccak256("\x19TRON Signed Message:\n" || len || message)`.
-    /// The returned `recovery_id` follows EVM convention (`27 | 28`).
+    /// The returned `v` byte follows EVM convention (`27 | 28`).
     ///
     /// # Errors
     ///
@@ -133,15 +133,12 @@ impl Signer {
     }
 }
 
-/// Bump the `recovery_id` of an [`SignOutput::Ecdsa`] by 27 (TRON v encoding).
+/// Bump the `v` byte of an [`SignOutput::Ecdsa`] by 27 (TRON message encoding).
 fn bump_v_by_27(out: SignOutput) -> SignOutput {
     match out {
-        SignOutput::Ecdsa {
+        SignOutput::Ecdsa { signature, v } => SignOutput::Ecdsa {
             signature,
-            recovery_id,
-        } => SignOutput::Ecdsa {
-            signature,
-            recovery_id: recovery_id.wrapping_add(27),
+            v: v.wrapping_add(27),
         },
         other => other,
     }

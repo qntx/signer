@@ -23,7 +23,7 @@ pub struct SignOutput {
     pub address: Option<String>,
     pub signature: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub recovery_id: Option<u8>,
+    pub v: Option<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -53,7 +53,7 @@ pub const fn sign(chain: &'static str, operation: &'static str) -> SignBuilder {
         operation,
         address: None,
         signature: String::new(),
-        recovery_id: None,
+        v: None,
         public_key: None,
         message: None,
     }
@@ -76,7 +76,7 @@ pub struct SignBuilder {
     operation: &'static str,
     address: Option<String>,
     signature: String,
-    recovery_id: Option<u8>,
+    v: Option<u8>,
     public_key: Option<String>,
     message: Option<String>,
 }
@@ -85,18 +85,6 @@ impl SignBuilder {
     /// Attach the signer's chain-native address.
     pub fn address(mut self, addr: impl Into<String>) -> Self {
         self.address = Some(addr.into());
-        self
-    }
-
-    /// Set the raw signature bytes (hex-encoded automatically).
-    pub fn signature(mut self, sig: &[u8]) -> Self {
-        self.signature = hex::encode(sig);
-        self
-    }
-
-    /// Propagate the secp256k1 recovery id (no-op for Ed25519 chains).
-    pub const fn recovery_id(mut self, rid: Option<u8>) -> Self {
-        self.recovery_id = rid;
         self
     }
 
@@ -118,14 +106,15 @@ impl SignBuilder {
         self
     }
 
-    /// Populate signature / recovery id / public key from a [`signer_primitives::SignOutput`].
+    /// Populate signature / `v` byte / public key from a
+    /// [`signer_primitives::SignOutput`].
     ///
     /// Works for every variant; ECDSA emits the full 65-byte wire form,
     /// Ed25519 emits 64 bytes, Schnorr / Ed25519-with-pubkey also propagate
     /// the attached public key.
     pub fn from_output(mut self, out: &signer_primitives::SignOutput) -> Self {
         self.signature = out.to_hex();
-        self.recovery_id = out.recovery_id();
+        self.v = out.v();
         if let Some(pk) = out.public_key() {
             self.public_key = Some(hex::encode(pk));
         }
@@ -143,7 +132,7 @@ impl SignBuilder {
             operation: self.operation,
             address: self.address,
             signature: self.signature,
-            recovery_id: self.recovery_id,
+            v: self.v,
             public_key: self.public_key,
             message: self.message,
         };
@@ -196,8 +185,8 @@ fn render_sign(out: &SignOutput, json: bool) -> CliResult {
         println!("      {}     {}", "Message".cyan().bold(), msg.dimmed());
     }
     println!("      {}   {}", "Signature".cyan().bold(), out.signature);
-    if let Some(rid) = out.recovery_id {
-        println!("      {}    {}", "Recovery".cyan().bold(), rid);
+    if let Some(v) = out.v {
+        println!("      {}           {}", "v".cyan().bold(), v);
     }
     if let Some(ref pk) = out.public_key {
         println!("      {}  {}", "Public Key".cyan().bold(), pk.dimmed());

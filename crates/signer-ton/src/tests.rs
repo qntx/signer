@@ -52,7 +52,7 @@ fn sign_trait_verify() {
     let out = Sign::sign_message(&s, b"test").unwrap();
     let sig_bytes = out.to_bytes();
     assert_eq!(sig_bytes.len(), 64);
-    assert!(out.recovery_id().is_none());
+    assert!(out.v().is_none());
     s.verify(b"test", &sig_bytes)
         .expect("trait signature must verify");
 }

@@ -31,7 +31,7 @@ fn sign_hash_returns_der() {
         "DER sig should be 68-72 bytes, got {}",
         sig_bytes.len()
     );
-    assert!(out.recovery_id().is_none());
+    assert!(out.v().is_none());
 }
 
 #[test]

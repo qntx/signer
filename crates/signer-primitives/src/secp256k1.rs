@@ -155,7 +155,7 @@ impl Secp256k1Signer {
         signature.copy_from_slice(&sig_bytes);
         Ok(SignOutput::Ecdsa {
             signature,
-            recovery_id: rid.to_byte(),
+            v: rid.to_byte(),
         })
     }
 

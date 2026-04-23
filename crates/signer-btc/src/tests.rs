@@ -29,7 +29,7 @@ fn sign_hash_verify() {
     let out = s.sign_hash(&hash).unwrap();
     let sig_bytes = out.to_bytes();
     assert_eq!(sig_bytes.len(), 65);
-    assert!(out.recovery_id().is_some());
+    assert!(out.v().is_some());
     verify(&s, &hash, &out);
 }
 

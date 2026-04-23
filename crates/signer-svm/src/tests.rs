@@ -71,7 +71,7 @@ fn sign_trait_verify() {
     let out = Sign::sign_message(&s, b"hello").unwrap();
     let sig_bytes = out.to_bytes();
     assert_eq!(sig_bytes.len(), 64);
-    assert!(out.recovery_id().is_none());
+    assert!(out.v().is_none());
     s.verify(b"hello", &sig_bytes)
         .expect("trait signature must verify");
 }
@@ -132,7 +132,7 @@ fn sign_trait_encode_signed_transaction_rejects_non_ed25519() {
     let s = test_signer();
     let wrong = SignOutput::Ecdsa {
         signature: [0u8; 64],
-        recovery_id: 0,
+        v: 0,
     };
     let mut tx = vec![1u8];
     tx.extend_from_slice(&[0u8; 64]);

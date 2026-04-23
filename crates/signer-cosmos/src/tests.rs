@@ -28,7 +28,7 @@ fn sign_hash_verify() {
     let hash: [u8; 32] = Sha256::digest(b"cosmos test").into();
     let out = s.sign_hash(&hash).unwrap();
     assert_eq!(out.to_bytes().len(), 65);
-    assert!(out.recovery_id().is_some());
+    assert!(out.v().is_some());
     verify(&s, &hash, &out);
 }
 

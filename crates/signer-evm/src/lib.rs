@@ -114,10 +114,10 @@ impl Signer {
     }
 
     /// EIP-191 `personal_sign`. Returns a [`SignOutput::Ecdsa`] with
-    /// `recovery_id = 27 | 28`.
+    /// `v = 27 | 28`.
     ///
-    /// The EVM wire format stores `v = 27 + parity`; the returned
-    /// `recovery_id` field already reflects that.
+    /// The EVM wire format stores `v = 27 + parity`; the returned `v` field
+    /// already reflects that.
     ///
     /// # Errors
     ///
@@ -132,7 +132,7 @@ impl Signer {
     }
 
     /// Sign EIP-712 typed structured data (JSON input). Returns a
-    /// [`SignOutput::Ecdsa`] with `recovery_id = 27 | 28`.
+    /// [`SignOutput::Ecdsa`] with `v = 27 | 28`.
     ///
     /// # Errors
     ///
@@ -144,10 +144,9 @@ impl Signer {
 
     /// Sign an unsigned typed transaction (EIP-1559 / EIP-2930).
     ///
-    /// Returns a [`SignOutput::Ecdsa`] with the **raw** recovery id
-    /// (`0 | 1`) — do **not** add 27 when using this output directly in
-    /// signed-transaction RLP encoding via
-    /// [`encode_signed_transaction`](Self::encode_signed_transaction).
+    /// Returns a [`SignOutput::Ecdsa`] with the **raw** `v` byte (`0 | 1`) —
+    /// do **not** add 27 when using this output directly in signed-transaction
+    /// RLP encoding via [`encode_signed_transaction`](Self::encode_signed_transaction).
     ///
     /// # Errors
     ///
@@ -160,7 +159,7 @@ impl Signer {
     /// Encode a signed typed transaction: `type || RLP([…fields, v, r, s])`.
     ///
     /// `signature` must be an [`SignOutput::Ecdsa`] produced by
-    /// [`sign_transaction`](Self::sign_transaction) (with raw `recovery_id`).
+    /// [`sign_transaction`](Self::sign_transaction) (with raw `v = 0 | 1`).
     ///
     /// # Errors
     ///
@@ -169,11 +168,7 @@ impl Signer {
         unsigned_tx: &[u8],
         signature: &SignOutput,
     ) -> Result<Vec<u8>, SignError> {
-        let SignOutput::Ecdsa {
-            signature: sig,
-            recovery_id,
-        } = *signature
-        else {
+        let SignOutput::Ecdsa { signature: sig, v } = *signature else {
             return Err(SignError::InvalidSignature(
                 "expected Ecdsa signature output".into(),
             ));
@@ -182,20 +177,17 @@ impl Signer {
         let mut s = [0u8; 32];
         r.copy_from_slice(&sig[..32]);
         s.copy_from_slice(&sig[32..]);
-        rlp::encode_signed_typed_tx(unsigned_tx, recovery_id, &r, &s)
+        rlp::encode_signed_typed_tx(unsigned_tx, v, &r, &s)
             .map_err(|e| SignError::InvalidTransaction(String::from(e)))
     }
 }
 
-/// Bump the `recovery_id` of an [`SignOutput::Ecdsa`] by 27 (EIP-191 v).
+/// Bump the `v` byte of an [`SignOutput::Ecdsa`] by 27 (EIP-191 encoding).
 fn bump_v_by_27(out: SignOutput) -> SignOutput {
     match out {
-        SignOutput::Ecdsa {
+        SignOutput::Ecdsa { signature, v } => SignOutput::Ecdsa {
             signature,
-            recovery_id,
-        } => SignOutput::Ecdsa {
-            signature,
-            recovery_id: recovery_id.wrapping_add(27),
+            v: v.wrapping_add(27),
         },
         other => other,
     }

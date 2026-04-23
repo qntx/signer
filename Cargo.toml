@@ -61,19 +61,19 @@ zeroize = { version = "1.8.2", default-features = false, features = ["derive"] }
 thiserror = { version = "2.0.18", default-features = false }
 
 # Kobe (optional bridge) — same 1.0 release train, developed locally via path.
-kobe-primitives = { version = "1.0", path = "../kobe/crates/kobe-primitives", default-features = false, features = ["std"] }
-kobe-btc = { version = "1.0", path = "../kobe/crates/kobe-btc", default-features = false, features = ["std"] }
-kobe-evm = { version = "1.0", path = "../kobe/crates/kobe-evm", default-features = false, features = ["std"] }
-kobe-svm = { version = "1.0", path = "../kobe/crates/kobe-svm", default-features = false, features = ["std"] }
-kobe-cosmos = { version = "1.0", path = "../kobe/crates/kobe-cosmos", default-features = false, features = ["std"] }
-kobe-tron = { version = "1.0", path = "../kobe/crates/kobe-tron", default-features = false, features = ["std"] }
-kobe-spark = { version = "1.0", path = "../kobe/crates/kobe-spark", default-features = false, features = ["std"] }
-kobe-fil = { version = "1.0", path = "../kobe/crates/kobe-fil", default-features = false, features = ["std"] }
-kobe-ton = { version = "1.0", path = "../kobe/crates/kobe-ton", default-features = false, features = ["std"] }
-kobe-sui = { version = "1.0", path = "../kobe/crates/kobe-sui", default-features = false, features = ["std"] }
-kobe-xrpl = { version = "1.0", path = "../kobe/crates/kobe-xrpl", default-features = false, features = ["std"] }
-kobe-aptos = { version = "1.0", path = "../kobe/crates/kobe-aptos", default-features = false, features = ["std"] }
-kobe-nostr = { version = "1.0", path = "../kobe/crates/kobe-nostr", default-features = false, features = ["std"] }
+kobe-primitives = { version = "1.0", default-features = false, features = ["std"] }
+kobe-btc = { version = "1.0", default-features = false, features = ["std"] }
+kobe-evm = { version = "1.0", default-features = false, features = ["std"] }
+kobe-svm = { version = "1.0", default-features = false, features = ["std"] }
+kobe-cosmos = { version = "1.0",  default-features = false, features = ["std"] }
+kobe-tron = { version = "1.0", default-features = false, features = ["std"] }
+kobe-spark = { version = "1.0", default-features = false, features = ["std"] }
+kobe-fil = { version = "1.0", default-features = false, features = ["std"] }
+kobe-ton = { version = "1.0", default-features = false, features = ["std"] }
+kobe-sui = { version = "1.0", default-features = false, features = ["std"] }
+kobe-xrpl = { version = "1.0", default-features = false, features = ["std"] }
+kobe-aptos = { version = "1.0", default-features = false, features = ["std"] }
+kobe-nostr = { version = "1.0", default-features = false, features = ["std"] }
 
 [profile.release]
 codegen-units = 1

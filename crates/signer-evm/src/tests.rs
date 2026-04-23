@@ -47,7 +47,7 @@ fn sign_hash_verify() {
 
     let sig_bytes = out.to_bytes();
     assert_eq!(sig_bytes.len(), 65);
-    let rid = out.recovery_id().expect("recovery id must be present");
+    let rid = out.v().expect("recovery id must be present");
     assert!(
         rid == 0 || rid == 1,
         "raw recovery_id must be 0 or 1, got {rid}"
@@ -86,7 +86,7 @@ fn sign_message_recovery_id_matches_v() {
     let out = s.sign_message(b"recovery test").unwrap();
     let sig_bytes = out.to_bytes();
     let v = sig_bytes[64];
-    let rid = out.recovery_id().unwrap();
+    let rid = out.v().unwrap();
     assert_eq!(v, rid, "v byte must equal recovery_id");
     assert!(rid == 27 || rid == 28);
 }

@@ -161,7 +161,7 @@ fn sign_hash_roundtrip() {
 
     let sig_bytes = out.to_bytes();
     assert_eq!(sig_bytes.len(), 64, "BIP-340 signature is 64 bytes");
-    assert!(out.recovery_id().is_none(), "Schnorr has no recovery id");
+    assert!(out.v().is_none(), "Schnorr has no recovery id");
     let pk = out
         .public_key()
         .expect("Schnorr output carries x-only pubkey");

@@ -27,7 +27,7 @@ fn sign_hash_verify() {
     let s = test_signer();
     let out = s.sign_hash(&[0u8; 32]).unwrap();
     assert_eq!(out.to_bytes().len(), 65);
-    assert!(out.recovery_id().is_some());
+    assert!(out.v().is_some());
     verify(&s, &[0u8; 32], &out);
 }
 

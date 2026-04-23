@@ -17,6 +17,15 @@
 //! - **No address derivation** — that responsibility lives in `kobe`.
 //! - **[`SignExt`]** — blanket extension trait that provides convenience
 //!   conversions (hex / flat bytes).
+//!
+//! # Verification
+//!
+//! Verification is exposed as a chain-specific inherent method on each
+//! `Signer` (e.g. `signer_btc::Signer::verify`). Because every chain derives
+//! its signable digest from the message through a different transform
+//! (EIP-191, Bitcoin message prefix, SUI intent, …), a single generic
+//! `Verify` trait would have to replay chain logic, so the workspace keeps
+//! verification inherent to avoid false abstraction.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -49,14 +58,21 @@ pub use secp256k1::Secp256k1Signer;
 /// variant rather than inspect optional metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SignOutput {
-    /// secp256k1 ECDSA with recovery id (EVM, BTC, Cosmos, Filecoin, Tron, Spark).
+    /// secp256k1 ECDSA with a single-byte tail (EVM, BTC, Cosmos, Filecoin, Tron, Spark).
     ///
-    /// Flat bytes: `signature || recovery_id` (65 B total).
+    /// Flat bytes: `signature || v` (65 B total). The exact meaning of `v`
+    /// depends on the call site:
+    ///
+    /// | Producer                                                  | `v` encoding |
+    /// |-----------------------------------------------------------|--------------|
+    /// | `Signer::sign_hash` / `Signer::sign_transaction` (ECDSA)  | `0` or `1` (raw parity)   |
+    /// | `signer_evm::Signer::sign_message` (EIP-191) / `sign_typed_data` | `27` or `28` |
+    /// | `signer_tron::Signer::sign_message` (TRON message prefix) | `27` or `28` |
     Ecdsa {
         /// 64-byte compact `r || s`.
         signature: [u8; 64],
-        /// Recovery id, `0` or `1`.
-        recovery_id: u8,
+        /// `v` byte, with chain-specific meaning documented above.
+        v: u8,
     },
     /// secp256k1 ECDSA encoded as ASN.1 DER (XRPL).
     ///
@@ -91,13 +107,10 @@ impl SignOutput {
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         match *self {
-            Self::Ecdsa {
-                signature,
-                recovery_id,
-            } => {
+            Self::Ecdsa { signature, v } => {
                 let mut out = Vec::with_capacity(65);
                 out.extend_from_slice(&signature);
-                out.push(recovery_id);
+                out.push(v);
                 out
             }
             Self::EcdsaDer(ref der) => der.clone(),
@@ -127,11 +140,13 @@ impl SignOutput {
         }
     }
 
-    /// Recovery id (secp256k1 ECDSA only).
+    /// `v` byte (secp256k1 ECDSA recoverable format only).
+    ///
+    /// See [`SignOutput::Ecdsa`] for the chain-specific meaning of this byte.
     #[must_use]
-    pub const fn recovery_id(&self) -> Option<u8> {
+    pub const fn v(&self) -> Option<u8> {
         match self {
-            Self::Ecdsa { recovery_id, .. } => Some(*recovery_id),
+            Self::Ecdsa { v, .. } => Some(*v),
             _ => None,
         }
     }
@@ -235,31 +250,6 @@ pub trait Sign: Send + Sync {
                 .into(),
         )
     }
-}
-
-/// Unified verification trait.
-///
-/// Implementors verify signatures produced by the paired [`Sign`] impl using
-/// the public key material stored on the signer.
-pub trait Verify: Send + Sync {
-    /// The error type returned by verification operations.
-    type Error: core::fmt::Debug + core::fmt::Display + From<SignError> + Send + Sync;
-
-    /// Verify that `signature` is valid over a pre-hashed 32-byte digest.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`SignError::InvalidSignature`] (or the chain-specific
-    /// equivalent) if verification fails.
-    fn verify_hash(&self, hash: &[u8; 32], signature: &[u8]) -> Result<(), Self::Error>;
-
-    /// Verify that `signature` is valid over `message`, applying the
-    /// chain-specific prefix / hash used by [`Sign::sign_message`].
-    ///
-    /// # Errors
-    ///
-    /// Returns a verification error on mismatch.
-    fn verify_message(&self, message: &[u8], signature: &[u8]) -> Result<(), Self::Error>;
 }
 
 /// Extension trait providing additional operations for all [`Sign`] implementors.
