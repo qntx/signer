@@ -1,14 +1,5 @@
 [workspace]
-members = [
-    "crates/signer", "crates/signer-primitives",
-    "crates/signer-btc", "crates/signer-evm", "crates/signer-svm",
-    "crates/signer-cosmos", "crates/signer-tron", "crates/signer-spark",
-    "crates/signer-fil", "crates/signer-ton", "crates/signer-sui",
-    "crates/signer-xrpl",
-    "crates/signer-aptos",
-    "crates/signer-nostr",
-    "crates/signer-cli",
-]
+members = ["crates/*"]
 default-members = ["crates/signer"]
 resolver = "3"
 
@@ -17,7 +8,7 @@ version = "1.0.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/qntx/signer"
-description = "Lightweight multi-chain transaction signer."
+description = "A lightweight, no_std multi-chain cryptographic signer in Rust."
 
 [workspace.dependencies]
 signer-primitives = { version = "1.0", path = "crates/signer-primitives", default-features = false }
@@ -37,8 +28,8 @@ signer-nostr = { version = "1.0", path = "crates/signer-nostr", default-features
 # Cryptography (versions aligned with kobe)
 k256 = { version = "0.13.4", default-features = false, features = ["ecdsa", "arithmetic"] }
 ed25519-dalek = { version = "2.2.0", default-features = false }
-sha2 = { version = "0.10", default-features = false }
-sha3 = { version = "0.10", default-features = false }
+sha2 = { version = "0.11.0", default-features = false }
+sha3 = { version = "0.11.0", default-features = false }
 blake2 = { version = "0.10", default-features = false }
 ripemd = { version = "0.2", default-features = false }
 bech32 = { version = "0.11", default-features = false, features = ["alloc"] }

@@ -10,7 +10,7 @@ extern crate alloc;
 
 use alloc::{string::String, vec::Vec};
 
-use ripemd::{Digest as _, Ripemd160};
+use ripemd::Ripemd160;
 use sha2::{Digest, Sha256};
 pub use signer_primitives::{self, Sign, SignError, SignExt, SignOutput};
 use signer_primitives::{Secp256k1Signer, delegate_secp256k1_ctors};

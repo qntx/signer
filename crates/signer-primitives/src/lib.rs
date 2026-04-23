@@ -253,10 +253,10 @@ pub trait Sign: Send + Sync {
 /// ```
 /// use signer_primitives::{ExtractSignableBytes, Sign};
 ///
-/// fn strip<S: Sign + ExtractSignableBytes>(
+/// fn strip<'a, S: Sign + ExtractSignableBytes>(
 ///     signer: &S,
-///     tx: &[u8],
-/// ) -> Result<&[u8], S::Error> {
+///     tx: &'a [u8],
+/// ) -> Result<&'a [u8], S::Error> {
 ///     signer.extract_signable_bytes(tx)
 /// }
 /// ```
