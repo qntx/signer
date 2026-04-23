@@ -276,16 +276,16 @@ Always use `--json` for programmatic consumption.
   "operation": "EIP-191 personal_sign",
   "address": "0x2c7536E3605D9C16a7a3D7b1898e529396a65c23",
   "signature": "a1b2c3...",
-  "recovery_id": 27,
+  "v": 27,
   "message": "Hello, Ethereum!"
 }
 ```
 
-Fields `address`, `recovery_id`, `public_key`, and `message` are optional and omitted when not applicable.
+Fields `address`, `v`, `public_key`, and `message` are optional and omitted when not applicable.
 
-- **secp256k1 ECDSA signatures**: 130-char hex (65 bytes: `r[32] || s[32] || v[1]`), `recovery_id` present
-- **Ed25519 signatures**: 128-char hex (64 bytes), no `recovery_id`
-- **BIP-340 Schnorr signatures (Nostr)**: 128-char hex (64 bytes: `r[32] || s[32]`), no `recovery_id`; `public_key` is 32-byte x-only hex; `address` is the `npub1…` bech32 form
+- **secp256k1 ECDSA signatures**: 130-char hex (65 bytes: `r[32] || s[32] || v[1]`), `v` field present (`0`/`1` for raw / `sign-hash` / `sign-tx`; `27`/`28` for `sign-message` on EVM and Tron, EIP-191 wire encoding)
+- **Ed25519 signatures**: 128-char hex (64 bytes), no `v`
+- **BIP-340 Schnorr signatures (Nostr)**: 128-char hex (64 bytes: `r[32] || s[32]`), no `v`; `public_key` is 32-byte x-only hex; `address` is the `npub1…` bech32 form
 
 ### Address Output
 
@@ -328,7 +328,7 @@ All errors in JSON mode return exit code 1 with:
 4. **Errors** in JSON mode return `{"error": "..."}` with exit code 1.
 5. **Solana keys** accept both hex and base58 keypair formats — the CLI auto-detects.
 6. **Nostr keys** accept both 64-char hex and NIP-19 `nsec1…` bech32 — the CLI auto-detects.
-7. **Signature length discriminator**: `recovery_id` present ⇒ secp256k1 ECDSA (65-byte sig); `public_key` present with `recovery_id: null` and 64-byte sig ⇒ Ed25519 (SUI/Nostr/Aptos wire) or BIP-340 Schnorr (Nostr). Use the `chain` field to disambiguate.
+7. **Signature length discriminator**: `v` present ⇒ secp256k1 ECDSA (65-byte sig); `public_key` present with no `v` and 64-byte sig ⇒ Ed25519 (SUI/Nostr/Aptos wire) or BIP-340 Schnorr (Nostr). Use the `chain` field to disambiguate. The `v` byte is `0`/`1` for raw signing (`sign-hash`, `sign-tx`) and `27`/`28` for EIP-191 `sign-message` on EVM / Tron.
 8. **Nostr `sign-message` does NOT hash** the input — it passes bytes straight into BIP-340. For NIP-01 events, compute `sha256(serialized_event)` first (or use `sign-tx` which does it for you) and feed the 32-byte result to `sign-hash`.
 9. **Address derivation** is limited: use `kobe` CLI for full HD wallet derivation with mnemonics (Nostr uses NIP-06 path `m/44'/1237'/<account>'/0/0`).
 10. **Pair with `kobe` for mnemonic-based flows**: `kobe <chain> new --json` outputs `accounts[].private_key` as hex (plus `nsec` for Nostr); pipe it into `signer <chain> sign-* -k <hex>` to sign. The `kobe` library crate can also be wired in at the code level via the `kobe` feature of each `signer-X` crate (`Signer::from_derived(&kobe_X::DerivedAccount)`).
