@@ -1,32 +1,35 @@
-//! Unified signing trait and types for multi-chain transaction signers.
+//! Unified signing traits and types for multi-chain transaction signers.
 //!
-//! This crate defines the [`Sign`] trait that every chain-specific signer
-//! crate implements, the blanket [`SignExt`] extension for flat-byte
-//! conversions, and a discriminated [`SignOutput`] enum covering every wire
-//! format the workspace produces.
+//! This crate defines the capability traits that every chain-specific signer
+//! crate implements — [`Sign`] for the core signing workflow,
+//! [`EncodeSignedTransaction`] and [`ExtractSignableBytes`] for opt-in
+//! transaction assembly — plus the discriminated [`SignOutput`] enum that
+//! covers every wire format the workspace produces.
 //!
-//! # Design
+//! # Design principles
 //!
-//! - **Stateful signers** — each `Signer` holds its private key internally.
-//! - **Type-safe hashing** — `sign_hash` requires a `&[u8; 32]` digest; ragged
-//!   byte slices are rejected at compile time rather than run time.
-//! - **Discriminated output** — [`SignOutput`] is an enum; callers pattern-match
-//!   on the variant to reach the exact bytes they need, with no `Option`
-//!   boilerplate.
-//! - **`Send + Sync`** — signers are safe to share across threads and async
-//!   runtimes.
+//! - **Single source of truth** — [`SignError`] is defined once here; chain
+//!   crates re-export it directly and only introduce a wrapper enum when they
+//!   carry additional failure modes.
+//! - **Capability traits** — [`Sign`] is the mandatory surface; optional
+//!   capabilities live in separate traits so types never carry "not
+//!   implemented" lies.
+//! - **Type-safe digests** — `sign_hash` accepts `&[u8; 32]`; ragged byte
+//!   slices are rejected at compile time.
+//! - **Discriminated output** — [`SignOutput`] variants mirror real wire
+//!   formats; callers pattern-match instead of juggling `Option` metadata.
+//! - **Thread-safe** — every signer is `Send + Sync` and ready to share
+//!   across async tasks.
 //! - **No address derivation** — that responsibility lives in `kobe`.
-//! - **[`SignExt`]** — blanket extension trait that provides convenience
-//!   conversions (hex / flat bytes).
 //!
 //! # Verification
 //!
-//! Verification is exposed as a chain-specific inherent method on each
-//! `Signer` (e.g. `signer_btc::Signer::verify`). Because every chain derives
-//! its signable digest from the message through a different transform
-//! (EIP-191, Bitcoin message prefix, SUI intent, …), a single generic
-//! `Verify` trait would have to replay chain logic, so the workspace keeps
-//! verification inherent to avoid false abstraction.
+//! Verification lives on each chain's inherent `Signer` (e.g.
+//! [`signer_btc::Signer::verify_hash`](https://docs.rs/signer-btc)).
+//! Because every chain derives its signable digest through a different
+//! transform (EIP-191, Bitcoin message prefix, Sui intent, …), a single
+//! generic `Verify` trait would have to replay chain logic, so the workspace
+//! keeps verification inherent to avoid false abstraction.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -38,6 +41,8 @@ use alloc::vec::Vec;
 #[cfg(feature = "ed25519")]
 mod ed25519;
 mod error;
+#[doc(hidden)]
+pub mod macros;
 #[cfg(feature = "schnorr")]
 mod schnorr;
 #[cfg(feature = "secp256k1")]
@@ -153,16 +158,27 @@ impl SignOutput {
     }
 }
 
-/// Unified signing trait implemented by every chain signer.
+/// Mandatory signing surface implemented by every chain-specific `Signer`.
 ///
-/// Signers hold their private key internally and expose three signing entry
-/// points. `sign_hash` is the type-safe low-level primitive (exactly 32 bytes
-/// in, wire-format [`SignOutput`] out). `sign_message` and `sign_transaction`
-/// are chain-aware wrappers that apply the appropriate prefix / hash /
-/// serialization before signing.
+/// Signers hold their private key internally and expose three entry points
+/// layered by abstraction level:
 ///
-/// **Thread-safety**: implementors must be `Send + Sync` to fit async
-/// runtimes and multi-threaded applications.
+/// - [`sign_hash`](Self::sign_hash) — sign a pre-computed 32-byte digest.
+///   Type-safe (`&[u8; 32]`) and chain-agnostic.
+/// - [`sign_message`](Self::sign_message) — apply the chain's message prefix
+///   / hash policy, then sign.
+/// - [`sign_transaction`](Self::sign_transaction) — interpret the input as
+///   the chain's unsigned transaction bytes, hash, and sign.
+///
+/// # Thread safety
+///
+/// Implementors must be `Send + Sync` so signers can cross async task
+/// boundaries and multi-threaded executors.
+///
+/// # Error contract
+///
+/// `Error` must be convertible from the shared [`SignError`] so chain crates
+/// can layer their own variants on top without losing the core failure modes.
 ///
 /// # Example
 ///
@@ -174,15 +190,18 @@ impl SignOutput {
 /// }
 /// ```
 pub trait Sign: Send + Sync {
-    /// The error type returned by signing operations.
-    type Error: core::fmt::Debug + core::fmt::Display + From<SignError> + Send + Sync;
+    /// Error returned by every signing operation.
+    ///
+    /// Must lift [`SignError`] losslessly so downstream code can attribute
+    /// core failures without string-matching.
+    type Error: core::fmt::Debug + core::fmt::Display + From<SignError> + Send + Sync + 'static;
 
     /// Sign a pre-hashed 32-byte digest.
     ///
-    /// All workspace chains use 32-byte digests (SHA-256 / SHA3-256 /
-    /// BLAKE2b-256 / Keccak-256). Consumers that already hold a digest should
-    /// call this directly; chains that need domain-specific prefixing go
-    /// through [`sign_message`](Self::sign_message) or
+    /// All workspace chains sign 32-byte digests (SHA-256, SHA3-256,
+    /// BLAKE2b-256, Keccak-256, SHA-512-half). Consumers that already hold a
+    /// digest should call this directly; chains that need domain-specific
+    /// prefixing go through [`sign_message`](Self::sign_message) or
     /// [`sign_transaction`](Self::sign_transaction) instead.
     ///
     /// # Errors
@@ -190,78 +209,109 @@ pub trait Sign: Send + Sync {
     /// Returns an error if the underlying signing primitive fails.
     fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, Self::Error>;
 
-    /// Sign an arbitrary message with chain-specific prefixing / hashing.
+    /// Sign an arbitrary message with the chain's message-signing convention.
     ///
-    /// - EVM: EIP-191 `personal_sign` (`v = 27 | 28`).
-    /// - Bitcoin: `\x18Bitcoin Signed Message:\n` prefix + compact-size length.
-    /// - Tron: `\x19TRON Signed Message:\n` prefix.
-    /// - Cosmos: SHA-256 of the raw message.
-    /// - Solana / TON: raw Ed25519 sign (no prefix).
-    /// - Sui: intent prefix + BCS + BLAKE2b-256.
-    /// - Aptos: raw Ed25519 sign.
-    /// - Nostr: raw BIP-340 Schnorr (off-protocol).
-    /// - XRPL: SHA-512 half + DER.
-    ///
-    /// Each chain crate documents its exact semantics on its `Signer`.
+    /// | Chain        | Transform                                                  |
+    /// |--------------|------------------------------------------------------------|
+    /// | EVM          | Keccak-256 of `EIP-191` prefix + message (`v = 27 \| 28`)  |
+    /// | Bitcoin      | double-SHA256 of `\x18Bitcoin Signed Message:\n` + varint  |
+    /// | Tron         | Keccak-256 of `\x19TRON Signed Message:\n` + message       |
+    /// | Cosmos       | SHA-256 of the raw message                                 |
+    /// | Solana / TON | Raw Ed25519 (no prefix)                                    |
+    /// | Sui          | BLAKE2b-256 of intent + BCS-encoded message                |
+    /// | Aptos        | Raw Ed25519 (no domain prefix)                             |
+    /// | Nostr        | Raw BIP-340 Schnorr (no prefix)                            |
+    /// | XRPL         | Not supported (returns an error)                           |
     ///
     /// # Errors
     ///
-    /// Returns an error if signing fails.
+    /// Returns an error if signing fails, or if the chain does not define a
+    /// canonical message-signing scheme.
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Self::Error>;
 
-    /// Sign an unsigned transaction.
+    /// Sign an unsigned transaction using the chain's sighash convention.
     ///
     /// Each chain crate documents the exact expected input format on its
     /// `Signer::sign_transaction` method (e.g. EVM expects an unsigned RLP
-    /// payload, BTC a sighash preimage, Cosmos a `SignDoc`).
+    /// payload, BTC a sighash preimage, Cosmos a `SignDoc`, XRPL the
+    /// transaction body *without* the `STX\0` prefix).
     ///
     /// # Errors
     ///
     /// Returns an error if the transaction is malformed or signing fails.
     fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Self::Error>;
+}
 
-    /// Extract the signable portion from a full serialized transaction.
-    ///
-    /// Some wire formats include non-signed metadata (e.g. Solana prepends
-    /// signature-slot placeholders). This method strips that metadata and
-    /// returns only the bytes that must be signed. The default implementation
-    /// returns the input unchanged.
+/// Optional capability: extract the signable portion from a fully serialized
+/// transaction.
+///
+/// Implemented by chains whose wire format interleaves signed payload and
+/// unsigned metadata (e.g. Solana's compact-u16 header plus signature-slot
+/// placeholders). The majority of chains sign the entire input verbatim and
+/// therefore do not implement this trait.
+///
+/// ```
+/// use signer_primitives::{ExtractSignableBytes, Sign};
+///
+/// fn strip<S: Sign + ExtractSignableBytes>(
+///     signer: &S,
+///     tx: &[u8],
+/// ) -> Result<&[u8], S::Error> {
+///     signer.extract_signable_bytes(tx)
+/// }
+/// ```
+pub trait ExtractSignableBytes: Sign {
+    /// Return the portion of `tx_bytes` that the sighash is computed over.
     ///
     /// # Errors
     ///
     /// Returns an error if the transaction is malformed.
-    fn extract_signable_bytes<'a>(&self, tx_bytes: &'a [u8]) -> Result<&'a [u8], Self::Error> {
-        Ok(tx_bytes)
-    }
+    fn extract_signable_bytes<'a>(&self, tx_bytes: &'a [u8]) -> Result<&'a [u8], Self::Error>;
+}
 
-    /// Encode a signed transaction from unsigned bytes + signature output.
-    ///
-    /// The default returns `Err` — chains that support encoding override it.
+/// Optional capability: assemble the final signed-transaction wire bytes from
+/// the unsigned input plus a [`SignOutput`].
+///
+/// Implemented by chains whose wire format can be reconstructed from
+/// `(unsigned_tx, signature)` without recomputing hashes (currently EVM's
+/// typed transaction RLP and Solana's signature-slot splicing). Other chains
+/// expect callers to splice the signature into their own domain-specific
+/// envelope and therefore do not implement this trait.
+///
+/// ```
+/// use signer_primitives::{EncodeSignedTransaction, Sign, SignOutput};
+///
+/// fn wrap<S: Sign + EncodeSignedTransaction>(
+///     signer: &S,
+///     unsigned: &[u8],
+///     signature: &SignOutput,
+/// ) -> Result<Vec<u8>, S::Error> {
+///     signer.encode_signed_transaction(unsigned, signature)
+/// }
+/// ```
+pub trait EncodeSignedTransaction: Sign {
+    /// Encode `unsigned_tx + signature` into the chain's signed-wire form.
     ///
     /// # Errors
     ///
-    /// Returns an error if encoding is not supported or inputs are malformed.
+    /// Returns an error if the unsigned payload or signature variant is
+    /// malformed for this chain.
     fn encode_signed_transaction(
         &self,
-        _tx_bytes: &[u8],
-        _signature: &SignOutput,
-    ) -> Result<Vec<u8>, Self::Error> {
-        Err(
-            SignError::InvalidTransaction("encode_signed_transaction not implemented".into())
-                .into(),
-        )
-    }
+        unsigned_tx: &[u8],
+        signature: &SignOutput,
+    ) -> Result<Vec<u8>, Self::Error>;
 }
 
-/// Extension trait providing additional operations for all [`Sign`] implementors.
-///
-/// Automatically implemented for any type implementing `Sign`.
+/// Blanket extension trait that adds flat-byte convenience wrappers to every
+/// [`Sign`] implementor.
 pub trait SignExt: Sign {
     /// Sign a 32-byte digest and return the flat signature bytes.
     ///
     /// # Errors
     ///
     /// Returns an error if signing fails.
+    #[inline]
     fn sign_hash_bytes(&self, hash: &[u8; 32]) -> Result<Vec<u8>, Self::Error> {
         self.sign_hash(hash).map(|out| out.to_bytes())
     }
@@ -271,6 +321,7 @@ pub trait SignExt: Sign {
     /// # Errors
     ///
     /// Returns an error if signing fails.
+    #[inline]
     fn sign_message_bytes(&self, message: &[u8]) -> Result<Vec<u8>, Self::Error> {
         self.sign_message(message).map(|out| out.to_bytes())
     }
@@ -280,6 +331,7 @@ pub trait SignExt: Sign {
     /// # Errors
     ///
     /// Returns an error if signing fails.
+    #[inline]
     fn sign_transaction_bytes(&self, tx_bytes: &[u8]) -> Result<Vec<u8>, Self::Error> {
         self.sign_transaction(tx_bytes).map(|out| out.to_bytes())
     }

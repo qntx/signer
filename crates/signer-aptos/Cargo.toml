@@ -20,7 +20,6 @@ signer-primitives = { workspace = true, features = ["ed25519"] }
 ed25519-dalek.workspace = true
 sha3.workspace = true
 hex.workspace = true
-thiserror.workspace = true
 
 kobe-aptos = { workspace = true, optional = true }
 

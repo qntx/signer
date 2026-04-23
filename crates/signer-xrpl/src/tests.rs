@@ -11,7 +11,7 @@
 use sha2::{Digest, Sha512};
 use signer_primitives::testing::verify_secp256k1_der;
 
-use super::{STX_PREFIX, Signer, sha512_half_prefixed};
+use super::{STX_PREFIX, Sign, Signer, sha512_half_prefixed};
 
 const TEST_KEY: &str = "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318";
 

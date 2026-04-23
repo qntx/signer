@@ -9,11 +9,10 @@
 //! # Examples
 //!
 //! ```
-//! use signer_btc::Signer;
+//! use signer_btc::{Sign as _, Signer};
 //!
 //! let signer = Signer::random();
-//! let hash = [0u8; 32];
-//! let out = signer.sign_hash(&hash).unwrap();
+//! let out = signer.sign_hash(&[0u8; 32]).unwrap();
 //! assert_eq!(out.to_bytes().len(), 65); // r(32) + s(32) + v(1)
 //! ```
 
@@ -23,64 +22,19 @@ extern crate alloc;
 
 use alloc::{string::String, vec::Vec};
 
-mod error;
-
-pub use error::SignError;
 use ripemd::{Digest as _, Ripemd160};
 use sha2::{Digest, Sha256};
-use signer_primitives::Secp256k1Signer;
-pub use signer_primitives::{self, Sign, SignExt, SignOutput};
+pub use signer_primitives::{self, Sign, SignError, SignExt, SignOutput};
+use signer_primitives::{Secp256k1Signer, delegate_secp256k1_ctors};
 
 /// Bitcoin transaction signer.
 ///
-/// Wraps a [`Secp256k1Signer`]. The inner key is zeroized on drop.
-pub struct Signer {
-    inner: Secp256k1Signer,
-}
-
-impl core::fmt::Debug for Signer {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("Signer")
-            .field("key", &"[REDACTED]")
-            .finish()
-    }
-}
+/// Newtype over [`Secp256k1Signer`]. The inner key is zeroized on drop.
+#[derive(Debug)]
+pub struct Signer(Secp256k1Signer);
 
 impl Signer {
-    /// Create from a raw 32-byte private key.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the bytes are not a valid secp256k1 scalar.
-    pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
-        Ok(Self {
-            inner: Secp256k1Signer::from_bytes(bytes)?,
-        })
-    }
-
-    /// Create from a hex-encoded private key (with or without `0x`).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the hex is invalid or the key is out of range.
-    pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
-        Ok(Self {
-            inner: Secp256k1Signer::from_hex(hex_str)?,
-        })
-    }
-
-    /// Generate a random signer.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the OS random number generator fails.
-    #[cfg(feature = "getrandom")]
-    #[must_use]
-    pub fn random() -> Self {
-        Self {
-            inner: Secp256k1Signer::random(),
-        }
-    }
+    delegate_secp256k1_ctors!();
 
     /// Bitcoin P2PKH address (legacy, starts with `1`).
     ///
@@ -91,7 +45,7 @@ impl Signer {
         reason = "SHA-256 output is always 32 bytes, slicing first 4 is safe"
     )]
     pub fn address(&self) -> String {
-        let pubkey = self.inner.compressed_public_key();
+        let pubkey = self.0.compressed_public_key();
         let sha = Sha256::digest(&pubkey);
         let hash160 = Ripemd160::digest(sha);
         let mut payload = Vec::with_capacity(25);
@@ -105,13 +59,13 @@ impl Signer {
     /// Compressed public key (33 bytes).
     #[must_use]
     pub fn public_key_bytes(&self) -> Vec<u8> {
-        self.inner.compressed_public_key()
+        self.0.compressed_public_key()
     }
 
     /// Compressed public key as hex (66 chars, no `0x` prefix).
     #[must_use]
     pub fn public_key_hex(&self) -> String {
-        hex::encode(self.inner.compressed_public_key())
+        hex::encode(self.0.compressed_public_key())
     }
 
     /// Verify a recoverable or compact ECDSA signature against a 32-byte
@@ -125,37 +79,18 @@ impl Signer {
     /// Returns [`SignError::InvalidSignature`] on malformed input or
     /// failed verification.
     pub fn verify_hash(&self, hash: &[u8; 32], signature: &[u8]) -> Result<(), SignError> {
-        Ok(self.inner.verify_prehash(hash, signature)?)
+        self.0.verify_prehash(hash, signature)
+    }
+}
+
+impl Sign for Signer {
+    type Error = SignError;
+
+    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
+        self.0.sign_prehash_recoverable(hash)
     }
 
-    /// Sign a 32-byte sighash. Returns a [`SignOutput::Ecdsa`]
-    /// with a 0 / 1 recovery id.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the signing primitive fails.
-    pub fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-        Ok(self.inner.sign_prehash_recoverable(hash)?)
-    }
-
-    /// Sign a Bitcoin transaction sighash preimage (double-SHA256 then ECDSA).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the signing primitive fails.
-    pub fn sign_transaction(&self, sighash_preimage: &[u8]) -> Result<SignOutput, SignError> {
-        let digest: [u8; 32] = Sha256::digest(Sha256::digest(sighash_preimage)).into();
-        self.sign_hash(&digest)
-    }
-
-    /// Sign a message using Bitcoin's message-signing convention.
-    ///
-    /// `digest = SHA256(SHA256(prefix || varint(len) || message))`
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the signing primitive fails.
-    pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         let prefix = b"\x18Bitcoin Signed Message:\n";
         let mut data = Vec::with_capacity(prefix.len() + 9 + message.len());
         data.extend_from_slice(prefix);
@@ -164,21 +99,10 @@ impl Signer {
         let digest: [u8; 32] = Sha256::digest(Sha256::digest(&data)).into();
         self.sign_hash(&digest)
     }
-}
 
-impl Sign for Signer {
-    type Error = SignError;
-
-    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, Self::Error> {
-        Self::sign_hash(self, hash)
-    }
-
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Self::Error> {
-        Self::sign_message(self, message)
-    }
-
-    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Self::Error> {
-        Self::sign_transaction(self, tx_bytes)
+    fn sign_transaction(&self, sighash_preimage: &[u8]) -> Result<SignOutput, SignError> {
+        let digest: [u8; 32] = Sha256::digest(Sha256::digest(sighash_preimage)).into();
+        self.sign_hash(&digest)
     }
 }
 

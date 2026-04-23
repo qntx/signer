@@ -12,8 +12,9 @@
 //! # Usage
 //!
 //! ```rust,no_run
-//! // Direct usage with a hex private key
-//! use signer::evm;
+//! // Direct usage with a hex private key.
+//! use signer::{Sign, evm};
+//!
 //! let s = evm::Signer::from_hex("0x...").unwrap();
 //! let sig = s.sign_message(b"hello").unwrap();
 //! ```

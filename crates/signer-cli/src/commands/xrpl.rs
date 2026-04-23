@@ -1,7 +1,7 @@
 //! XRPL signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_xrpl::Signer;
+use signer_xrpl::{Sign, Signer};
 
 use super::{parse_hex, parse_hex32};
 use crate::output::{self, CliResult};

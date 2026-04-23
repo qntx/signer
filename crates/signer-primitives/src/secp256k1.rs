@@ -204,4 +204,28 @@ impl Secp256k1Signer {
             .verify_prehash(hash, &sig)
             .map_err(|e| SignError::InvalidSignature(e.to_string()))
     }
+
+    /// Verify a DER-encoded ECDSA signature against a 32-byte pre-hashed
+    /// digest.
+    ///
+    /// Complement to [`sign_prehash_der`](Self::sign_prehash_der); chains
+    /// whose wire format is DER (e.g. XRPL) use this to round-trip their
+    /// signatures.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SignError::InvalidSignature`] if the DER is malformed or
+    /// verification fails.
+    pub fn verify_prehash_der(
+        &self,
+        hash: &[u8; DIGEST_LEN],
+        signature_der: &[u8],
+    ) -> Result<(), SignError> {
+        let sig = Signature::from_der(signature_der)
+            .map_err(|e| SignError::InvalidSignature(e.to_string()))?;
+        self.key
+            .verifying_key()
+            .verify_prehash(hash, &sig)
+            .map_err(|e| SignError::InvalidSignature(e.to_string()))
+    }
 }

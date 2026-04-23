@@ -18,7 +18,6 @@ kobe = ["dep:kobe-ton"]
 [dependencies]
 signer-primitives = { workspace = true, features = ["ed25519"] }
 ed25519-dalek.workspace = true
-thiserror.workspace = true
 
 kobe-ton = { workspace = true, optional = true }
 

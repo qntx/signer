@@ -1,7 +1,7 @@
 //! Spark signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_spark::Signer;
+use signer_spark::{Sign, Signer};
 
 use super::{parse_hex, parse_hex32};
 use crate::output::{self, CliResult};

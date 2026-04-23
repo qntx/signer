@@ -8,7 +8,7 @@
 //! # Examples
 //!
 //! ```
-//! use signer_evm::Signer;
+//! use signer_evm::{Sign as _, Signer};
 //!
 //! let signer = Signer::random();
 //! let out = signer.sign_message(b"hello").unwrap();
@@ -22,64 +22,20 @@ extern crate alloc;
 use alloc::{format, string::String, vec::Vec};
 
 mod eip712;
-mod error;
 mod rlp;
 
-pub use error::SignError;
 use sha3::{Digest, Keccak256};
-use signer_primitives::Secp256k1Signer;
-pub use signer_primitives::{self, Sign, SignExt, SignOutput};
+pub use signer_primitives::{self, EncodeSignedTransaction, Sign, SignError, SignExt, SignOutput};
+use signer_primitives::{Secp256k1Signer, delegate_secp256k1_ctors};
 
 /// EVM transaction signer.
 ///
-/// Wraps a [`Secp256k1Signer`]. The inner key is zeroized on drop.
-pub struct Signer {
-    inner: Secp256k1Signer,
-}
-
-impl core::fmt::Debug for Signer {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("Signer")
-            .field("key", &"[REDACTED]")
-            .finish()
-    }
-}
+/// Newtype over [`Secp256k1Signer`]. The inner key is zeroized on drop.
+#[derive(Debug)]
+pub struct Signer(Secp256k1Signer);
 
 impl Signer {
-    /// Create a signer from a raw 32-byte private key.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the bytes are not a valid secp256k1 scalar.
-    pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
-        Ok(Self {
-            inner: Secp256k1Signer::from_bytes(bytes)?,
-        })
-    }
-
-    /// Create a signer from a hex-encoded private key (with or without `0x`).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the hex is invalid or the key is out of range.
-    pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
-        Ok(Self {
-            inner: Secp256k1Signer::from_hex(hex_str)?,
-        })
-    }
-
-    /// Generate a random signer.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the OS random number generator fails.
-    #[cfg(feature = "getrandom")]
-    #[must_use]
-    pub fn random() -> Self {
-        Self {
-            inner: Secp256k1Signer::random(),
-        }
-    }
+    delegate_secp256k1_ctors!();
 
     /// Ethereum address derived from this signing key (EIP-55 checksummed).
     #[must_use]
@@ -88,7 +44,7 @@ impl Signer {
         reason = "uncompressed pubkey is always 65B, Keccak256 is always 32B"
     )]
     pub fn address(&self) -> String {
-        let uncompressed = self.inner.uncompressed_public_key();
+        let uncompressed = self.0.uncompressed_public_key();
         let hash = Keccak256::digest(&uncompressed[1..]);
         eip55_checksum(&hex::encode(&hash[12..]))
     }
@@ -96,13 +52,13 @@ impl Signer {
     /// Compressed public key (33 bytes).
     #[must_use]
     pub fn public_key_bytes(&self) -> Vec<u8> {
-        self.inner.compressed_public_key()
+        self.0.compressed_public_key()
     }
 
     /// Compressed public key as hex (66 chars, no `0x` prefix).
     #[must_use]
     pub fn public_key_hex(&self) -> String {
-        hex::encode(self.inner.compressed_public_key())
+        hex::encode(self.0.compressed_public_key())
     }
 
     /// Verify an ECDSA signature against a 32-byte pre-hashed digest.
@@ -115,39 +71,7 @@ impl Signer {
     /// Returns [`SignError::InvalidSignature`] on malformed input or
     /// failed verification.
     pub fn verify_hash(&self, hash: &[u8; 32], signature: &[u8]) -> Result<(), SignError> {
-        Ok(self.inner.verify_prehash(hash, signature)?)
-    }
-
-    /// Sign a 32-byte digest with recoverable ECDSA.
-    ///
-    /// The returned [`SignOutput::Ecdsa`] carries the raw recovery id
-    /// (`0` or `1`). Use [`sign_message`](Self::sign_message) or
-    /// [`sign_typed_data`](Self::sign_typed_data) if you need EIP-191
-    /// semantics (`v = 27 | 28`).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the signing primitive fails.
-    pub fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-        Ok(self.inner.sign_prehash_recoverable(hash)?)
-    }
-
-    /// EIP-191 `personal_sign`. Returns a [`SignOutput::Ecdsa`] with
-    /// `v = 27 | 28`.
-    ///
-    /// The EVM wire format stores `v = 27 + parity`; the returned `v` field
-    /// already reflects that.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if signing fails.
-    pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        let prefix = format!("\x19Ethereum Signed Message:\n{}", message.len());
-        let mut data = Vec::with_capacity(prefix.len() + message.len());
-        data.extend_from_slice(prefix.as_bytes());
-        data.extend_from_slice(message);
-        let digest: [u8; 32] = Keccak256::digest(&data).into();
-        Ok(bump_v_by_27(self.sign_hash(&digest)?))
+        self.0.verify_prehash(hash, signature)
     }
 
     /// Sign EIP-712 typed structured data (JSON input). Returns a
@@ -158,27 +82,15 @@ impl Signer {
     /// Returns an error if the JSON is malformed or signing fails.
     pub fn sign_typed_data(&self, typed_data_json: &str) -> Result<SignOutput, SignError> {
         let digest = eip712::hash_typed_data_json(typed_data_json)?;
-        Ok(bump_v_by_27(self.sign_hash(&digest)?))
-    }
-
-    /// Sign an unsigned typed transaction (EIP-1559 / EIP-2930).
-    ///
-    /// Returns a [`SignOutput::Ecdsa`] with the **raw** `v` byte (`0 | 1`) —
-    /// do **not** add 27 when using this output directly in signed-transaction
-    /// RLP encoding via [`encode_signed_transaction`](Self::encode_signed_transaction).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the transaction bytes are malformed.
-    pub fn sign_transaction(&self, unsigned_tx: &[u8]) -> Result<SignOutput, SignError> {
-        let digest: [u8; 32] = Keccak256::digest(unsigned_tx).into();
-        self.sign_hash(&digest)
+        Ok(bump_v_by_27(self.0.sign_prehash_recoverable(&digest)?))
     }
 
     /// Encode a signed typed transaction: `type || RLP([…fields, v, r, s])`.
     ///
-    /// `signature` must be an [`SignOutput::Ecdsa`] produced by
-    /// [`sign_transaction`](Self::sign_transaction) (with raw `v = 0 | 1`).
+    /// `signature` must be a [`SignOutput::Ecdsa`] produced by
+    /// [`sign_transaction`](Sign::sign_transaction) (with raw `v = 0 | 1`).
+    ///
+    /// Also available via the [`EncodeSignedTransaction`] trait.
     ///
     /// # Errors
     ///
@@ -201,38 +113,42 @@ impl Signer {
     }
 }
 
-/// Bump the `v` byte of an [`SignOutput::Ecdsa`] by 27 (EIP-191 encoding).
-fn bump_v_by_27(out: SignOutput) -> SignOutput {
-    match out {
-        SignOutput::Ecdsa { signature, v } => SignOutput::Ecdsa {
-            signature,
-            v: v.wrapping_add(27),
-        },
-        other => other,
-    }
-}
-
 impl Sign for Signer {
     type Error = SignError;
 
-    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, Self::Error> {
-        Self::sign_hash(self, hash)
+    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
+        self.0.sign_prehash_recoverable(hash)
     }
 
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Self::Error> {
-        Self::sign_message(self, message)
+    /// EIP-191 `personal_sign`. Returns a [`SignOutput::Ecdsa`] with
+    /// `v = 27 | 28`.
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
+        let prefix = format!("\x19Ethereum Signed Message:\n{}", message.len());
+        let mut data = Vec::with_capacity(prefix.len() + message.len());
+        data.extend_from_slice(prefix.as_bytes());
+        data.extend_from_slice(message);
+        let digest: [u8; 32] = Keccak256::digest(&data).into();
+        Ok(bump_v_by_27(self.0.sign_prehash_recoverable(&digest)?))
     }
 
-    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Self::Error> {
-        Self::sign_transaction(self, tx_bytes)
+    /// Sign an unsigned typed transaction (EIP-1559 / EIP-2930).
+    ///
+    /// Returns a [`SignOutput::Ecdsa`] with the **raw** `v` byte (`0 | 1`) —
+    /// do **not** add 27 when feeding the result into
+    /// [`Signer::encode_signed_transaction`].
+    fn sign_transaction(&self, unsigned_tx: &[u8]) -> Result<SignOutput, SignError> {
+        let digest: [u8; 32] = Keccak256::digest(unsigned_tx).into();
+        self.0.sign_prehash_recoverable(&digest)
     }
+}
 
+impl EncodeSignedTransaction for Signer {
     fn encode_signed_transaction(
         &self,
-        tx_bytes: &[u8],
+        unsigned_tx: &[u8],
         signature: &SignOutput,
-    ) -> Result<Vec<u8>, Self::Error> {
-        Self::encode_signed_transaction(tx_bytes, signature)
+    ) -> Result<Vec<u8>, SignError> {
+        Self::encode_signed_transaction(unsigned_tx, signature)
     }
 }
 
@@ -245,6 +161,17 @@ impl Signer {
     /// Returns an error if the private key is invalid.
     pub fn from_derived(account: &kobe_evm::DerivedAccount) -> Result<Self, SignError> {
         Self::from_bytes(account.private_key_bytes())
+    }
+}
+
+/// Bump the `v` byte of an [`SignOutput::Ecdsa`] by 27 (EIP-191 encoding).
+fn bump_v_by_27(out: SignOutput) -> SignOutput {
+    match out {
+        SignOutput::Ecdsa { signature, v } => SignOutput::Ecdsa {
+            signature,
+            v: v.wrapping_add(27),
+        },
+        other => other,
     }
 }
 

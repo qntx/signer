@@ -21,7 +21,6 @@ hex.workspace = true
 sha2.workspace = true
 ripemd.workspace = true
 bs58.workspace = true
-thiserror.workspace = true
 
 kobe-spark = { workspace = true, optional = true }
 

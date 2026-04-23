@@ -1307,7 +1307,6 @@ dependencies = [
  "kobe-aptos",
  "sha3 0.10.9",
  "signer-primitives",
- "thiserror",
 ]
 
 [[package]]
@@ -1320,7 +1319,6 @@ dependencies = [
  "ripemd 0.2.0",
  "sha2 0.10.9",
  "signer-primitives",
- "thiserror",
 ]
 
 [[package]]
@@ -1358,7 +1356,6 @@ dependencies = [
  "ripemd 0.2.0",
  "sha2 0.10.9",
  "signer-primitives",
- "thiserror",
 ]
 
 [[package]]
@@ -1370,7 +1367,6 @@ dependencies = [
  "serde_json",
  "sha3 0.10.9",
  "signer-primitives",
- "thiserror",
  "zeroize",
 ]
 
@@ -1382,7 +1378,6 @@ dependencies = [
  "hex",
  "kobe-fil",
  "signer-primitives",
- "thiserror",
 ]
 
 [[package]]
@@ -1420,7 +1415,6 @@ dependencies = [
  "ripemd 0.2.0",
  "sha2 0.10.9",
  "signer-primitives",
- "thiserror",
 ]
 
 [[package]]
@@ -1432,7 +1426,6 @@ dependencies = [
  "hex",
  "kobe-sui",
  "signer-primitives",
- "thiserror",
 ]
 
 [[package]]
@@ -1456,7 +1449,6 @@ dependencies = [
  "hex",
  "kobe-ton",
  "signer-primitives",
- "thiserror",
 ]
 
 [[package]]
@@ -1469,7 +1461,6 @@ dependencies = [
  "sha2 0.10.9",
  "sha3 0.10.9",
  "signer-primitives",
- "thiserror",
 ]
 
 [[package]]
@@ -1482,7 +1473,6 @@ dependencies = [
  "ripemd 0.2.0",
  "sha2 0.10.9",
  "signer-primitives",
- "thiserror",
 ]
 
 [[package]]

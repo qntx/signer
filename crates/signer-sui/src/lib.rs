@@ -12,14 +12,11 @@ extern crate alloc;
 
 use alloc::{format, string::String, vec::Vec};
 
-mod error;
-
 use blake2::Blake2bVar;
 use blake2::digest::{Update, VariableOutput};
-pub use ed25519_dalek::{self, Signature};
-pub use error::SignError;
-use signer_primitives::Ed25519Signer;
-pub use signer_primitives::{self, Sign, SignExt, SignOutput};
+pub use ed25519_dalek::Signature;
+pub use signer_primitives::{self, Sign, SignError, SignExt, SignOutput};
+use signer_primitives::{Ed25519Signer, delegate_ed25519_ctors};
 
 /// Ed25519 signature scheme flag used by Sui.
 const ED25519_FLAG: u8 = 0x00;
@@ -32,62 +29,20 @@ const MSG_INTENT: [u8; 3] = [0x03, 0x00, 0x00];
 
 /// Sui transaction signer.
 ///
-/// Wraps an [`Ed25519Signer`]. The inner key is zeroized on drop by
+/// Newtype over [`Ed25519Signer`]. The inner key is zeroized on drop by
 /// `ed25519-dalek`.
-pub struct Signer {
-    inner: Ed25519Signer,
-}
-
-impl core::fmt::Debug for Signer {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("Signer")
-            .field("key", &"[REDACTED]")
-            .finish()
-    }
-}
+#[derive(Debug)]
+pub struct Signer(Ed25519Signer);
 
 impl Signer {
-    /// Create from raw 32-byte secret key bytes.
-    ///
-    /// # Errors
-    ///
-    /// Reserved for future compatibility; currently never fails.
-    pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
-        Ok(Self {
-            inner: Ed25519Signer::from_bytes(bytes)?,
-        })
-    }
-
-    /// Create from a hex-encoded 32-byte private key (with or without `0x`).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the hex is invalid or not 32 bytes.
-    pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
-        Ok(Self {
-            inner: Ed25519Signer::from_hex(hex_str)?,
-        })
-    }
-
-    /// Generate a random signer.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the OS random number generator fails.
-    #[cfg(feature = "getrandom")]
-    #[must_use]
-    pub fn random() -> Self {
-        Self {
-            inner: Ed25519Signer::random(),
-        }
-    }
+    delegate_ed25519_ctors!();
 
     /// Sui address: `0x` + hex(BLAKE2b-256(`0x00` || pubkey)).
     #[must_use]
     pub fn address(&self) -> String {
         let mut buf = Vec::with_capacity(33);
         buf.push(ED25519_FLAG);
-        buf.extend_from_slice(&self.inner.public_key_bytes());
+        buf.extend_from_slice(&self.0.public_key_bytes());
         let hash = blake2b_256(&buf);
         format!("0x{}", hex::encode(hash))
     }
@@ -95,58 +50,22 @@ impl Signer {
     /// Public key bytes (32 bytes).
     #[must_use]
     pub fn public_key_bytes(&self) -> Vec<u8> {
-        self.inner.public_key_bytes()
+        self.0.public_key_bytes()
     }
 
     /// Public key in hex (64 chars, no `0x` prefix).
     #[must_use]
     pub fn public_key_hex(&self) -> String {
-        self.inner.public_key_hex()
+        self.0.public_key_hex()
     }
 
     /// Sign arbitrary bytes with Ed25519 (raw, no intent prefix).
     ///
-    /// Returns the native [`ed25519_dalek::Signature`]. For the unified
-    /// [`SignOutput::Ed25519WithPubkey`] wire form, use [`Self::sign_message`].
+    /// Returns the native [`Signature`]. For the unified
+    /// [`SignOutput::Ed25519WithPubkey`] wire form, use [`Sign::sign_message`].
     #[must_use]
     pub fn sign_raw(&self, message: &[u8]) -> Signature {
-        self.inner.sign_raw(message)
-    }
-
-    /// Sign a 32-byte digest with Ed25519 (no intent prefix).
-    ///
-    /// # Errors
-    ///
-    /// Never fails; the [`Result`] is kept for trait symmetry.
-    pub fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-        Ok(self.inner.sign_output_with_pubkey(hash))
-    }
-
-    /// Sign a personal message with Sui's intent-based BLAKE2b-256 hashing.
-    ///
-    /// The message is first BCS-serialized (ULEB128 length prefix), then
-    /// `BLAKE2b-256(intent[3, 0, 0] || bcs_bytes)` is signed with Ed25519.
-    ///
-    /// # Errors
-    ///
-    /// Never fails; the [`Result`] is kept for trait symmetry.
-    pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        let bcs = bcs_serialize_bytes(message);
-        let digest = intent_hash(MSG_INTENT, &bcs);
-        Ok(self.inner.sign_output_with_pubkey(&digest))
-    }
-
-    /// Sign a Sui transaction with intent-based BLAKE2b-256 hashing.
-    ///
-    /// Computes `BLAKE2b-256(intent[0, 0, 0] || tx_bytes)` then signs the
-    /// digest with Ed25519.
-    ///
-    /// # Errors
-    ///
-    /// Never fails; the [`Result`] is kept for trait symmetry.
-    pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
-        let digest = intent_hash(TX_INTENT, tx_bytes);
-        Ok(self.inner.sign_output_with_pubkey(&digest))
+        self.0.sign_raw(message)
     }
 
     /// Verify a 64-byte Ed25519 signature over `message`.
@@ -155,7 +74,7 @@ impl Signer {
     ///
     /// Returns [`SignError::InvalidSignature`] on verification failure.
     pub fn verify(&self, message: &[u8], signature: &[u8]) -> Result<(), SignError> {
-        Ok(self.inner.verify(message, signature)?)
+        self.0.verify(message, signature)
     }
 
     /// Encode a Sui wire signature: `flag(0x00) || sig(64) || pubkey(32)`.
@@ -164,7 +83,7 @@ impl Signer {
         let mut out = Vec::with_capacity(97);
         out.push(ED25519_FLAG);
         out.extend_from_slice(&signature.to_bytes());
-        out.extend_from_slice(&self.inner.public_key_bytes());
+        out.extend_from_slice(&self.0.public_key_bytes());
         out
     }
 }
@@ -172,16 +91,28 @@ impl Signer {
 impl Sign for Signer {
     type Error = SignError;
 
+    /// Sign a 32-byte digest with Ed25519 (no intent prefix).
     fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-        Self::sign_hash(self, hash)
+        Ok(self.0.sign_output_with_pubkey(hash))
     }
 
+    /// Sign a personal message with Sui's intent-based BLAKE2b-256 hashing.
+    ///
+    /// The message is first BCS-serialized (ULEB128 length prefix), then
+    /// `BLAKE2b-256(intent[3, 0, 0] || bcs_bytes)` is signed with Ed25519.
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        Self::sign_message(self, message)
+        let bcs = bcs_serialize_bytes(message);
+        let digest = intent_hash(MSG_INTENT, &bcs);
+        Ok(self.0.sign_output_with_pubkey(&digest))
     }
 
+    /// Sign a Sui transaction with intent-based BLAKE2b-256 hashing.
+    ///
+    /// Computes `BLAKE2b-256(intent[0, 0, 0] || tx_bytes)` then signs the
+    /// digest with Ed25519.
     fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
-        Self::sign_transaction(self, tx_bytes)
+        let digest = intent_hash(TX_INTENT, tx_bytes);
+        Ok(self.0.sign_output_with_pubkey(&digest))
     }
 }
 

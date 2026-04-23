@@ -12,7 +12,7 @@
 use sha3::{Digest, Keccak256};
 use signer_primitives::testing::verify_secp256k1_recoverable;
 
-use super::Signer;
+use super::{Sign, Signer};
 
 const TEST_KEY: &str = "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318";
 const TEST_ADDR: &str = "0x2c7536E3605D9C16a7a3D7b1898e529396a65c23";

@@ -21,7 +21,6 @@ hex.workspace = true
 sha2.workspace = true
 ripemd.workspace = true
 bech32.workspace = true
-thiserror.workspace = true
 
 kobe-cosmos = { workspace = true, optional = true }
 

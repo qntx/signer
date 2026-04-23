@@ -12,14 +12,10 @@ extern crate alloc;
 
 use alloc::{format, string::String, vec::Vec};
 
+pub use ed25519_dalek::Signature;
 use sha3::Digest as _;
-
-mod error;
-
-pub use ed25519_dalek::{self, Signature};
-pub use error::SignError;
-use signer_primitives::Ed25519Signer;
-pub use signer_primitives::{self, Sign, SignExt, SignOutput};
+pub use signer_primitives::{self, Sign, SignError, SignExt, SignOutput};
+use signer_primitives::{Ed25519Signer, delegate_ed25519_ctors};
 
 /// Ed25519 single-key authentication scheme byte used by Aptos.
 const ED25519_SCHEME: u8 = 0x00;
@@ -29,60 +25,18 @@ const RAW_TX_DOMAIN: &[u8] = b"APTOS::RawTransaction";
 
 /// Aptos transaction signer.
 ///
-/// Wraps an [`Ed25519Signer`]. The inner key is zeroized on drop by
+/// Newtype over [`Ed25519Signer`]. The inner key is zeroized on drop by
 /// `ed25519-dalek`.
-pub struct Signer {
-    inner: Ed25519Signer,
-}
-
-impl core::fmt::Debug for Signer {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("Signer")
-            .field("key", &"[REDACTED]")
-            .finish()
-    }
-}
+#[derive(Debug)]
+pub struct Signer(Ed25519Signer);
 
 impl Signer {
-    /// Create from raw 32-byte secret key bytes.
-    ///
-    /// # Errors
-    ///
-    /// Reserved for future compatibility; currently never fails.
-    pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
-        Ok(Self {
-            inner: Ed25519Signer::from_bytes(bytes)?,
-        })
-    }
-
-    /// Create from a hex-encoded 32-byte private key (with or without `0x`).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the hex is invalid or not 32 bytes.
-    pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
-        Ok(Self {
-            inner: Ed25519Signer::from_hex(hex_str)?,
-        })
-    }
-
-    /// Generate a random signer.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the OS random number generator fails.
-    #[cfg(feature = "getrandom")]
-    #[must_use]
-    pub fn random() -> Self {
-        Self {
-            inner: Ed25519Signer::random(),
-        }
-    }
+    delegate_ed25519_ctors!();
 
     /// Aptos account address: `0x` + hex(`SHA3-256(pubkey || 0x00)`).
     #[must_use]
     pub fn address(&self) -> String {
-        let mut buf = self.inner.public_key_bytes();
+        let mut buf = self.0.public_key_bytes();
         buf.push(ED25519_SCHEME);
         let hash = sha3_256(&buf);
         format!("0x{}", hex::encode(hash))
@@ -91,54 +45,22 @@ impl Signer {
     /// Public key bytes (32 bytes).
     #[must_use]
     pub fn public_key_bytes(&self) -> Vec<u8> {
-        self.inner.public_key_bytes()
+        self.0.public_key_bytes()
     }
 
     /// Public key in hex.
     #[must_use]
     pub fn public_key_hex(&self) -> String {
-        self.inner.public_key_hex()
+        self.0.public_key_hex()
     }
 
     /// Sign arbitrary bytes with raw Ed25519 (no domain prefix).
     ///
-    /// Returns the native [`ed25519_dalek::Signature`] type. Callers that
-    /// want the unified [`SignOutput::Ed25519WithPubkey`] wire form should
-    /// use [`Self::sign_message`] instead.
+    /// Returns the native [`Signature`]. For the unified
+    /// [`SignOutput::Ed25519WithPubkey`] wire form, use [`Sign::sign_message`].
     #[must_use]
     pub fn sign_raw(&self, message: &[u8]) -> Signature {
-        self.inner.sign_raw(message)
-    }
-
-    /// Sign a 32-byte digest with Ed25519 (no Aptos domain prefix).
-    ///
-    /// # Errors
-    ///
-    /// Never fails; the [`Result`] is kept for trait symmetry.
-    pub fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-        Ok(self.inner.sign_output_with_pubkey(hash))
-    }
-
-    /// Sign an arbitrary message with raw Ed25519 (no Aptos domain prefix).
-    ///
-    /// # Errors
-    ///
-    /// Never fails; the [`Result`] is kept for trait symmetry.
-    pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        Ok(self.inner.sign_output_with_pubkey(message))
-    }
-
-    /// Sign a BCS-serialized `RawTransaction`.
-    ///
-    /// Computes `SHA3-256("APTOS::RawTransaction")` as the 32-byte prefix,
-    /// then signs `prefix || bcs_raw_tx` with Ed25519.
-    ///
-    /// # Errors
-    ///
-    /// Never fails; the [`Result`] is kept for trait symmetry.
-    pub fn sign_transaction(&self, bcs_raw_tx: &[u8]) -> Result<SignOutput, SignError> {
-        let signing_msg = tx_signing_message(bcs_raw_tx);
-        Ok(self.inner.sign_output_with_pubkey(&signing_msg))
+        self.0.sign_raw(message)
     }
 
     /// Verify a 64-byte Ed25519 signature over `message`.
@@ -148,23 +70,30 @@ impl Signer {
     /// Returns [`SignError::InvalidSignature`] if the bytes are not a valid
     /// 64-byte signature or fail verification.
     pub fn verify(&self, message: &[u8], signature: &[u8]) -> Result<(), SignError> {
-        Ok(self.inner.verify(message, signature)?)
+        self.0.verify(message, signature)
     }
 }
 
 impl Sign for Signer {
     type Error = SignError;
 
+    /// Sign a 32-byte digest with Ed25519 (no Aptos domain prefix).
     fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-        Self::sign_hash(self, hash)
+        Ok(self.0.sign_output_with_pubkey(hash))
     }
 
+    /// Sign an arbitrary message with raw Ed25519 (no Aptos domain prefix).
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        Self::sign_message(self, message)
+        Ok(self.0.sign_output_with_pubkey(message))
     }
 
-    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
-        Self::sign_transaction(self, tx_bytes)
+    /// Sign a BCS-serialized `RawTransaction`.
+    ///
+    /// Computes `SHA3-256("APTOS::RawTransaction")` as the 32-byte prefix,
+    /// then signs `prefix || bcs_raw_tx` with Ed25519.
+    fn sign_transaction(&self, bcs_raw_tx: &[u8]) -> Result<SignOutput, SignError> {
+        let signing_msg = tx_signing_message(bcs_raw_tx);
+        Ok(self.0.sign_output_with_pubkey(&signing_msg))
     }
 }
 

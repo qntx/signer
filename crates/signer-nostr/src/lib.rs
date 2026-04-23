@@ -11,7 +11,7 @@
 //! # Examples
 //!
 //! ```
-//! use signer_nostr::Signer;
+//! use signer_nostr::{Sign as _, Signer};
 //!
 //! // NIP-06 test vector 1.
 //! let signer = Signer::from_hex(
@@ -35,8 +35,8 @@ use alloc::vec::Vec;
 
 use bech32::{Bech32, Hrp};
 use sha2::{Digest as _, Sha256};
-use signer_primitives::SchnorrSigner;
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
+use signer_primitives::{SchnorrSigner, delegate_schnorr_ctors};
 use zeroize::Zeroizing;
 
 mod error;
@@ -52,67 +52,23 @@ pub const NOTE_HRP: &str = "note";
 
 /// Nostr transaction signer.
 ///
-/// Wraps a BIP-340 [`SchnorrSigner`]. The inner key is zeroized on drop.
-pub struct Signer {
-    inner: SchnorrSigner,
-}
-
-impl core::fmt::Debug for Signer {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("Signer")
-            .field("key", &"[REDACTED]")
-            .finish()
-    }
-}
+/// Newtype over BIP-340 [`SchnorrSigner`]. The inner key is zeroized on drop.
+#[derive(Debug)]
+pub struct Signer(SchnorrSigner);
 
 impl Signer {
-    /// Create from a raw 32-byte private key.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`SignError::InvalidKey`] if the bytes are not a valid
-    /// secp256k1 scalar.
-    pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
-        Ok(Self {
-            inner: SchnorrSigner::from_bytes(bytes)?,
-        })
-    }
-
-    /// Create from a hex-encoded private key (with or without `0x`).
-    ///
-    /// # Errors
-    ///
-    /// Returns [`SignError::InvalidKey`] if the hex is invalid or the key is
-    /// out of range.
-    pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
-        Ok(Self {
-            inner: SchnorrSigner::from_hex(hex_str)?,
-        })
-    }
+    delegate_schnorr_ctors!(SignError);
 
     /// Create from a NIP-19 `nsec1…` bech32-encoded private key.
     ///
     /// # Errors
     ///
     /// Returns [`SignError::Bech32`] if the string is malformed or has the
-    /// wrong human-readable part, or [`SignError::InvalidKey`] if the decoded
+    /// wrong human-readable part, or a core [`SignError::Core`] if the decoded
     /// bytes are not a valid secp256k1 scalar.
     pub fn from_nsec(nsec: &str) -> Result<Self, SignError> {
         let bytes = decode_bech32_32(nsec, NSEC_HRP)?;
         Self::from_bytes(&bytes)
-    }
-
-    /// Generate a random signer using OS-provided entropy.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the OS random number generator fails.
-    #[cfg(feature = "getrandom")]
-    #[must_use]
-    pub fn random() -> Self {
-        Self {
-            inner: SchnorrSigner::random(),
-        }
     }
 
     /// NIP-19 `npub1…` bech32-encoded x-only public key.
@@ -120,7 +76,7 @@ impl Signer {
     /// This is the canonical on-wire address format for a Nostr account.
     #[must_use]
     pub fn address(&self) -> String {
-        encode_bech32(NPUB_HRP, &self.inner.xonly_public_key())
+        encode_bech32(NPUB_HRP, &self.0.xonly_public_key())
     }
 
     /// Alias for [`address`](Self::address).
@@ -134,20 +90,35 @@ impl Signer {
     /// Handle with the same care as the raw private key.
     #[must_use]
     pub fn nsec(&self) -> Zeroizing<String> {
-        Zeroizing::new(encode_bech32(NSEC_HRP, &self.inner.to_bytes()))
+        Zeroizing::new(encode_bech32(NSEC_HRP, &self.0.to_bytes()))
     }
 
     /// 32-byte x-only public key (NIP-01 wire format).
     #[must_use]
     pub fn public_key_bytes(&self) -> Vec<u8> {
-        self.inner.xonly_public_key().to_vec()
+        self.0.xonly_public_key().to_vec()
     }
 
     /// Hex-encoded 32-byte x-only public key (64 lowercase characters).
     #[must_use]
     pub fn public_key_hex(&self) -> String {
-        self.inner.xonly_public_key_hex()
+        self.0.xonly_public_key_hex()
     }
+
+    /// Verify a signature against a message with this signer's public key.
+    ///
+    /// Primarily intended for round-trip testing.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SignError::Core`] on verification failure.
+    pub fn verify(&self, message: &[u8], signature: &[u8]) -> Result<(), SignError> {
+        self.0.verify(message, signature).map_err(Into::into)
+    }
+}
+
+impl Sign for Signer {
+    type Error = SignError;
 
     /// Sign a NIP-01 event id (32-byte SHA-256 of the canonical serialization).
     ///
@@ -155,15 +126,10 @@ impl Signer {
     /// event per NIP-01 §"Events and signatures", compute its SHA-256, and
     /// pass the resulting 32 bytes here.
     ///
-    /// Returns a 64-byte BIP-340 Schnorr signature with the signer's
-    /// x-only public key attached.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`SignError::InvalidMessage`] if `event_id` is not 32 bytes,
-    /// or [`SignError::SigningFailed`] if the primitive fails.
-    pub fn sign_hash(&self, event_id: &[u8; 32]) -> Result<SignOutput, SignError> {
-        Ok(self.inner.sign_prehash(event_id)?)
+    /// Returns a 64-byte BIP-340 Schnorr signature with the signer's x-only
+    /// public key attached.
+    fn sign_hash(&self, event_id: &[u8; 32]) -> Result<SignOutput, SignError> {
+        self.0.sign_prehash(event_id).map_err(Into::into)
     }
 
     /// Sign arbitrary bytes with BIP-340 Schnorr (deterministic).
@@ -184,12 +150,8 @@ impl Signer {
     ///
     /// Use this method only for bespoke off-protocol challenges where both
     /// signer and verifier agree on the exact input bytes.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`SignError::SigningFailed`] if the primitive fails.
-    pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        Ok(self.inner.sign(message)?)
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
+        self.0.sign(message).map_err(Into::into)
     }
 
     /// Sign a serialized NIP-01 event: computes SHA-256 then Schnorr-signs.
@@ -198,40 +160,9 @@ impl Signer {
     /// `[0, pubkey, created_at, kind, tags, content]` as specified in
     /// NIP-01. The returned 64-byte signature is valid for the event whose
     /// id equals `sha256(serialized_event)`.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`SignError::SigningFailed`] if the primitive fails.
-    pub fn sign_transaction(&self, serialized_event: &[u8]) -> Result<SignOutput, SignError> {
+    fn sign_transaction(&self, serialized_event: &[u8]) -> Result<SignOutput, SignError> {
         let event_id: [u8; 32] = Sha256::digest(serialized_event).into();
         self.sign_hash(&event_id)
-    }
-
-    /// Verify a signature against a message with this signer's public key.
-    ///
-    /// Primarily intended for round-trip testing.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`SignError::InvalidSignature`] on verification failure.
-    pub fn verify(&self, message: &[u8], signature: &[u8]) -> Result<(), SignError> {
-        Ok(self.inner.verify(message, signature)?)
-    }
-}
-
-impl Sign for Signer {
-    type Error = SignError;
-
-    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, Self::Error> {
-        Self::sign_hash(self, hash)
-    }
-
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Self::Error> {
-        Self::sign_message(self, message)
-    }
-
-    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Self::Error> {
-        Self::sign_transaction(self, tx_bytes)
     }
 }
 
@@ -244,8 +175,8 @@ impl Signer {
     ///
     /// # Errors
     ///
-    /// Returns [`SignError::InvalidKey`] if the derived bytes are not a
-    /// valid secp256k1 scalar.
+    /// Returns [`SignError::Core`] if the derived bytes are not a valid
+    /// secp256k1 scalar.
     pub fn from_derived(account: &kobe_nostr::DerivedAccount) -> Result<Self, SignError> {
         Self::from_bytes(account.private_key_bytes())
     }

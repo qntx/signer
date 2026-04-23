@@ -19,7 +19,6 @@ kobe = ["dep:kobe-fil"]
 signer-primitives = { workspace = true, features = ["secp256k1"] }
 hex.workspace = true
 blake2.workspace = true
-thiserror.workspace = true
 
 kobe-fil = { workspace = true, optional = true }
 

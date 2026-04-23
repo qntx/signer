@@ -1,7 +1,7 @@
 //! Solana signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_svm::Signer;
+use signer_svm::{Sign, Signer};
 
 use super::parse_hex;
 use crate::output::{self, CliResult};

@@ -1,7 +1,7 @@
 //! Filecoin signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_fil::Signer;
+use signer_fil::{Sign, Signer};
 
 use super::{parse_hex, parse_hex32};
 use crate::output::{self, CliResult};

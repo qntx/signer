@@ -10,7 +10,7 @@
 
 use signer_primitives::SignOutput;
 
-use super::{Sign, Signer};
+use super::{EncodeSignedTransaction, Sign, Signer};
 
 /// RFC 8032 Test Vector 1.
 const TEST_KEY: &str = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
@@ -123,7 +123,7 @@ fn sign_trait_encode_signed_transaction_requires_ed25519_variant() {
     let mut tx = vec![1u8];
     tx.extend_from_slice(&[0u8; 64]);
     tx.extend_from_slice(b"body");
-    let encoded = Sign::encode_signed_transaction(&s, &tx, &out).unwrap();
+    let encoded = EncodeSignedTransaction::encode_signed_transaction(&s, &tx, &out).unwrap();
     assert_eq!(&encoded[1..65], &out.to_bytes());
 }
 
@@ -136,7 +136,7 @@ fn sign_trait_encode_signed_transaction_rejects_non_ed25519() {
     };
     let mut tx = vec![1u8];
     tx.extend_from_slice(&[0u8; 64]);
-    assert!(Sign::encode_signed_transaction(&s, &tx, &wrong).is_err());
+    assert!(EncodeSignedTransaction::encode_signed_transaction(&s, &tx, &wrong).is_err());
 }
 
 #[test]

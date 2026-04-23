@@ -1,7 +1,7 @@
 //! Cosmos signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_cosmos::Signer;
+use signer_cosmos::{Sign, Signer};
 
 use super::{parse_hex, parse_hex32};
 use crate::output::{self, CliResult};

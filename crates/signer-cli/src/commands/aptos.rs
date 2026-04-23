@@ -1,8 +1,7 @@
 //! Aptos signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_aptos::Signer;
-use signer_primitives::Sign;
+use signer_aptos::{Sign, Signer};
 
 use super::parse_hex;
 use crate::output::{self, CliResult};

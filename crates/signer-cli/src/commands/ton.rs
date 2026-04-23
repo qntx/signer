@@ -1,8 +1,7 @@
 //! TON signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_primitives::Sign;
-use signer_ton::Signer;
+use signer_ton::{Sign, Signer};
 
 use super::parse_hex;
 use crate::output::{self, CliResult};

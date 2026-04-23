@@ -1,7 +1,7 @@
 //! Tron signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_tron::Signer;
+use signer_tron::{Sign, Signer};
 
 use super::{parse_hex, parse_hex32};
 use crate::output::{self, CliResult};
