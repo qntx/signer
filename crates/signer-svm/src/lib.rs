@@ -119,15 +119,41 @@ impl Signer {
     }
 
     /// Sign arbitrary bytes with raw Ed25519 (no hashing or prefixing).
+    ///
+    /// Returns the native [`ed25519_dalek::Signature`]. For the unified
+    /// [`SignOutput::Ed25519`] wire form, use [`Self::sign_message`].
     #[must_use]
     pub fn sign_raw(&self, message: &[u8]) -> Signature {
         self.inner.sign_raw(message)
     }
 
-    /// Sign serialized Solana transaction message bytes.
-    #[must_use]
-    pub fn sign_transaction_message(&self, message_bytes: &[u8]) -> Signature {
-        self.sign_raw(message_bytes)
+    /// Sign a 32-byte digest with Ed25519.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; the [`Result`] is kept for trait symmetry.
+    pub fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
+        Ok(self.inner.sign_output(hash))
+    }
+
+    /// Sign an arbitrary message with raw Ed25519 (Solana's native convention).
+    ///
+    /// # Errors
+    ///
+    /// Never fails; the [`Result`] is kept for trait symmetry.
+    pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
+        Ok(self.inner.sign_output(message))
+    }
+
+    /// Sign a serialized Solana transaction message (post-header payload).
+    ///
+    /// Solana's wire format signs the raw message bytes directly.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; the [`Result`] is kept for trait symmetry.
+    pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
+        Ok(self.inner.sign_output(tx_bytes))
     }
 
     /// Verify a 64-byte Ed25519 signature.

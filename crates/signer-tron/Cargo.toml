@@ -4,8 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+readme = "../../README.md"
 description = "TRON transaction signer — secp256k1 ECDSA + Keccak-256."
-
+keywords = ["crypto", "signer", "tron", "secp256k1", "keccak"]
+categories = ["cryptography::cryptocurrencies", "no-std"]
 [features]
 default = ["std"]
 std = ["alloc", "signer-primitives/std"]
@@ -15,6 +17,7 @@ kobe = ["dep:kobe-tron"]
 
 [dependencies]
 signer-primitives = { workspace = true, features = ["secp256k1"] }
+hex.workspace = true
 sha2.workspace = true
 sha3.workspace = true
 bs58.workspace = true

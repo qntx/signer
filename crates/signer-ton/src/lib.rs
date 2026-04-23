@@ -91,12 +91,42 @@ impl Signer {
     }
 
     /// Sign arbitrary bytes with raw Ed25519 (no hashing or prefixing).
+    ///
+    /// Returns the native [`ed25519_dalek::Signature`]. For the unified
+    /// [`SignOutput::Ed25519`] wire form, use [`Self::sign_message`].
     #[must_use]
     pub fn sign_raw(&self, message: &[u8]) -> Signature {
         self.inner.sign_raw(message)
     }
 
-    /// Verify a 64-byte Ed25519 signature.
+    /// Sign a 32-byte digest with Ed25519.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; the [`Result`] is kept for trait symmetry.
+    pub fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
+        Ok(self.inner.sign_output(hash))
+    }
+
+    /// Sign an arbitrary message with raw Ed25519 (TON's native convention).
+    ///
+    /// # Errors
+    ///
+    /// Never fails; the [`Result`] is kept for trait symmetry.
+    pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
+        Ok(self.inner.sign_output(message))
+    }
+
+    /// Sign transaction bytes with raw Ed25519.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; the [`Result`] is kept for trait symmetry.
+    pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
+        Ok(self.inner.sign_output(tx_bytes))
+    }
+
+    /// Verify a 64-byte Ed25519 signature over `message`.
     ///
     /// # Errors
     ///
@@ -110,15 +140,15 @@ impl Sign for Signer {
     type Error = SignError;
 
     fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-        Ok(self.inner.sign_output(hash))
+        Self::sign_hash(self, hash)
     }
 
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        Ok(self.inner.sign_output(message))
+        Self::sign_message(self, message)
     }
 
     fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
-        Ok(self.inner.sign_output(tx_bytes))
+        Self::sign_transaction(self, tx_bytes)
     }
 }
 

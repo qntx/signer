@@ -4,8 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+readme = "../../README.md"
 description = "TON transaction signer — Ed25519 signing."
-
+keywords = ["crypto", "signer", "ton", "ed25519", "wallet"]
+categories = ["cryptography::cryptocurrencies", "no-std"]
 [features]
 default = ["std"]
 std = ["alloc", "signer-primitives/std"]

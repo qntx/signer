@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+readme = "../../README.md"
 description = "Nostr transaction signer — BIP-340 Schnorr signing, NIP-01/NIP-19 bech32."
 keywords = ["crypto", "signer", "nostr", "schnorr", "bip340"]
 categories = ["cryptography::cryptocurrencies"]

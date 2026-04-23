@@ -101,22 +101,47 @@ impl Signer {
     }
 
     /// Sign arbitrary bytes with raw Ed25519 (no domain prefix).
+    ///
+    /// Returns the native [`ed25519_dalek::Signature`] type. Callers that
+    /// want the unified [`SignOutput::Ed25519WithPubkey`] wire form should
+    /// use [`Self::sign_message`] instead.
     #[must_use]
     pub fn sign_raw(&self, message: &[u8]) -> Signature {
         self.inner.sign_raw(message)
+    }
+
+    /// Sign a 32-byte digest with Ed25519 (no Aptos domain prefix).
+    ///
+    /// # Errors
+    ///
+    /// Never fails; the [`Result`] is kept for trait symmetry.
+    pub fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
+        Ok(self.inner.sign_output_with_pubkey(hash))
+    }
+
+    /// Sign an arbitrary message with raw Ed25519 (no Aptos domain prefix).
+    ///
+    /// # Errors
+    ///
+    /// Never fails; the [`Result`] is kept for trait symmetry.
+    pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
+        Ok(self.inner.sign_output_with_pubkey(message))
     }
 
     /// Sign a BCS-serialized `RawTransaction`.
     ///
     /// Computes `SHA3-256("APTOS::RawTransaction")` as the 32-byte prefix,
     /// then signs `prefix || bcs_raw_tx` with Ed25519.
-    #[must_use]
-    pub fn sign_transaction_bcs(&self, bcs_raw_tx: &[u8]) -> Signature {
+    ///
+    /// # Errors
+    ///
+    /// Never fails; the [`Result`] is kept for trait symmetry.
+    pub fn sign_transaction(&self, bcs_raw_tx: &[u8]) -> Result<SignOutput, SignError> {
         let signing_msg = tx_signing_message(bcs_raw_tx);
-        self.inner.sign_raw(&signing_msg)
+        Ok(self.inner.sign_output_with_pubkey(&signing_msg))
     }
 
-    /// Verify a 64-byte Ed25519 signature.
+    /// Verify a 64-byte Ed25519 signature over `message`.
     ///
     /// # Errors
     ///
@@ -131,16 +156,15 @@ impl Sign for Signer {
     type Error = SignError;
 
     fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-        Ok(self.inner.sign_output_with_pubkey(hash))
+        Self::sign_hash(self, hash)
     }
 
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        Ok(self.inner.sign_output_with_pubkey(message))
+        Self::sign_message(self, message)
     }
 
     fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
-        let signing_msg = tx_signing_message(tx_bytes);
-        Ok(self.inner.sign_output_with_pubkey(&signing_msg))
+        Self::sign_transaction(self, tx_bytes)
     }
 }
 

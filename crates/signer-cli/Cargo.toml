@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+readme = "../../README.md"
 description = "Multi-chain transaction signing CLI tool."
 keywords = ["crypto", "signer", "bitcoin", "ethereum", "cli"]
 categories = ["command-line-utilities", "cryptography"]

@@ -172,7 +172,7 @@ impl SchnorrSigner {
     /// accepts arbitrary-length payloads.
     ///
     /// The returned [`SignOutput`] carries the 64-byte signature and the
-    /// signer's 32-byte x-only public key (`recovery_id` is always `None`).
+    /// signer's 32-byte x-only public key (`v()` is always `None`).
     ///
     /// # Errors
     ///

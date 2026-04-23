@@ -77,30 +77,35 @@ signer --json evm sign-message -k "0x4c0883a6..." -m "test"
 
 ### Library Usage
 
+Every chain exposes the same inherent surface (`sign_hash` / `sign_message` /
+`sign_transaction` / `verify` / `public_key_hex` / `address`). The unified
+[`SignOutput`] enum carries chain-native wire formats with pattern-match
+accessors — no `use signer_primitives::Sign` required for everyday work.
+
 ```rust
 use signer_evm::Signer;
 
 let signer = Signer::from_hex("4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318")?;
-let out = signer.sign_message(b"hello")?;
+let out = signer.sign_message(b"hello")?;   // SignOutput::Ecdsa { .., v: 27 | 28 }
 
 println!("Address:   {}", signer.address());
-println!("Signature: {}", hex::encode(&out.signature));
+println!("Signature: {}", out.to_hex());     // 65-byte r || s || v, hex-encoded
+if let Some(v) = out.v() { println!("v: {v}"); }
 ```
 
 ```rust
 use signer_svm::Signer;
-use ed25519_dalek::Signer as _;
 
 let signer = Signer::random();
-let sig = signer.sign(b"hello solana");
-signer.verify(b"hello solana", &sig)?;
+let out = signer.sign_message(b"hello solana")?;     // SignOutput::Ed25519([u8; 64])
+signer.verify(b"hello solana", &out.to_bytes())?;    // inherent verify, &[u8] everywhere
 
 println!("Address: {}", signer.address());
 ```
 
 ### Kobe HD Wallet Integration
 
-Enable the `kobe` feature to construct signers from [kobe](https://github.com/qntx/kobe) derived keys:
+Enable the `kobe` feature to construct signers from [kobe](https://github.com/qntx/kobe) 1.0 derived keys:
 
 ```rust
 use kobe::Wallet;
@@ -108,16 +113,27 @@ use kobe_evm::Deriver;
 use signer_evm::Signer;
 
 let wallet = Wallet::from_mnemonic("abandon abandon ... about", None)?;
-let derived = Deriver::new(&wallet).derive(0)?;
-let signer = Signer::from_derived(&derived)?;
+let account = Deriver::new(&wallet).derive(0)?;
+let signer  = Signer::from_derived(&account)?;
 println!("Address: {}", signer.address());
+```
+
+For chains with newtype-wrapped accounts (Bitcoin / Solana), pass the
+chain-specific account directly:
+
+```rust
+// Bitcoin: kobe_btc::BtcAccount wraps DerivedAccount + WIF / address type
+let account = kobe_btc::Deriver::new(&wallet, kobe_btc::Network::Mainnet)?.derive(0)?;
+let signer  = signer_btc::Signer::from_derived(&account)?;
 ```
 
 ## Design
 
 - **12 chains** — Ethereum, Bitcoin, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, Aptos, Nostr
 - **Zero hand-rolled crypto** — secp256k1 ECDSA & BIP-340 Schnorr via [k256](https://docs.rs/k256), Ed25519 via [ed25519-dalek](https://docs.rs/ed25519-dalek)
-- **Unified trait** — `Sign` trait with `sign_hash`, `sign_message`, `sign_transaction` across all chains
+- **Type-safe digests** — `sign_hash` takes `&[u8; 32]`; ragged byte slices are rejected at compile time
+- **Discriminated `SignOutput`** — enum variants (`Ecdsa`, `EcdsaDer`, `Ed25519`, `Ed25519WithPubkey`, `Schnorr`) carry chain-native wire formats; no `Option` juggling
+- **Inherent API parity** — every chain `Signer` exposes canonical `sign_hash` / `sign_message` / `sign_transaction` / `verify` / `public_key_hex` directly, with the `Sign` trait delegating on top
 - **`no_std` + `alloc`** — All library crates compile without `std`; embedded / WASM ready
 - **Security hardened** — `ZeroizeOnDrop`, `Debug` redacted (`[REDACTED]`), `Clone` removed, `Send + Sync`
 - **Kobe integration** — Optional HD wallet bridging via `kobe` feature flag

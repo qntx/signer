@@ -36,7 +36,7 @@ pub(crate) const DIGEST_LEN: usize = 32;
 /// assert_eq!(signer.uncompressed_public_key().len(), 65);
 ///
 /// let out = signer.sign_prehash_recoverable(&[0u8; 32])?;
-/// assert_eq!(out.to_bytes().len(), 65); // r(32) + s(32) + recovery_id(1)
+/// assert_eq!(out.to_bytes().len(), 65); // r(32) + s(32) + v(1)
 /// # Ok::<_, signer_primitives::SignError>(())
 /// ```
 pub struct Secp256k1Signer {

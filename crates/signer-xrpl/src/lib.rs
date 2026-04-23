@@ -102,6 +102,25 @@ impl Signer {
         self.inner.compressed_public_key()
     }
 
+    /// Compressed public key as hex (66 chars, no `0x` prefix).
+    #[must_use]
+    pub fn public_key_hex(&self) -> String {
+        hex::encode(self.inner.compressed_public_key())
+    }
+
+    /// Verify an ECDSA signature against a 32-byte pre-hashed digest.
+    ///
+    /// Accepts 64-byte (`r || s`) or 65-byte (`r || s || v`) input;
+    /// the `v` byte is ignored for verification.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SignError::InvalidSignature`] on malformed input or
+    /// failed verification.
+    pub fn verify_hash(&self, hash: &[u8; 32], signature: &[u8]) -> Result<(), SignError> {
+        Ok(self.inner.verify_prehash(hash, signature)?)
+    }
+
     /// Sign a 32-byte pre-hashed digest with secp256k1.
     ///
     /// Returns a [`SignOutput::EcdsaDer`] (variable length, typically 70–72 bytes).

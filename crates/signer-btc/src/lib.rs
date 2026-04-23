@@ -14,7 +14,7 @@
 //! let signer = Signer::random();
 //! let hash = [0u8; 32];
 //! let out = signer.sign_hash(&hash).unwrap();
-//! assert_eq!(out.to_bytes().len(), 65); // r(32) + s(32) + recovery_id(1)
+//! assert_eq!(out.to_bytes().len(), 65); // r(32) + s(32) + v(1)
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -106,6 +106,26 @@ impl Signer {
     #[must_use]
     pub fn public_key_bytes(&self) -> Vec<u8> {
         self.inner.compressed_public_key()
+    }
+
+    /// Compressed public key as hex (66 chars, no `0x` prefix).
+    #[must_use]
+    pub fn public_key_hex(&self) -> String {
+        hex::encode(self.inner.compressed_public_key())
+    }
+
+    /// Verify a recoverable or compact ECDSA signature against a 32-byte
+    /// pre-hashed sighash.
+    ///
+    /// Accepts 64-byte (`r || s`) or 65-byte (`r || s || v`) input; the
+    /// `v` byte is ignored for verification.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SignError::InvalidSignature`] on malformed input or
+    /// failed verification.
+    pub fn verify_hash(&self, hash: &[u8; 32], signature: &[u8]) -> Result<(), SignError> {
+        Ok(self.inner.verify_prehash(hash, signature)?)
     }
 
     /// Sign a 32-byte sighash. Returns a [`SignOutput::Ecdsa`]

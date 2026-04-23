@@ -4,8 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+readme = "../../README.md"
 description = "Filecoin transaction signer — secp256k1 ECDSA + Blake2b."
-
+keywords = ["crypto", "signer", "filecoin", "blake2b", "secp256k1"]
+categories = ["cryptography::cryptocurrencies", "no-std"]
 [features]
 default = ["std"]
 std = ["alloc", "signer-primitives/std"]
@@ -15,6 +17,7 @@ kobe = ["dep:kobe-fil"]
 
 [dependencies]
 signer-primitives = { workspace = true, features = ["secp256k1"] }
+hex.workspace = true
 blake2.workspace = true
 thiserror.workspace = true
 

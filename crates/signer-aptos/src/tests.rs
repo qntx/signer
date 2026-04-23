@@ -60,12 +60,12 @@ fn sign_wrong_message_fails() {
 }
 
 #[test]
-fn sign_transaction_bcs_verify() {
+fn sign_transaction_verify() {
     let s = test_signer();
     let bcs_tx = b"fake bcs raw transaction";
-    let sig = s.sign_transaction_bcs(bcs_tx);
+    let out = s.sign_transaction(bcs_tx).unwrap();
     let signing_msg = tx_signing_message(bcs_tx);
-    s.verify(&signing_msg, sig.to_bytes().as_slice())
+    s.verify(&signing_msg, &out.to_bytes())
         .expect("transaction signature must verify against signing message");
 }
 
@@ -92,8 +92,8 @@ fn sign_trait_includes_pubkey() {
 #[test]
 fn deterministic_signing() {
     let s = test_signer();
-    let s1 = s.sign_transaction_bcs(b"same input");
-    let s2 = s.sign_transaction_bcs(b"same input");
+    let s1 = s.sign_transaction(b"same input").unwrap();
+    let s2 = s.sign_transaction(b"same input").unwrap();
     assert_eq!(s1.to_bytes(), s2.to_bytes());
 }
 

@@ -50,9 +50,9 @@ fn from_bytes_matches_from_hex() {
 fn sign_transaction_intent_verify() {
     let s = test_signer();
     let tx = b"bcs transaction data";
-    let sig = s.sign_transaction_intent(tx);
+    let out = s.sign_transaction(tx).unwrap();
     let digest = intent_hash(TX_INTENT, tx);
-    s.verify(&digest, sig.to_bytes().as_slice())
+    s.verify(&digest, &out.to_bytes())
         .expect("intent digest must verify");
 }
 
@@ -60,10 +60,10 @@ fn sign_transaction_intent_verify() {
 fn sign_message_bcs_intent_verify() {
     let s = test_signer();
     let msg = b"hello sui";
-    let sig = s.sign_message_intent(msg);
+    let out = s.sign_message(msg).unwrap();
     let bcs = bcs_serialize_bytes(msg);
     let digest = intent_hash(MSG_INTENT, &bcs);
-    s.verify(&digest, sig.to_bytes().as_slice())
+    s.verify(&digest, &out.to_bytes())
         .expect("personal msg digest must verify");
 }
 
@@ -92,8 +92,8 @@ fn sign_trait_includes_pubkey() {
 #[test]
 fn deterministic_signing() {
     let s = test_signer();
-    let s1 = s.sign_transaction_intent(b"same input");
-    let s2 = s.sign_transaction_intent(b"same input");
+    let s1 = s.sign_transaction(b"same input").unwrap();
+    let s2 = s.sign_transaction(b"same input").unwrap();
     assert_eq!(s1.to_bytes(), s2.to_bytes());
 }
 

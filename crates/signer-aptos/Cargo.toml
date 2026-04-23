@@ -4,8 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+readme = "../../README.md"
 description = "Aptos transaction signer — Ed25519 signing with SHA3-256 domain separation."
-
+keywords = ["crypto", "signer", "aptos", "ed25519", "sha3"]
+categories = ["cryptography::cryptocurrencies", "no-std"]
 [features]
 default = ["std"]
 std = ["alloc", "signer-primitives/std"]

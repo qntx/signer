@@ -1,7 +1,6 @@
 //! Solana signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_primitives::Sign;
 use signer_svm::Signer;
 
 use super::parse_hex;

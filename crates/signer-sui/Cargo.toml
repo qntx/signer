@@ -4,8 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+readme = "../../README.md"
 description = "Sui transaction signer — Ed25519 + intent-based signing."
-
+keywords = ["crypto", "signer", "sui", "ed25519", "blake2b"]
+categories = ["cryptography::cryptocurrencies", "no-std"]
 [features]
 default = ["std"]
 std = ["alloc", "signer-primitives/std"]

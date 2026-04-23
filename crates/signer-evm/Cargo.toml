@@ -4,8 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+readme = "../../README.md"
 description = "EVM transaction signer — EIP-191, EIP-712, typed transaction signing."
-
+keywords = ["crypto", "signer", "ethereum", "eip712", "eip191"]
+categories = ["cryptography::cryptocurrencies", "no-std"]
 [features]
 default = ["std"]
 std = ["alloc", "signer-primitives/std"]
@@ -15,8 +17,8 @@ kobe = ["dep:kobe-evm"]
 
 [dependencies]
 signer-primitives = { workspace = true, features = ["secp256k1"] }
-sha3.workspace = true
 hex.workspace = true
+sha3.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 
@@ -24,6 +26,7 @@ kobe-evm = { workspace = true, optional = true }
 
 [dev-dependencies]
 signer-primitives = { workspace = true, features = ["testing"] }
+hex.workspace = true
 zeroize.workspace = true
 
 [lints]

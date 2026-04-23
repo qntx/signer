@@ -4,7 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+readme = "../../README.md"
 description = "Multi-chain transaction signer — umbrella crate re-exporting chain-specific signers."
+keywords = ["crypto", "signer", "wallet", "multichain", "no_std"]
+categories = ["cryptography::cryptocurrencies", "no-std"]
 
 [dependencies]
 signer-primitives.workspace = true
@@ -68,6 +71,10 @@ kobe = [
     "signer-aptos?/kobe",
     "signer-nostr?/kobe",
 ]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [lints]
 workspace = true

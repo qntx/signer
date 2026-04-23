@@ -98,35 +98,58 @@ impl Signer {
         self.inner.public_key_bytes()
     }
 
+    /// Public key in hex (64 chars, no `0x` prefix).
+    #[must_use]
+    pub fn public_key_hex(&self) -> String {
+        self.inner.public_key_hex()
+    }
+
     /// Sign arbitrary bytes with Ed25519 (raw, no intent prefix).
+    ///
+    /// Returns the native [`ed25519_dalek::Signature`]. For the unified
+    /// [`SignOutput::Ed25519WithPubkey`] wire form, use [`Self::sign_message`].
     #[must_use]
     pub fn sign_raw(&self, message: &[u8]) -> Signature {
         self.inner.sign_raw(message)
     }
 
-    /// Sign a Sui transaction with intent-based BLAKE2b-256 hashing.
+    /// Sign a 32-byte digest with Ed25519 (no intent prefix).
     ///
-    /// Computes `BLAKE2b-256(intent[0,0,0] || tx_bytes)` then signs the digest.
-    /// Returns the raw Ed25519 [`Signature`].
-    #[must_use]
-    pub fn sign_transaction_intent(&self, tx_bytes: &[u8]) -> Signature {
-        let digest = intent_hash(TX_INTENT, tx_bytes);
-        self.inner.sign_raw(&digest)
+    /// # Errors
+    ///
+    /// Never fails; the [`Result`] is kept for trait symmetry.
+    pub fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
+        Ok(self.inner.sign_output_with_pubkey(hash))
     }
 
-    /// Sign a personal message with intent-based BLAKE2b-256 hashing.
+    /// Sign a personal message with Sui's intent-based BLAKE2b-256 hashing.
     ///
     /// The message is first BCS-serialized (ULEB128 length prefix), then
-    /// `BLAKE2b-256(intent[3,0,0] || bcs_bytes)` is signed.
-    /// Returns the raw Ed25519 [`Signature`].
-    #[must_use]
-    pub fn sign_message_intent(&self, message: &[u8]) -> Signature {
+    /// `BLAKE2b-256(intent[3, 0, 0] || bcs_bytes)` is signed with Ed25519.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; the [`Result`] is kept for trait symmetry.
+    pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         let bcs = bcs_serialize_bytes(message);
         let digest = intent_hash(MSG_INTENT, &bcs);
-        self.inner.sign_raw(&digest)
+        Ok(self.inner.sign_output_with_pubkey(&digest))
     }
 
-    /// Verify a 64-byte Ed25519 signature.
+    /// Sign a Sui transaction with intent-based BLAKE2b-256 hashing.
+    ///
+    /// Computes `BLAKE2b-256(intent[0, 0, 0] || tx_bytes)` then signs the
+    /// digest with Ed25519.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; the [`Result`] is kept for trait symmetry.
+    pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
+        let digest = intent_hash(TX_INTENT, tx_bytes);
+        Ok(self.inner.sign_output_with_pubkey(&digest))
+    }
+
+    /// Verify a 64-byte Ed25519 signature over `message`.
     ///
     /// # Errors
     ///
@@ -150,18 +173,15 @@ impl Sign for Signer {
     type Error = SignError;
 
     fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-        Ok(self.inner.sign_output_with_pubkey(hash))
+        Self::sign_hash(self, hash)
     }
 
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        let bcs = bcs_serialize_bytes(message);
-        let digest = intent_hash(MSG_INTENT, &bcs);
-        Ok(self.inner.sign_output_with_pubkey(&digest))
+        Self::sign_message(self, message)
     }
 
     fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
-        let digest = intent_hash(TX_INTENT, tx_bytes);
-        Ok(self.inner.sign_output_with_pubkey(&digest))
+        Self::sign_transaction(self, tx_bytes)
     }
 }
 
