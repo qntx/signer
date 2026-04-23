@@ -54,6 +54,9 @@ mod secp256k1;
 #[cfg(feature = "testing")]
 pub mod testing;
 
+#[cfg(test)]
+mod tests;
+
 #[cfg(feature = "ed25519")]
 pub use ed25519::Ed25519Signer;
 pub use error::SignError;

@@ -1,0 +1,14 @@
+{
+  "name": "signer-goldens",
+  "private": true,
+  "type": "module",
+  "description": "Generates cross-implementation Known Answer Test vectors for the Rust `signer` workspace. Every golden is computed by a mature, independent JS library so the Rust tests assert equivalence against an external reference rather than against their own past output.",
+  "scripts": {
+    "generate": "node generate.mjs"
+  },
+  "dependencies": {
+    "@noble/curves": "^1.9.4",
+    "@noble/hashes": "^1.8.0",
+    "@scure/base": "^1.2.6"
+  }
+}

@@ -1,261 +1,195 @@
-//! Unit tests for the Nostr signer.
+//! Nostr signer Known Answer Tests.
 //!
-//! Key-derivation test vectors are sourced from
-//! [NIP-06](https://nips.nostr.com/6). BIP-340 signing is validated by
-//! round-tripping `sign` through `verify`, and by comparing against k256's
-//! own published test vectors indirectly (the library is the source of truth
-//! for the primitive).
+//! Two layers of authority pin the test values:
+//!
+//! - **NIP-06 Test Vectors 1 + 2** for the `nsec1…` / `npub1…` bech32
+//!   encoding and x-only pubkey derivation — these are *protocol* KATs
+//!   published alongside the spec.
+//! - **Cross-implementation goldens** (`@noble/curves` BIP-340 Schnorr
+//!   with `auxRand = [0u8; 32]`) for the three signing entry points.
+//!   Matching them byte-for-byte proves our `k256::schnorr` wrapping
+//!   does not accidentally deviate from the reference.
 
 #![allow(
+    clippy::unwrap_used,
+    clippy::missing_assert_message,
     clippy::indexing_slicing,
-    reason = "tests index into fixed-size signature/key buffers with known lengths"
+    reason = "test module: panics are acceptable and assertions self-describe"
 )]
-
-use sha2::{Digest as _, Sha256};
 
 use super::*;
 
-#[cfg(feature = "kobe")]
-mod kobe_integration {
-    use zeroize::Zeroizing;
+// -- NIP-06 Test Vector 1 -------------------------------------------------
 
-    use super::Signer;
-
-    /// Hand-built `DerivedAccount` using NIP-06 test vector 1 material.
-    fn tv1_derived_account() -> kobe_nostr::DerivedAccount {
-        let mut sk = Zeroizing::new([0u8; 32]);
-        hex::decode_to_slice(
-            "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a",
-            sk.as_mut_slice(),
-        )
-        .unwrap();
-        let pk = hex::decode("17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917")
-            .unwrap();
-        kobe_nostr::DerivedAccount::new(
-            String::from("m/44'/1237'/0'/0/0"),
-            sk,
-            pk,
-            String::from("npub1zutzeysacnf9rru6zqwmxd54mud0k44tst6l70ja5mhv8jjumytsd2x7nu"),
-        )
-    }
-
-    #[test]
-    fn from_derived_matches_from_hex() {
-        let acct = tv1_derived_account();
-        let via_bytes = Signer::from_derived(&acct).unwrap();
-        let via_hex = Signer::from_hex(acct.private_key_hex().as_str()).unwrap();
-        assert_eq!(via_bytes.address(), via_hex.address());
-        assert_eq!(
-            via_bytes.address(),
-            "npub1zutzeysacnf9rru6zqwmxd54mud0k44tst6l70ja5mhv8jjumytsd2x7nu"
-        );
-    }
-}
-
-/// NIP-06 test vector 1: private key hex.
 const TV1_PRIV_HEX: &str = "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a";
-/// NIP-06 test vector 1: x-only public key hex.
 const TV1_PUB_HEX: &str = "17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917";
-/// NIP-06 test vector 1: NIP-19 nsec encoding.
 const TV1_NSEC: &str = "nsec10allq0gjx7fddtzef0ax00mdps9t2kmtrldkyjfs8l5xruwvh2dq0lhhkp";
-/// NIP-06 test vector 1: NIP-19 npub encoding.
 const TV1_NPUB: &str = "npub1zutzeysacnf9rru6zqwmxd54mud0k44tst6l70ja5mhv8jjumytsd2x7nu";
 
-/// NIP-06 test vector 2: private key hex.
+// -- NIP-06 Test Vector 2 -------------------------------------------------
+
 const TV2_PRIV_HEX: &str = "c15d739894c81a2fcfd3a2df85a0d2c0dbc47a280d092799f144d73d7ae78add";
-/// NIP-06 test vector 2: NIP-19 npub encoding.
 const TV2_NPUB: &str = "npub16sdj9zv4f8sl85e45vgq9n7nsgt5qphpvmf7vk8r5hhvmdjxx4es8rq74h";
+
+// -- Cross-implementation KATs (BIP-340 with aux_rand = zeros) ------------
+
+const DIGEST_HEX: &str = "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20";
+const TX_HEX: &str = "deadbeef00010203";
+const MESSAGE: &str = "signer kat v3";
+
+/// BIP-340 Schnorr over `DIGEST_HEX`, `aux_rand = [0u8; 32]`.
+const SIGN_HASH_HEX: &str = "38170398b948d77ec62412ad4d8b4e8b098e56a2dd3186be11d86d7ef1371c4e3c6eebc56cd475874ef94771a179b4d46605af2ddc0c983a540de615ad32f677";
+/// BIP-340 Schnorr over the raw `MESSAGE` bytes — no implicit SHA-256.
+const SIGN_MESSAGE_HEX: &str = "161451d4e7edde557075f7f94fecdef168378ab24455a72da9c24a63e4e1de288c28d22e664c0809815bc7898b1181b166a922f29bb0047ac18cc0be72d6d779";
+/// BIP-340 Schnorr over `SHA-256(TX_HEX)` — NIP-01 event-id path.
+const SIGN_TX_HEX: &str = "25493b03c3f359bdb13c637e903852c9c34024414b8d9981abd9fdd7afafa2b24bd018b1d3bf5c206da29af504fc80116fce6472f3c7d268cba288dc009227ce";
 
 fn tv1_signer() -> Signer {
     Signer::from_hex(TV1_PRIV_HEX).unwrap()
 }
 
-#[test]
-fn from_hex_and_from_bytes_agree() {
-    let from_hex = Signer::from_hex(TV1_PRIV_HEX).unwrap();
-
-    let raw = hex::decode(TV1_PRIV_HEX).unwrap();
-    let bytes: [u8; 32] = raw.try_into().unwrap();
-    let from_bytes = Signer::from_bytes(&bytes).unwrap();
-
-    assert_eq!(from_hex.public_key_hex(), from_bytes.public_key_hex());
+fn digest() -> [u8; 32] {
+    hex::decode(DIGEST_HEX).unwrap().try_into().unwrap()
 }
 
-#[test]
-fn from_hex_accepts_0x_prefix() {
-    let with_prefix = Signer::from_hex(&alloc::format!("0x{TV1_PRIV_HEX}")).unwrap();
-    let without_prefix = Signer::from_hex(TV1_PRIV_HEX).unwrap();
-    assert_eq!(
-        with_prefix.public_key_hex(),
-        without_prefix.public_key_hex(),
-    );
-}
+// ============================================================================
+// NIP-06 bech32 and x-only public key KATs
+// ============================================================================
 
 #[test]
-fn from_hex_rejects_wrong_length() {
-    assert!(Signer::from_hex("deadbeef").is_err(), "short key rejected");
-    assert!(
-        Signer::from_hex(&"aa".repeat(33)).is_err(),
-        "long key rejected",
-    );
-}
-
-#[test]
-fn from_hex_rejects_invalid_scalar() {
-    // Zero is not a valid secp256k1 scalar.
-    assert!(Signer::from_hex(&"00".repeat(32)).is_err());
-}
-
-#[test]
-fn public_key_is_xonly_32_bytes() {
+fn nip06_tv1_xonly_pubkey_matches_kat() {
     let s = tv1_signer();
-    assert_eq!(s.public_key_bytes().len(), 32);
-    assert_eq!(s.public_key_hex().len(), 64);
     assert_eq!(s.public_key_hex(), TV1_PUB_HEX);
+    assert_eq!(s.public_key_bytes().len(), 32);
 }
 
 #[test]
-fn nip19_npub_kat_vector1() {
-    assert_eq!(tv1_signer().address(), TV1_NPUB);
-}
-
-#[test]
-fn nip19_nsec_kat_vector1() {
-    assert_eq!(tv1_signer().nsec().as_str(), TV1_NSEC);
-}
-
-#[test]
-fn nip19_nsec_roundtrip_vector1() {
+fn nip06_tv1_npub_and_nsec_match_kat() {
     let s = tv1_signer();
-    let reloaded = Signer::from_nsec(s.nsec().as_str()).unwrap();
-    assert_eq!(s.public_key_hex(), reloaded.public_key_hex());
+    assert_eq!(s.address(), TV1_NPUB);
+    assert_eq!(s.nsec().as_str(), TV1_NSEC);
 }
 
 #[test]
-fn nip19_npub_kat_vector2() {
+fn nip06_tv2_npub_matches_kat() {
     let s = Signer::from_hex(TV2_PRIV_HEX).unwrap();
     assert_eq!(s.address(), TV2_NPUB);
 }
 
+/// `nsec1…` bech32 round-trip — decoding a signer's own `nsec` must
+/// reproduce the same public identity.
 #[test]
-fn from_nsec_rejects_wrong_hrp() {
-    // A valid `npub` should be rejected when we ask for `nsec`.
-    let err = Signer::from_nsec(TV1_NPUB).expect_err("npub is not an nsec");
-    assert!(
-        matches!(err, SignError::Bech32(_)),
-        "expected Bech32 variant, got {err:?}",
+fn nsec_round_trip_preserves_public_identity() {
+    let s = tv1_signer();
+    let reloaded = Signer::from_nsec(s.nsec().as_str()).unwrap();
+    assert_eq!(reloaded.public_key_hex(), s.public_key_hex());
+}
+
+/// HRP must match: an `npub1…` passed where an `nsec1…` is expected is a
+/// bech32 error, not a silent fall-through.
+#[test]
+fn from_nsec_rejects_wrong_hrp_and_malformed_bech32() {
+    assert!(matches!(
+        Signer::from_nsec(TV1_NPUB),
+        Err(SignError::Bech32(_))
+    ));
+    assert!(matches!(
+        Signer::from_nsec("nsec1notvalid"),
+        Err(SignError::Bech32(_))
+    ));
+}
+
+// ============================================================================
+// BIP-340 Schnorr cross-implementation KATs
+// ============================================================================
+
+/// `sign_hash` takes a 32-byte `event.id` and signs it with BIP-340
+/// (`aux_rand` zero). Must match `@noble/curves` byte-for-byte.
+#[test]
+fn sign_hash_matches_noble_bip340_kat() {
+    let out = tv1_signer().sign_hash(&digest()).unwrap();
+    assert_eq!(out.to_hex(), SIGN_HASH_HEX);
+    assert!(out.v().is_none(), "BIP-340 Schnorr has no recovery id");
+    assert_eq!(
+        hex::encode(out.public_key().unwrap()),
+        TV1_PUB_HEX,
+        "output must carry the signer's x-only pubkey",
     );
 }
 
+/// `sign_message` passes bytes verbatim into BIP-340 — no implicit hash.
 #[test]
-fn from_nsec_rejects_malformed() {
-    let err = Signer::from_nsec("nsec1notvalid").expect_err("malformed bech32");
-    assert!(matches!(err, SignError::Bech32(_)));
+fn sign_message_is_raw_bip340_matches_noble_kat() {
+    let out = tv1_signer().sign_message(MESSAGE.as_bytes()).unwrap();
+    assert_eq!(out.to_hex(), SIGN_MESSAGE_HEX);
 }
 
+/// `sign_transaction` hashes the serialized NIP-01 event with SHA-256
+/// first, then signs the resulting event id with BIP-340.
 #[test]
-fn sign_hash_roundtrip() {
-    let s = tv1_signer();
-    let event_id = [0x42u8; 32];
-    let out = s.sign_hash(&event_id).unwrap();
-
-    let sig_bytes = out.to_bytes();
-    assert_eq!(sig_bytes.len(), 64, "BIP-340 signature is 64 bytes");
-    assert!(out.v().is_none(), "Schnorr has no recovery id");
-    let pk = out
-        .public_key()
-        .expect("Schnorr output carries x-only pubkey");
-    assert_eq!(pk.len(), 32);
-    assert_eq!(pk, &s.public_key_bytes()[..]);
-
-    // Signature must verify against the same 32-byte message.
-    s.verify(&event_id, &sig_bytes).unwrap();
+fn sign_transaction_sha256_event_id_matches_noble_kat() {
+    let tx = hex::decode(TX_HEX).unwrap();
+    let out = tv1_signer().sign_transaction(&tx).unwrap();
+    assert_eq!(out.to_hex(), SIGN_TX_HEX);
 }
 
+/// Sanity: `sign_transaction(event)` must equal
+/// `sign_hash(sha256(event))` — cheap equivalence check that keeps the
+/// two sister code paths from drifting apart.
 #[test]
-fn sign_hash_is_deterministic() {
-    let s = tv1_signer();
-    let event_id = [0u8; 32];
-    let a = s.sign_hash(&event_id).unwrap();
-    let b = s.sign_hash(&event_id).unwrap();
-    assert_eq!(a.to_bytes(), b.to_bytes(), "deterministic signing");
-}
-
-#[test]
-fn sign_message_roundtrip() {
-    let s = tv1_signer();
-    let msg = b"a Nostr message";
-    let out = s.sign_message(msg).unwrap();
-    let sig_bytes = out.to_bytes();
-    assert_eq!(sig_bytes.len(), 64);
-    s.verify(msg, &sig_bytes).unwrap();
-}
-
-#[test]
-fn sign_transaction_matches_sign_hash_of_sha256() {
+fn sign_transaction_equals_sign_hash_of_sha256() {
+    use sha2::{Digest as _, Sha256};
     let s = tv1_signer();
     let event_json =
         br#"[0,"17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917",1700000000,1,[],"hi"]"#;
-
-    let via_transaction = s.sign_transaction(event_json).unwrap();
-    let digest: [u8; 32] = Sha256::digest(event_json).into();
-    let via_hash = s.sign_hash(&digest).unwrap();
-
-    assert_eq!(via_transaction.to_bytes(), via_hash.to_bytes());
+    let direct = s.sign_transaction(event_json).unwrap();
+    let event_id: [u8; 32] = Sha256::digest(event_json).into();
+    let via_hash = s.sign_hash(&event_id).unwrap();
+    assert_eq!(direct.to_bytes(), via_hash.to_bytes());
 }
 
+/// Tampered signature / wrong message must fail `verify`. This is
+/// chain-specific because `Signer::verify` is the public NIP-01 entry
+/// point used by clients to validate relayed events.
 #[test]
-fn verify_rejects_wrong_signature() {
+fn verify_rejects_tampered_signature_and_wrong_message() {
     let s = tv1_signer();
     let msg = b"authentic message";
-    let out = s.sign_message(msg).unwrap();
-    let sig_bytes = out.to_bytes();
+    let sig = s.sign_message(msg).unwrap().to_bytes();
 
-    let mut tampered = sig_bytes.clone();
+    let mut tampered = sig.clone();
     tampered[0] ^= 0x01;
-    assert!(
-        s.verify(msg, &tampered).is_err(),
-        "tampered signature must not verify",
-    );
-    assert!(
-        s.verify(b"different message", &sig_bytes).is_err(),
-        "original signature must not verify for a different message",
-    );
+    assert!(s.verify(msg, &tampered).is_err());
+    assert!(s.verify(b"different message", &sig).is_err());
 }
 
-#[test]
-fn sign_output_public_key_is_xonly() {
-    let s = tv1_signer();
-    let out = s.sign_hash(&[0u8; 32]).unwrap();
-    let pk = out
-        .public_key()
-        .expect("schnorr output carries x-only pubkey");
-    assert_eq!(pk.len(), 32);
-    assert_eq!(hex::encode(pk), TV1_PUB_HEX);
-}
+#[cfg(feature = "kobe")]
+mod kobe_integration {
+    use zeroize::Zeroizing;
 
-#[cfg(feature = "getrandom")]
-#[test]
-fn random_signer_produces_valid_signatures() {
-    let s = Signer::random();
-    assert_eq!(s.public_key_bytes().len(), 32);
-    assert!(s.address().starts_with("npub1"));
-    let msg = b"random-key message";
-    let out = s.sign_message(msg).unwrap();
-    s.verify(msg, &out.to_bytes()).unwrap();
-}
+    use super::{Signer, TV1_NPUB, TV1_PRIV_HEX, TV1_PUB_HEX};
 
-mod sign_trait {
-    use signer_primitives::SignMessage;
-
-    use super::*;
+    /// NIP-06 TV1 surfaced through a `kobe_nostr::DerivedAccount` — the
+    /// idiomatic integration path for consumers that derive an account
+    /// from a mnemonic.
+    fn tv1_derived_account() -> kobe_nostr::DerivedAccount {
+        let mut sk = Zeroizing::new([0u8; 32]);
+        hex::decode_to_slice(TV1_PRIV_HEX, sk.as_mut_slice()).unwrap();
+        let pk = hex::decode(TV1_PUB_HEX).unwrap();
+        kobe_nostr::DerivedAccount::new(
+            String::from("m/44'/1237'/0'/0/0"),
+            sk,
+            pk,
+            String::from(TV1_NPUB),
+        )
+    }
 
     #[test]
-    fn delegate_impl_matches_direct_call() {
-        let s = tv1_signer();
-        let msg = b"delegate";
-        let via_trait = <Signer as SignMessage>::sign_message(&s, msg).unwrap();
-        let via_method = s.sign_message(msg).unwrap();
-        assert_eq!(via_trait.to_bytes(), via_method.to_bytes());
+    fn from_derived_matches_nip06_tv1_kat() {
+        let acct = tv1_derived_account();
+        let via_derived = Signer::from_derived(&acct).unwrap();
+        let via_hex = Signer::from_hex(acct.private_key_hex().as_str()).unwrap();
+        assert_eq!(via_derived.address(), TV1_NPUB);
+        assert_eq!(via_derived.address(), via_hex.address());
     }
 }

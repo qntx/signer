@@ -1,160 +1,145 @@
-//! Unit tests for the Solana signer.
+//! Solana signer Known Answer Tests.
+//!
+//! Goldens are produced by an independent `@noble/curves` (ed25519) +
+//! `@scure/base` (base58) run. The KATs pin the Base58 pubkey address,
+//! all three Ed25519 entry points, and the compact-u16 + signature-slot
+//! splicing machinery that makes Solana's wire format work.
 
 #![allow(
     clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::indexing_slicing,
     clippy::missing_assert_message,
-    reason = "test module: panics are acceptable and assertions are self-describing"
+    clippy::indexing_slicing,
+    reason = "test module: panics are acceptable and assertions self-describe"
 )]
 
-use signer_primitives::SignOutput;
-
-use super::{EncodeSignedTransaction, Sign, SignMessage, Signer};
+use super::{EncodeSignedTransaction, Sign, SignError, SignMessage, SignOutput, Signer};
 
 /// RFC 8032 Test Vector 1.
-const TEST_KEY: &str = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
-const TEST_PUBKEY: &str = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
+const PRIV_KEY_HEX: &str = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
+const PUBKEY_HEX: &str = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
+const DIGEST_HEX: &str = "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20";
+const TX_HEX: &str = "deadbeef00010203";
+const MESSAGE: &str = "signer kat v3";
 
-fn test_signer() -> Signer {
-    Signer::from_hex(TEST_KEY).unwrap()
+/// `base58(public_key_bytes)`.
+const ADDRESS: &str = "FVen3X669xLzsi6N2V91DoiyzHzg1uAgqiT8jZ9nS96Z";
+
+/// Ed25519 over each fixed input.
+const SIGN_HASH_HEX: &str = "8d917876339a83dc45d1796e557c7baf8bff5e88ab000e166136fa8a32e8318c6e0c05d03a29f317ff7114c7b128ea9a80d57142b818dc0f515f950afef5660b";
+const SIGN_MESSAGE_HEX: &str = "9bf92051ec0e310dd98463902e79f9ab406f100c26901526e415d8f1be3f9544cef179c7bb977eda3dc93df8acc5476d57c38d0bbe777165a68d50655c20d707";
+const SIGN_TX_HEX: &str = "3e9d05cb132f2c766fd1a993bff79e168814d7241683a1bdb95fac2b8500805d009eb99a80000fcc14b5097c6f8d9850a03c275c8ebea1867454a0114d2f7a07";
+
+fn signer_fixture() -> Signer {
+    Signer::from_hex(PRIV_KEY_HEX).unwrap()
+}
+
+fn digest() -> [u8; 32] {
+    hex::decode(DIGEST_HEX).unwrap().try_into().unwrap()
 }
 
 #[test]
-fn rfc8032_vector1_pubkey() {
-    assert_eq!(test_signer().public_key_hex(), TEST_PUBKEY);
+fn address_base58_matches_noble_kat() {
+    let s = signer_fixture();
+    assert_eq!(s.public_key_hex(), PUBKEY_HEX);
+    assert_eq!(s.address(), ADDRESS);
 }
 
 #[test]
-fn address_is_base58_pubkey() {
-    let s = test_signer();
-    let decoded = bs58::decode(&s.address()).into_vec().unwrap();
-    assert_eq!(decoded.len(), 32);
-    assert_eq!(hex::encode(&decoded), TEST_PUBKEY);
+fn sign_hash_matches_noble_ed25519_kat() {
+    let out = signer_fixture().sign_hash(&digest()).unwrap();
+    assert_eq!(out.to_hex(), SIGN_HASH_HEX);
 }
 
 #[test]
-fn from_bytes_matches_from_hex() {
-    let bytes: [u8; 32] = hex::decode(TEST_KEY).unwrap().try_into().unwrap();
-    let s1 = Signer::from_bytes(&bytes).unwrap();
-    assert_eq!(s1.address(), test_signer().address());
+fn sign_message_matches_noble_ed25519_kat() {
+    let out = signer_fixture().sign_message(MESSAGE.as_bytes()).unwrap();
+    assert_eq!(out.to_hex(), SIGN_MESSAGE_HEX);
 }
 
 #[test]
-fn keypair_base58_roundtrip() {
-    let s = test_signer();
+fn sign_transaction_matches_noble_ed25519_kat() {
+    let tx = hex::decode(TX_HEX).unwrap();
+    let out = signer_fixture().sign_transaction(&tx).unwrap();
+    assert_eq!(out.to_hex(), SIGN_TX_HEX);
+}
+
+/// The Phantom / Backpack / Solflare 64-byte keypair (secret || public)
+/// round-trips through `keypair_base58` → `from_keypair_base58`.
+#[test]
+fn keypair_base58_round_trip_preserves_identity() {
+    let s = signer_fixture();
     let b58 = s.keypair_base58();
     let restored = Signer::from_keypair_base58(&b58).unwrap();
-    assert_eq!(s.address(), restored.address());
-    assert_eq!(s.public_key_hex(), restored.public_key_hex());
+    assert_eq!(restored.address(), s.address());
+    assert_eq!(restored.public_key_hex(), s.public_key_hex());
 }
 
+/// Malformed Base58 / wrong-length keypair payloads must not be accepted.
 #[test]
-fn sign_and_verify() {
-    let s = test_signer();
-    let msg = b"test message for solana";
-    let sig = s.sign_raw(msg);
-    s.verify(msg, sig.to_bytes().as_slice())
-        .expect("signature must verify");
+fn from_keypair_base58_rejects_invalid_inputs() {
+    assert!(matches!(
+        Signer::from_keypair_base58("invalid!!!"),
+        Err(SignError::InvalidKeypair(_))
+    ));
+    // Valid Base58 but wrong length (< 64 bytes decoded).
+    assert!(matches!(
+        Signer::from_keypair_base58("3J98t1"),
+        Err(SignError::InvalidKeypair(_))
+    ));
 }
 
+/// Compact-u16 header stripping: the single-signature envelope is
+/// `0x01 || zeros(64) || message_body`; the stripped body must equal the
+/// signable payload verbatim.
 #[test]
-fn sign_wrong_message_fails() {
-    let s = test_signer();
-    let sig = s.sign_raw(b"correct");
-    assert!(s.verify(b"wrong", sig.to_bytes().as_slice()).is_err());
-}
-
-#[test]
-fn sign_trait_verify() {
-    let s = test_signer();
-    let out = SignMessage::sign_message(&s, b"hello").unwrap();
-    let sig_bytes = out.to_bytes();
-    assert_eq!(sig_bytes.len(), 64);
-    assert!(out.v().is_none());
-    s.verify(b"hello", &sig_bytes)
-        .expect("trait signature must verify");
-}
-
-#[test]
-fn deterministic_signature() {
-    let s = test_signer();
-    let digest = [0u8; 32];
-    let out1 = Sign::sign_hash(&s, &digest).unwrap();
-    let out2 = Sign::sign_hash(&s, &digest).unwrap();
-    assert_eq!(out1.to_bytes(), out2.to_bytes());
-}
-
-#[test]
-fn extract_signable_bytes_strips_header() {
-    let mut tx = vec![1u8];
+fn extract_signable_bytes_strips_compact_u16_header_and_signature_slots() {
+    let mut tx = vec![1u8]; // compact-u16 `num_sigs = 1`
     tx.extend_from_slice(&[0u8; 64]);
     tx.extend_from_slice(b"message_body");
-    let signable = Signer::extract_signable_bytes(&tx).unwrap();
-    assert_eq!(signable, b"message_body");
+    let body = Signer::extract_signable_bytes(&tx).unwrap();
+    assert_eq!(body, b"message_body");
+
+    assert!(matches!(
+        Signer::extract_signable_bytes(&[]),
+        Err(SignError::Core(_))
+    ));
 }
 
+/// Splicing: both the low-level `splice_signature` and the
+/// `SignOutput`-accepting `encode_signed_transaction` must produce the
+/// same bytes — same 64-byte signature in the first slot, identical tail.
 #[test]
-fn extract_signable_bytes_rejects_empty() {
-    assert!(Signer::extract_signable_bytes(&[]).is_err());
-}
-
-#[test]
-fn encode_signed_transaction_splices_sig() {
-    let s = test_signer();
-    let msg = b"message_body";
+fn encode_signed_transaction_matches_splice_signature() {
+    let s = signer_fixture();
+    let msg_body = b"message_body";
     let mut tx = vec![1u8];
     tx.extend_from_slice(&[0u8; 64]);
-    tx.extend_from_slice(msg);
+    tx.extend_from_slice(msg_body);
 
-    let sig = s.sign_raw(msg);
-    let sig_bytes = sig.to_bytes();
+    let raw_sig = s.sign_raw(msg_body).to_bytes();
+    let spliced_low = Signer::splice_signature(&tx, &raw_sig).unwrap();
+    assert_eq!(&spliced_low[1..65], &raw_sig);
+    assert_eq!(&spliced_low[65..], msg_body);
 
-    // Low-level splicer: accepts raw 64-byte compact signature.
-    let signed_raw = Signer::splice_signature(&tx, &sig_bytes).unwrap();
-    assert_eq!(&signed_raw[1..65], &sig_bytes);
-    assert_eq!(&signed_raw[65..], msg);
-
-    // High-level entry: accepts the unified SignOutput enum.
-    let sig_output = SignOutput::Ed25519(sig_bytes);
-    let signed_output = Signer::encode_signed_transaction(&tx, &sig_output).unwrap();
-    assert_eq!(signed_raw, signed_output);
+    let spliced_high =
+        Signer::encode_signed_transaction(&tx, &SignOutput::Ed25519(raw_sig)).unwrap();
+    assert_eq!(spliced_low, spliced_high);
 }
 
+/// `encode_signed_transaction` must refuse non-Ed25519 variants — this is
+/// the type-level contract behind the `EncodeSignedTransaction` trait.
 #[test]
-fn sign_trait_encode_signed_transaction_requires_ed25519_variant() {
-    let s = test_signer();
-    let digest = [0u8; 32];
-    let out = Sign::sign_hash(&s, &digest).unwrap();
-    // Trait-level encode_signed_transaction accepts the unified SignOutput enum.
+fn encode_signed_transaction_rejects_non_ed25519_variant() {
+    let s = signer_fixture();
     let mut tx = vec![1u8];
     tx.extend_from_slice(&[0u8; 64]);
     tx.extend_from_slice(b"body");
-    let encoded = EncodeSignedTransaction::encode_signed_transaction(&s, &tx, &out).unwrap();
-    assert_eq!(&encoded[1..65], &out.to_bytes());
-}
-
-#[test]
-fn sign_trait_encode_signed_transaction_rejects_non_ed25519() {
-    let s = test_signer();
     let wrong = SignOutput::Ecdsa {
         signature: [0u8; 64],
         v: 0,
     };
-    let mut tx = vec![1u8];
-    tx.extend_from_slice(&[0u8; 64]);
-    assert!(EncodeSignedTransaction::encode_signed_transaction(&s, &tx, &wrong).is_err());
-}
-
-#[test]
-fn rejects_invalid_keypair_base58() {
-    assert!(Signer::from_keypair_base58("invalid!!!").is_err());
-    assert!(Signer::from_keypair_base58("3J98t1").is_err());
-}
-
-#[test]
-fn debug_does_not_leak_key() {
-    let debug = format!("{:?}", test_signer());
-    assert!(debug.contains("[REDACTED]"));
-    assert!(!debug.contains("9d61b1"));
+    assert!(matches!(
+        EncodeSignedTransaction::encode_signed_transaction(&s, &tx, &wrong),
+        Err(SignError::Core(_))
+    ));
 }

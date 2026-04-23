@@ -1,70 +1,51 @@
-//! Unit tests for the Filecoin signer.
+//! Filecoin signer Known Answer Tests.
+//!
+//! Goldens are produced by an independent `@noble/curves` +
+//! `@noble/hashes` (`blake2b`) + `@scure/base` run so address, message and
+//! transaction assertions are real cross-implementation checks.
 
 #![allow(
     clippy::unwrap_used,
-    clippy::indexing_slicing,
     clippy::missing_assert_message,
-    reason = "test module: panics are acceptable and assertions are self-describing"
+    reason = "test module: panics are acceptable and assertions self-describe"
 )]
 
-use blake2::Digest;
-use signer_primitives::testing::verify_secp256k1_recoverable;
+use super::{Sign, SignMessage, Signer};
 
-use super::{Blake2b256, Sign, SignMessage, SignOutput, Signer};
+const PRIV_KEY_HEX: &str = "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318";
+const TX_HEX: &str = "deadbeef00010203";
+const MESSAGE: &str = "signer kat v3";
 
-const TEST_KEY: &str = "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318";
+/// `"f1" || base32_lower(BLAKE2b-160(uncompressed_pubkey) || BLAKE2b-32(0x01 || payload))`.
+const ADDRESS: &str = "f1utzlswpqelskilx7nxzz3ocwjrsc3ejwwhooyhq";
 
-fn test_signer() -> Signer {
-    Signer::from_hex(TEST_KEY).unwrap()
+/// ECDSA over `BLAKE2b-256(MESSAGE)`.
+const SIGN_MESSAGE_HEX: &str = "31b80c83405c13758283d37716ebb396927da0a3c5746be422a7d8ab8075087b32533148d950f939bbc960a81257c1e897f7f9a97a6fd0bebe6b66174a301ba200";
+
+/// ECDSA over `BLAKE2b-256(TX_HEX)`.
+const SIGN_TX_HEX: &str = "7b30af7ea3acd312a098f62ff59960dd43f8a7bae8b34ddcd7c443dcb568dabb0b8c3f31e5455b58bf61afd1511eb2c60bd06d7c72c5e7261539253093ec813801";
+
+fn signer_fixture() -> Signer {
+    Signer::from_hex(PRIV_KEY_HEX).unwrap()
 }
 
-fn verify(s: &Signer, hash: &[u8; 32], out: &SignOutput) {
-    verify_secp256k1_recoverable(&s.public_key_bytes(), hash, &out.to_bytes());
+/// `f1…` protocol-1 address — BLAKE2b-160 of the uncompressed pubkey,
+/// followed by a 4-byte `BLAKE2b` checksum over `0x01 || payload`, encoded
+/// with RFC 4648 base32 lowercase (no padding).
+#[test]
+fn address_f1_blake2b_protocol1_matches_noble_kat() {
+    assert_eq!(signer_fixture().address(), ADDRESS);
 }
 
 #[test]
-fn sign_hash_verify() {
-    let s = test_signer();
-    let hash: [u8; 32] = Blake2b256::digest(b"filecoin test").into();
-    let out = s.sign_hash(&hash).unwrap();
-    assert_eq!(out.to_bytes().len(), 65);
-    assert!(out.v().is_some());
-    verify(&s, &hash, &out);
+fn sign_message_blake2b256_matches_noble_kat() {
+    let out = signer_fixture().sign_message(MESSAGE.as_bytes()).unwrap();
+    assert_eq!(out.to_hex(), SIGN_MESSAGE_HEX);
 }
 
 #[test]
-fn sign_transaction_blake2b_verify() {
-    let s = test_signer();
-    let tx = b"fil tx bytes";
-    let out = s.sign_transaction(tx).unwrap();
-    let expected: [u8; 32] = Blake2b256::digest(tx).into();
-    verify(&s, &expected, &out);
-}
-
-#[test]
-fn deterministic_signature() {
-    let s = test_signer();
-    let out1 = s.sign_message(b"same").unwrap();
-    let out2 = s.sign_message(b"same").unwrap();
-    assert_eq!(out1.to_bytes(), out2.to_bytes());
-}
-
-#[test]
-fn from_bytes_roundtrip() {
-    let bytes: [u8; 32] = hex::decode(TEST_KEY).unwrap().try_into().unwrap();
-    let s = Signer::from_bytes(&bytes).unwrap();
-    assert_eq!(s.public_key_bytes(), test_signer().public_key_bytes());
-}
-
-#[test]
-fn rejects_invalid_input() {
-    assert!(Signer::from_hex("not-hex").is_err());
-    assert!(Signer::from_bytes(&[0u8; 32]).is_err());
-}
-
-#[test]
-fn debug_does_not_leak_key() {
-    let debug = format!("{:?}", test_signer());
-    assert!(debug.contains("[REDACTED]"));
-    assert!(!debug.contains("4c0883"));
+fn sign_transaction_blake2b256_matches_noble_kat() {
+    let tx = hex::decode(TX_HEX).unwrap();
+    let out = signer_fixture().sign_transaction(&tx).unwrap();
+    assert_eq!(out.to_hex(), SIGN_TX_HEX);
 }
