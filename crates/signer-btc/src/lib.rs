@@ -1,10 +1,21 @@
 //! Bitcoin transaction signer built on secp256k1 ECDSA.
 //!
-//! Provides sighash signing, legacy Bitcoin message signing with the
-//! `\x18Bitcoin Signed Message:\n` prefix and `CompactSize` length encoding,
-//! and `P2PKH` address derivation.
+//! Provides sighash signing, [BIP-137](https://github.com/bitcoin/bips/blob/master/bip-0137.mediawiki)
+//! message signing with the `\x18Bitcoin Signed Message:\n` prefix and
+//! `CompactSize` length encoding, and `P2PKH` address derivation.
 //!
 //! **Address derivation is handled by `kobe-btc` — this crate is signing only.**
+//!
+//! # Message signing (BIP-137)
+//!
+//! The default [`SignMessage::sign_message`] implementation targets the
+//! canonical P2PKH-compressed address type used by Bitcoin Core's legacy
+//! `signmessage` RPC, Electrum, and every major hardware wallet — the
+//! recovery `v` byte is encoded as `31 | 32` (`27 + recid + 4`) so the
+//! resulting signature round-trips through `verifymessage`. Callers that
+//! need to sign for SegWit-P2SH, native `SegWit` (bech32), or an uncompressed
+//! P2PKH address select the header explicitly through
+//! [`Signer::sign_message_with`] and [`BitcoinMessageAddressType`].
 //!
 //! # Examples
 //!
@@ -24,8 +35,46 @@ use alloc::{string::String, vec::Vec};
 
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha256};
-pub use signer_primitives::{self, Sign, SignError, SignExt, SignOutput};
+pub use signer_primitives::{
+    self, Sign, SignError, SignExt, SignMessage, SignMessageExt, SignOutput,
+};
 use signer_primitives::{Secp256k1Signer, delegate_secp256k1_ctors};
+
+/// Bitcoin address type selector for [BIP-137](https://github.com/bitcoin/bips/blob/master/bip-0137.mediawiki)
+/// message signing.
+///
+/// Controls the `v` byte offset prepended to the 64-byte compact ECDSA
+/// signature. Every variant adds `recid + offset` onto the recovery id
+/// `0 | 1` that [`Secp256k1Signer::sign_prehash_recoverable`] produces,
+/// yielding the on-wire headers specified by BIP-137.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum BitcoinMessageAddressType {
+    /// Legacy P2PKH address derived from an **uncompressed** public key.
+    /// Header bytes: `27 | 28 | 29 | 30`.
+    P2pkhUncompressed,
+    /// Legacy P2PKH address derived from a **compressed** public key
+    /// (Bitcoin Core's `signmessage` default, Electrum, most hardware wallets).
+    /// Header bytes: `31 | 32 | 33 | 34`.
+    #[default]
+    P2pkhCompressed,
+    /// `SegWit` wrapped P2SH-P2WPKH. Header bytes: `35 | 36 | 37 | 38`.
+    SegwitP2sh,
+    /// Native `SegWit` (bech32 / P2WPKH). Header bytes: `39 | 40 | 41 | 42`.
+    SegwitBech32,
+}
+
+impl BitcoinMessageAddressType {
+    /// BIP-137 base offset added to the recovery id.
+    #[must_use]
+    pub const fn header_offset(self) -> u8 {
+        match self {
+            Self::P2pkhUncompressed => 27,
+            Self::P2pkhCompressed => 31,
+            Self::SegwitP2sh => 35,
+            Self::SegwitBech32 => 39,
+        }
+    }
+}
 
 /// Bitcoin transaction signer.
 ///
@@ -79,7 +128,32 @@ impl Signer {
     /// Returns [`SignError::InvalidSignature`] on malformed input or
     /// failed verification.
     pub fn verify_hash(&self, hash: &[u8; 32], signature: &[u8]) -> Result<(), SignError> {
-        self.0.verify_prehash(hash, signature)
+        self.0.verify_prehash_any(hash, signature)
+    }
+
+    /// Sign `message` as a BIP-137 Bitcoin signed message, selecting the
+    /// header byte for the given [`BitcoinMessageAddressType`].
+    ///
+    /// The digest is `double_SHA256("\x18Bitcoin Signed Message:\n" || CompactSize(len) || message)`
+    /// and the returned [`SignOutput::Ecdsa`] carries a `v` byte of
+    /// `header_offset + recid`, which is exactly what Bitcoin Core's
+    /// `verifymessage` RPC (and compatible wallets) expect on the wire.
+    ///
+    /// [`SignMessage::sign_message`] is a convenience wrapper that fixes the
+    /// address type to [`BitcoinMessageAddressType::P2pkhCompressed`], matching
+    /// the canonical legacy behaviour.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying ECDSA primitive fails.
+    pub fn sign_message_with(
+        &self,
+        address_type: BitcoinMessageAddressType,
+        message: &[u8],
+    ) -> Result<SignOutput, SignError> {
+        let digest = bitcoin_message_digest(message);
+        let out = self.0.sign_prehash_recoverable(&digest)?;
+        Ok(apply_bip137_header(out, address_type))
     }
 }
 
@@ -90,19 +164,20 @@ impl Sign for Signer {
         self.0.sign_prehash_recoverable(hash)
     }
 
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        let prefix = b"\x18Bitcoin Signed Message:\n";
-        let mut data = Vec::with_capacity(prefix.len() + 9 + message.len());
-        data.extend_from_slice(prefix);
-        encode_compact_size(&mut data, message.len());
-        data.extend_from_slice(message);
-        let digest: [u8; 32] = Sha256::digest(Sha256::digest(&data)).into();
-        self.sign_hash(&digest)
-    }
-
     fn sign_transaction(&self, sighash_preimage: &[u8]) -> Result<SignOutput, SignError> {
         let digest: [u8; 32] = Sha256::digest(Sha256::digest(sighash_preimage)).into();
         self.sign_hash(&digest)
+    }
+}
+
+impl SignMessage for Signer {
+    /// BIP-137 message signing for the **compressed P2PKH** address type.
+    ///
+    /// Returns a 65-byte [`SignOutput::Ecdsa`] with `v = 31 | 32`, directly
+    /// consumable by Bitcoin Core's `verifymessage` and equivalent wallets.
+    /// For other address types see [`Signer::sign_message_with`].
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
+        self.sign_message_with(BitcoinMessageAddressType::P2pkhCompressed, message)
     }
 }
 
@@ -134,6 +209,28 @@ fn encode_compact_size(buf: &mut Vec<u8>, n: usize) {
     } else {
         buf.push(0xFF);
         buf.extend_from_slice(&(n as u64).to_le_bytes());
+    }
+}
+
+/// Compute `double_SHA256("\x18Bitcoin Signed Message:\n" || CompactSize(len) || message)`.
+pub(crate) fn bitcoin_message_digest(message: &[u8]) -> [u8; 32] {
+    const PREFIX: &[u8] = b"\x18Bitcoin Signed Message:\n";
+    let mut data = Vec::with_capacity(PREFIX.len() + 9 + message.len());
+    data.extend_from_slice(PREFIX);
+    encode_compact_size(&mut data, message.len());
+    data.extend_from_slice(message);
+    Sha256::digest(Sha256::digest(&data)).into()
+}
+
+/// Rewrite the `v` byte of an [`SignOutput::Ecdsa`] with the BIP-137 header
+/// offset for the given address type.
+fn apply_bip137_header(out: SignOutput, address_type: BitcoinMessageAddressType) -> SignOutput {
+    match out {
+        SignOutput::Ecdsa { signature, v } => SignOutput::Ecdsa {
+            signature,
+            v: address_type.header_offset().wrapping_add(v),
+        },
+        other => other,
     }
 }
 

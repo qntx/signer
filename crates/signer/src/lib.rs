@@ -13,7 +13,7 @@
 //!
 //! ```rust,no_run
 //! // Direct usage with a hex private key.
-//! use signer::{Sign, evm};
+//! use signer::{SignMessage, evm};
 //!
 //! let s = evm::Signer::from_hex("0x...").unwrap();
 //! let sig = s.sign_message(b"hello").unwrap();
@@ -34,7 +34,7 @@ pub use signer_fil as fil;
 #[cfg(feature = "nostr")]
 pub use signer_nostr as nostr;
 pub use signer_primitives as primitives;
-pub use signer_primitives::{Sign, SignError, SignExt, SignOutput};
+pub use signer_primitives::{Sign, SignError, SignExt, SignMessage, SignMessageExt, SignOutput};
 #[cfg(feature = "spark")]
 pub use signer_spark as spark;
 #[cfg(feature = "sui")]

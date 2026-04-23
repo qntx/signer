@@ -15,7 +15,9 @@ use alloc::{format, string::String, vec::Vec};
 use blake2::Blake2bVar;
 use blake2::digest::{Update, VariableOutput};
 pub use ed25519_dalek::Signature;
-pub use signer_primitives::{self, Sign, SignError, SignExt, SignOutput};
+pub use signer_primitives::{
+    self, Sign, SignError, SignExt, SignMessage, SignMessageExt, SignOutput,
+};
 use signer_primitives::{Ed25519Signer, delegate_ed25519_ctors};
 
 /// Ed25519 signature scheme flag used by Sui.
@@ -96,6 +98,17 @@ impl Sign for Signer {
         Ok(self.0.sign_output_with_pubkey(hash))
     }
 
+    /// Sign a Sui transaction with intent-based BLAKE2b-256 hashing.
+    ///
+    /// Computes `BLAKE2b-256(intent[0, 0, 0] || tx_bytes)` then signs the
+    /// digest with Ed25519.
+    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
+        let digest = intent_hash(TX_INTENT, tx_bytes);
+        Ok(self.0.sign_output_with_pubkey(&digest))
+    }
+}
+
+impl SignMessage for Signer {
     /// Sign a personal message with Sui's intent-based BLAKE2b-256 hashing.
     ///
     /// The message is first BCS-serialized (ULEB128 length prefix), then
@@ -103,15 +116,6 @@ impl Sign for Signer {
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         let bcs = bcs_serialize_bytes(message);
         let digest = intent_hash(MSG_INTENT, &bcs);
-        Ok(self.0.sign_output_with_pubkey(&digest))
-    }
-
-    /// Sign a Sui transaction with intent-based BLAKE2b-256 hashing.
-    ///
-    /// Computes `BLAKE2b-256(intent[0, 0, 0] || tx_bytes)` then signs the
-    /// digest with Ed25519.
-    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
-        let digest = intent_hash(TX_INTENT, tx_bytes);
         Ok(self.0.sign_output_with_pubkey(&digest))
     }
 }

@@ -1,7 +1,7 @@
 //! TON signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_ton::{Sign, Signer};
+use signer_ton::{Sign, SignMessage, Signer};
 
 use super::parse_hex;
 use crate::output::{self, CliResult};
@@ -43,7 +43,7 @@ impl TonCommand {
         match self.command {
             TonSubcommand::Sign { key, message } => {
                 let signer = Signer::from_hex(&key)?;
-                let out = Sign::sign_message(&signer, message.as_bytes())?;
+                let out = SignMessage::sign_message(&signer, message.as_bytes())?;
                 output::sign(CHAIN, "Ed25519")
                     .address(signer.address())
                     .from_output(&out)

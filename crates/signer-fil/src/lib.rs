@@ -11,7 +11,9 @@ use alloc::{format, string::String, vec::Vec};
 
 use blake2::digest::consts::{U4, U20, U32};
 use blake2::{Blake2b, Digest};
-pub use signer_primitives::{self, Sign, SignError, SignExt, SignOutput};
+pub use signer_primitives::{
+    self, Sign, SignError, SignExt, SignMessage, SignMessageExt, SignOutput,
+};
 use signer_primitives::{Secp256k1Signer, delegate_secp256k1_ctors};
 
 type Blake2b256 = Blake2b<U32>;
@@ -67,7 +69,7 @@ impl Signer {
     /// Returns [`SignError::InvalidSignature`] on malformed input or
     /// failed verification.
     pub fn verify_hash(&self, hash: &[u8; 32], signature: &[u8]) -> Result<(), SignError> {
-        self.0.verify_prehash(hash, signature)
+        self.0.verify_prehash_any(hash, signature)
     }
 }
 
@@ -78,13 +80,20 @@ impl Sign for Signer {
         self.0.sign_prehash_recoverable(hash)
     }
 
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        let digest: [u8; 32] = Blake2b256::digest(message).into();
-        self.0.sign_prehash_recoverable(&digest)
-    }
-
     fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
         let digest: [u8; 32] = Blake2b256::digest(tx_bytes).into();
+        self.0.sign_prehash_recoverable(&digest)
+    }
+}
+
+impl SignMessage for Signer {
+    /// BLAKE2b-256 of the raw message bytes, signed with secp256k1 ECDSA.
+    ///
+    /// No domain prefix is applied — Filecoin's wallet ecosystem does not
+    /// specify a canonical off-chain message framing; callers who need one
+    /// should hash their own preimage and call [`Sign::sign_hash`].
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
+        let digest: [u8; 32] = Blake2b256::digest(message).into();
         self.0.sign_prehash_recoverable(&digest)
     }
 }

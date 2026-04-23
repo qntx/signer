@@ -1,9 +1,9 @@
 //! Unified signing traits and types for multi-chain transaction signers.
 //!
 //! This crate defines the capability traits that every chain-specific signer
-//! crate implements — [`Sign`] for the core signing workflow,
-//! [`EncodeSignedTransaction`] and [`ExtractSignableBytes`] for opt-in
-//! transaction assembly — plus the discriminated [`SignOutput`] enum that
+//! crate implements — [`Sign`] for the mandatory signing surface,
+//! [`SignMessage`] / [`EncodeSignedTransaction`] / [`ExtractSignableBytes`]
+//! for opt-in capabilities — plus the discriminated [`SignOutput`] enum that
 //! covers every wire format the workspace produces.
 //!
 //! # Design principles
@@ -11,13 +11,17 @@
 //! - **Single source of truth** — [`SignError`] is defined once here; chain
 //!   crates re-export it directly and only introduce a wrapper enum when they
 //!   carry additional failure modes.
-//! - **Capability traits** — [`Sign`] is the mandatory surface; optional
+//! - **Capability traits** — [`Sign`] is the mandatory minimum; optional
 //!   capabilities live in separate traits so types never carry "not
-//!   implemented" lies.
+//!   implemented" lies. Chains without a canonical message-signing standard
+//!   (e.g. XRPL, Cosmos) simply do not implement [`SignMessage`].
 //! - **Type-safe digests** — `sign_hash` accepts `&[u8; 32]`; ragged byte
 //!   slices are rejected at compile time.
 //! - **Discriminated output** — [`SignOutput`] variants mirror real wire
 //!   formats; callers pattern-match instead of juggling `Option` metadata.
+//! - **Fallible randomness** — every primitive exposes a `try_random`
+//!   constructor that surfaces [`getrandom`] failures; the panicking
+//!   `random()` helper is kept only as an ergonomic wrapper.
 //! - **Thread-safe** — every signer is `Send + Sync` and ready to share
 //!   across async tasks.
 //! - **No address derivation** — that responsibility lives in `kobe`.
@@ -67,17 +71,23 @@ pub enum SignOutput {
     /// secp256k1 ECDSA with a single-byte tail (EVM, BTC, Cosmos, Filecoin, Tron, Spark).
     ///
     /// Flat bytes: `signature || v` (65 B total). The exact meaning of `v`
-    /// depends on the call site:
+    /// depends on the producing call site and chain; every producer in the
+    /// workspace documents its encoding explicitly:
     ///
-    /// | Producer                                                  | `v` encoding |
-    /// |-----------------------------------------------------------|--------------|
-    /// | `Signer::sign_hash` / `Signer::sign_transaction` (ECDSA)  | `0` or `1` (raw parity)   |
-    /// | `signer_evm::Signer::sign_message` (EIP-191) / `sign_typed_data` | `27` or `28` |
-    /// | `signer_tron::Signer::sign_message` (TRON message prefix) | `27` or `28` |
+    /// | Producer                                                              | `v` encoding              |
+    /// |-----------------------------------------------------------------------|---------------------------|
+    /// | [`Sign::sign_hash`] / [`Sign::sign_transaction`] (every ECDSA chain)  | `0` or `1` (raw parity)   |
+    /// | `signer_evm::Signer::{sign_message, sign_typed_data}` (EIP-191)       | `27` or `28`              |
+    /// | `signer_tron::Signer::sign_message` (TRON message prefix)             | `27` or `28`              |
+    /// | `signer_btc::Signer::sign_message` (BIP-137, compressed P2PKH)        | `31` or `32`              |
+    /// | `signer_btc::Signer::sign_message_with` (BIP-137, caller-selected)    | `27..=42` per BIP-137     |
+    /// | `signer_spark::Signer::sign_message` (same BIP-137 encoding as BTC)   | `31` or `32`              |
     Ecdsa {
         /// 64-byte compact `r || s`.
         signature: [u8; 64],
-        /// `v` byte, with chain-specific meaning documented above.
+        /// `v` byte. The raw parity is always in the low bit; producers that
+        /// need the chain's on-wire header (EIP-191, BIP-137, …) add the
+        /// appropriate constant before constructing this variant.
         v: u8,
     },
     /// secp256k1 ECDSA encoded as ASN.1 DER (XRPL).
@@ -160,15 +170,16 @@ impl SignOutput {
 
 /// Mandatory signing surface implemented by every chain-specific `Signer`.
 ///
-/// Signers hold their private key internally and expose three entry points
-/// layered by abstraction level:
+/// Signers hold their private key internally and expose two entry points:
 ///
 /// - [`sign_hash`](Self::sign_hash) — sign a pre-computed 32-byte digest.
 ///   Type-safe (`&[u8; 32]`) and chain-agnostic.
-/// - [`sign_message`](Self::sign_message) — apply the chain's message prefix
-///   / hash policy, then sign.
 /// - [`sign_transaction`](Self::sign_transaction) — interpret the input as
 ///   the chain's unsigned transaction bytes, hash, and sign.
+///
+/// Off-chain message signing lives on the opt-in [`SignMessage`] trait
+/// because it is not universal: XRPL and Cosmos have no canonical scheme
+/// that fits a single-argument signature.
 ///
 /// # Thread safety
 ///
@@ -177,57 +188,40 @@ impl SignOutput {
 ///
 /// # Error contract
 ///
-/// `Error` must be convertible from the shared [`SignError`] so chain crates
-/// can layer their own variants on top without losing the core failure modes.
+/// `Error` must be a real [`core::error::Error`] and losslessly liftable
+/// from [`SignError`], so downstream code can attribute core failures
+/// without string-matching while still participating in the standard
+/// `?` / `Box<dyn Error>` ecosystem.
 ///
 /// # Example
 ///
 /// ```
 /// use signer_primitives::{Sign, SignOutput};
 ///
-/// fn sign_with_any<S: Sign>(signer: &S, msg: &[u8]) -> Result<SignOutput, S::Error> {
-///     signer.sign_message(msg)
+/// fn sign_hash_generic<S: Sign>(signer: &S, hash: &[u8; 32]) -> Result<SignOutput, S::Error> {
+///     signer.sign_hash(hash)
 /// }
 /// ```
 pub trait Sign: Send + Sync {
     /// Error returned by every signing operation.
     ///
-    /// Must lift [`SignError`] losslessly so downstream code can attribute
-    /// core failures without string-matching.
-    type Error: core::fmt::Debug + core::fmt::Display + From<SignError> + Send + Sync + 'static;
+    /// Implementations must honour the full [`core::error::Error`] contract
+    /// (which implies [`core::fmt::Debug`] + [`core::fmt::Display`]) and
+    /// losslessly accept [`SignError`] via [`From`].
+    type Error: core::error::Error + From<SignError> + Send + Sync + 'static;
 
     /// Sign a pre-hashed 32-byte digest.
     ///
     /// All workspace chains sign 32-byte digests (SHA-256, SHA3-256,
     /// BLAKE2b-256, Keccak-256, SHA-512-half). Consumers that already hold a
     /// digest should call this directly; chains that need domain-specific
-    /// prefixing go through [`sign_message`](Self::sign_message) or
+    /// prefixing go through [`SignMessage::sign_message`] or
     /// [`sign_transaction`](Self::sign_transaction) instead.
     ///
     /// # Errors
     ///
     /// Returns an error if the underlying signing primitive fails.
     fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, Self::Error>;
-
-    /// Sign an arbitrary message with the chain's message-signing convention.
-    ///
-    /// | Chain        | Transform                                                  |
-    /// |--------------|------------------------------------------------------------|
-    /// | EVM          | Keccak-256 of `EIP-191` prefix + message (`v = 27 \| 28`)  |
-    /// | Bitcoin      | double-SHA256 of `\x18Bitcoin Signed Message:\n` + varint  |
-    /// | Tron         | Keccak-256 of `\x19TRON Signed Message:\n` + message       |
-    /// | Cosmos       | SHA-256 of the raw message                                 |
-    /// | Solana / TON | Raw Ed25519 (no prefix)                                    |
-    /// | Sui          | BLAKE2b-256 of intent + BCS-encoded message                |
-    /// | Aptos        | Raw Ed25519 (no domain prefix)                             |
-    /// | Nostr        | Raw BIP-340 Schnorr (no prefix)                            |
-    /// | XRPL         | Not supported (returns an error)                           |
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if signing fails, or if the chain does not define a
-    /// canonical message-signing scheme.
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Self::Error>;
 
     /// Sign an unsigned transaction using the chain's sighash convention.
     ///
@@ -240,6 +234,45 @@ pub trait Sign: Send + Sync {
     ///
     /// Returns an error if the transaction is malformed or signing fails.
     fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Self::Error>;
+}
+
+/// Opt-in capability: sign an off-chain message with the chain's own
+/// message-signing convention.
+///
+/// Implemented only by chains with a well-defined standard for signing
+/// arbitrary messages. Chains without one (XRPL has no canonical scheme;
+/// Cosmos defers to ADR-036 which requires a pre-built `SignDoc` and is
+/// therefore best served through [`Sign::sign_transaction`]) simply do
+/// not implement this trait, making the capability visible in the type
+/// system rather than hidden behind a runtime `Err`.
+///
+/// | Chain            | Transform                                                          | `v` on `Ecdsa`    |
+/// |------------------|--------------------------------------------------------------------|-------------------|
+/// | EVM              | Keccak-256 of `\x19Ethereum Signed Message:\n{len}` + message      | `27` or `28`      |
+/// | Bitcoin / Spark  | double-SHA256 of `\x18Bitcoin Signed Message:\n` + CompactSize+msg | `31` or `32`      |
+/// | Tron             | Keccak-256 of `\x19TRON Signed Message:\n{len}` + message          | `27` or `28`      |
+/// | Filecoin         | BLAKE2b-256 of the raw message                                     | `0` or `1`        |
+/// | Solana / TON     | Raw Ed25519 over the message (no prefix)                           | — (Ed25519)       |
+/// | Sui              | BLAKE2b-256 of `PersonalMessage` intent + BCS-encoded message        | — (Ed25519)       |
+/// | Aptos            | Raw Ed25519 over the message (no domain prefix)                    | — (Ed25519)       |
+/// | Nostr            | Raw BIP-340 Schnorr over the message (no prefix)                   | — (Schnorr)       |
+///
+/// # Example
+///
+/// ```
+/// use signer_primitives::{SignMessage, SignOutput};
+///
+/// fn personal_sign<S: SignMessage>(signer: &S, msg: &[u8]) -> Result<SignOutput, S::Error> {
+///     signer.sign_message(msg)
+/// }
+/// ```
+pub trait SignMessage: Sign {
+    /// Sign an arbitrary message with the chain's message-signing convention.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying signing primitive fails.
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Self::Error>;
 }
 
 /// Optional capability: extract the signable portion from a fully serialized
@@ -305,6 +338,9 @@ pub trait EncodeSignedTransaction: Sign {
 
 /// Blanket extension trait that adds flat-byte convenience wrappers to every
 /// [`Sign`] implementor.
+///
+/// `sign_message_bytes` lives on the companion [`SignMessageExt`] so the
+/// helper is visible only on types that actually implement [`SignMessage`].
 pub trait SignExt: Sign {
     /// Sign a 32-byte digest and return the flat signature bytes.
     ///
@@ -314,16 +350,6 @@ pub trait SignExt: Sign {
     #[inline]
     fn sign_hash_bytes(&self, hash: &[u8; 32]) -> Result<Vec<u8>, Self::Error> {
         self.sign_hash(hash).map(|out| out.to_bytes())
-    }
-
-    /// Sign a message and return the flat signature bytes.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if signing fails.
-    #[inline]
-    fn sign_message_bytes(&self, message: &[u8]) -> Result<Vec<u8>, Self::Error> {
-        self.sign_message(message).map(|out| out.to_bytes())
     }
 
     /// Sign a transaction and return the flat signature bytes.
@@ -338,3 +364,18 @@ pub trait SignExt: Sign {
 }
 
 impl<T: Sign> SignExt for T {}
+
+/// Flat-byte helper for [`SignMessage`].
+pub trait SignMessageExt: SignMessage {
+    /// Sign a message and return the flat signature bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if signing fails.
+    #[inline]
+    fn sign_message_bytes(&self, message: &[u8]) -> Result<Vec<u8>, Self::Error> {
+        self.sign_message(message).map(|out| out.to_bytes())
+    }
+}
+
+impl<T: SignMessage> SignMessageExt for T {}

@@ -1,7 +1,7 @@
 //! Sui signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_sui::{Sign, Signer};
+use signer_sui::{Sign, SignMessage, Signer};
 
 use super::parse_hex;
 use crate::output::{self, CliResult};
@@ -43,7 +43,7 @@ impl SuiCommand {
         match self.command {
             SuiSubcommand::SignMessage { key, message } => {
                 let signer = Signer::from_hex(&key)?;
-                let out = Sign::sign_message(&signer, message.as_bytes())?;
+                let out = SignMessage::sign_message(&signer, message.as_bytes())?;
                 output::sign(CHAIN, "personal message (BCS + intent)")
                     .address(signer.address())
                     .from_output(&out)

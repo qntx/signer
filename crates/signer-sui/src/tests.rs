@@ -9,8 +9,8 @@
 )]
 
 use super::{
-    ED25519_FLAG, MSG_INTENT, Sign, Signer, TX_INTENT, bcs_serialize_bytes, blake2b_256,
-    intent_hash,
+    ED25519_FLAG, MSG_INTENT, Sign, SignMessage, Signer, TX_INTENT, bcs_serialize_bytes,
+    blake2b_256, intent_hash,
 };
 
 /// RFC 8032 Test Vector 1.

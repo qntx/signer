@@ -8,7 +8,7 @@
 //! # Examples
 //!
 //! ```
-//! use signer_evm::{Sign as _, Signer};
+//! use signer_evm::{SignMessage as _, Signer};
 //!
 //! let signer = Signer::random();
 //! let out = signer.sign_message(b"hello").unwrap();
@@ -25,7 +25,10 @@ mod eip712;
 mod rlp;
 
 use sha3::{Digest, Keccak256};
-pub use signer_primitives::{self, EncodeSignedTransaction, Sign, SignError, SignExt, SignOutput};
+pub use signer_primitives::{
+    self, EncodeSignedTransaction, Sign, SignError, SignExt, SignMessage, SignMessageExt,
+    SignOutput,
+};
 use signer_primitives::{Secp256k1Signer, delegate_secp256k1_ctors};
 
 /// EVM transaction signer.
@@ -71,7 +74,7 @@ impl Signer {
     /// Returns [`SignError::InvalidSignature`] on malformed input or
     /// failed verification.
     pub fn verify_hash(&self, hash: &[u8; 32], signature: &[u8]) -> Result<(), SignError> {
-        self.0.verify_prehash(hash, signature)
+        self.0.verify_prehash_any(hash, signature)
     }
 
     /// Sign EIP-712 typed structured data (JSON input). Returns a
@@ -120,6 +123,18 @@ impl Sign for Signer {
         self.0.sign_prehash_recoverable(hash)
     }
 
+    /// Sign an unsigned typed transaction (EIP-1559 / EIP-2930).
+    ///
+    /// Returns a [`SignOutput::Ecdsa`] with the **raw** `v` byte (`0 | 1`) —
+    /// do **not** add 27 when feeding the result into
+    /// [`Signer::encode_signed_transaction`].
+    fn sign_transaction(&self, unsigned_tx: &[u8]) -> Result<SignOutput, SignError> {
+        let digest: [u8; 32] = Keccak256::digest(unsigned_tx).into();
+        self.0.sign_prehash_recoverable(&digest)
+    }
+}
+
+impl SignMessage for Signer {
     /// EIP-191 `personal_sign`. Returns a [`SignOutput::Ecdsa`] with
     /// `v = 27 | 28`.
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
@@ -129,16 +144,6 @@ impl Sign for Signer {
         data.extend_from_slice(message);
         let digest: [u8; 32] = Keccak256::digest(&data).into();
         Ok(bump_v_by_27(self.0.sign_prehash_recoverable(&digest)?))
-    }
-
-    /// Sign an unsigned typed transaction (EIP-1559 / EIP-2930).
-    ///
-    /// Returns a [`SignOutput::Ecdsa`] with the **raw** `v` byte (`0 | 1`) —
-    /// do **not** add 27 when feeding the result into
-    /// [`Signer::encode_signed_transaction`].
-    fn sign_transaction(&self, unsigned_tx: &[u8]) -> Result<SignOutput, SignError> {
-        let digest: [u8; 32] = Keccak256::digest(unsigned_tx).into();
-        self.0.sign_prehash_recoverable(&digest)
     }
 }
 

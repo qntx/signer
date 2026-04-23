@@ -246,16 +246,16 @@ fn random_signer_produces_valid_signatures() {
 }
 
 mod sign_trait {
-    use signer_primitives::Sign;
+    use signer_primitives::SignMessage;
 
     use super::*;
 
     #[test]
-    fn delegate_impl_matches_inherent() {
+    fn delegate_impl_matches_direct_call() {
         let s = tv1_signer();
         let msg = b"delegate";
-        let via_trait = <Signer as Sign>::sign_message(&s, msg).unwrap();
-        let via_inherent = s.sign_message(msg).unwrap();
-        assert_eq!(via_trait.to_bytes(), via_inherent.to_bytes());
+        let via_trait = <Signer as SignMessage>::sign_message(&s, msg).unwrap();
+        let via_method = s.sign_message(msg).unwrap();
+        assert_eq!(via_trait.to_bytes(), via_method.to_bytes());
     }
 }

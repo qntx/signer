@@ -10,12 +10,30 @@
 use sha2::{Digest, Sha256};
 use signer_primitives::testing::verify_secp256k1_recoverable;
 
-use super::{Sign, SignOutput, Signer};
+use super::{BitcoinMessageAddressType, Sign, SignMessage, SignOutput, Signer};
 
 const TEST_KEY: &str = "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318";
 
 fn test_signer() -> Signer {
     Signer::from_hex(TEST_KEY).unwrap()
+}
+
+/// Recover the 65-byte compact signature regardless of which BIP-137
+/// header byte the signer prepended, so the underlying ECDSA proof can be
+/// checked against the expected digest.
+fn verify_compact(s: &Signer, hash: &[u8; 32], out: &SignOutput, header_offset: u8) {
+    let bytes = out.to_bytes();
+    assert_eq!(bytes.len(), 65);
+    let header = bytes[64];
+    assert!(
+        header >= header_offset && header < header_offset + 4,
+        "expected BIP-137 header in {}..{}, got {header}",
+        header_offset,
+        header_offset + 4,
+    );
+    let mut raw = bytes;
+    raw[64] = header - header_offset;
+    verify_secp256k1_recoverable(&s.public_key_bytes(), hash, &raw);
 }
 
 fn verify(s: &Signer, hash: &[u8; 32], out: &SignOutput) {
@@ -57,7 +75,7 @@ fn from_bytes_roundtrip() {
 }
 
 #[test]
-fn sign_message_short_verify() {
+fn sign_message_short_bip137_compressed_p2pkh() {
     let s = test_signer();
     let msg = b"Hello Bitcoin!";
     let out = s.sign_message(msg).unwrap();
@@ -71,11 +89,13 @@ fn sign_message_short_verify() {
     data.push(msg.len() as u8);
     data.extend_from_slice(msg);
     let expected: [u8; 32] = Sha256::digest(Sha256::digest(&data)).into();
-    verify(&s, &expected, &out);
+
+    // Default `sign_message` must emit the compressed-P2PKH header (31 | 32).
+    verify_compact(&s, &expected, &out, 31);
 }
 
 #[test]
-fn sign_message_long_varint_verify() {
+fn sign_message_long_varint_bip137_compressed_p2pkh() {
     let s = test_signer();
     let msg = vec![0x42u8; 300];
     let out = s.sign_message(&msg).unwrap();
@@ -86,11 +106,11 @@ fn sign_message_long_varint_verify() {
     data.extend_from_slice(&300u16.to_le_bytes());
     data.extend_from_slice(&msg);
     let expected: [u8; 32] = Sha256::digest(Sha256::digest(&data)).into();
-    verify(&s, &expected, &out);
+    verify_compact(&s, &expected, &out, 31);
 }
 
 #[test]
-fn sign_message_varint_boundary_253() {
+fn sign_message_varint_boundary_253_bip137_compressed_p2pkh() {
     let s = test_signer();
     let msg = vec![0xAA; 253];
     let out = s.sign_message(&msg).unwrap();
@@ -101,7 +121,26 @@ fn sign_message_varint_boundary_253() {
     data.extend_from_slice(&253u16.to_le_bytes());
     data.extend_from_slice(&msg);
     let expected: [u8; 32] = Sha256::digest(Sha256::digest(&data)).into();
-    verify(&s, &expected, &out);
+    verify_compact(&s, &expected, &out, 31);
+}
+
+#[test]
+fn sign_message_with_all_address_types_bip137() {
+    let s = test_signer();
+    let msg = b"header byte check";
+
+    let cases: &[(BitcoinMessageAddressType, u8)] = &[
+        (BitcoinMessageAddressType::P2pkhUncompressed, 27),
+        (BitcoinMessageAddressType::P2pkhCompressed, 31),
+        (BitcoinMessageAddressType::SegwitP2sh, 35),
+        (BitcoinMessageAddressType::SegwitBech32, 39),
+    ];
+    let digest = super::bitcoin_message_digest(msg);
+    for (ty, offset) in cases {
+        let out = s.sign_message_with(*ty, msg).unwrap();
+        assert_eq!(ty.header_offset(), *offset);
+        verify_compact(&s, &digest, &out, *offset);
+    }
 }
 
 #[test]

@@ -90,18 +90,41 @@ impl Ed25519Signer {
 
     /// Generate a random signer using OS-provided entropy.
     ///
+    /// Prefer this `try_*` form on embedded / WASM targets where the entropy
+    /// source can legitimately fail.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SignError::SigningFailed`] if the OS RNG is unavailable.
+    #[cfg(feature = "getrandom")]
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "`from_bytes` is infallible for Ed25519; the wrapped Result is a forward-compat shim"
+    )]
+    pub fn try_random() -> Result<Self, SignError> {
+        let mut bytes = [0u8; 32];
+        let fill = getrandom::fill(&mut bytes).map_err(|e| SignError::SigningFailed(e.to_string()));
+        let out = fill.and_then(|()| Self::from_bytes(&bytes));
+        bytes.fill(0);
+        out
+    }
+
+    /// Generate a random signer, panicking on entropy failure.
+    ///
+    /// Thin wrapper over [`try_random`](Self::try_random); library code
+    /// targeting constrained environments should prefer the fallible form.
+    ///
     /// # Panics
     ///
     /// Panics if the OS random number generator fails.
     #[cfg(feature = "getrandom")]
     #[must_use]
-    #[allow(clippy::expect_used, reason = "getrandom failure is unrecoverable")]
+    #[allow(
+        clippy::expect_used,
+        reason = "panicking wrapper — callers needing graceful handling use try_random"
+    )]
     pub fn random() -> Self {
-        let mut bytes = [0u8; 32];
-        getrandom::fill(&mut bytes).expect("getrandom failed");
-        let signer = Self::from_bytes(&bytes).expect("ed25519 from_bytes is infallible");
-        bytes.fill(0);
-        signer
+        Self::try_random().expect("Ed25519Signer::random: entropy source failed")
     }
 
     /// Expose the inner [`SigningKey`].

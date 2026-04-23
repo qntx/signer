@@ -104,6 +104,30 @@ impl SchnorrSigner {
 
     /// Generate a random signer using OS-provided entropy.
     ///
+    /// Prefer this `try_*` form on embedded / WASM targets where the entropy
+    /// source can legitimately fail.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SignError::SigningFailed`] if the OS RNG is unavailable,
+    /// and [`SignError::InvalidKey`] if the sampled scalar is out of range
+    /// (probability ≈ 2⁻¹²⁸, cryptographically negligible).
+    #[cfg(feature = "getrandom")]
+    pub fn try_random() -> Result<Self, SignError> {
+        let mut bytes = Zeroizing::new([0u8; 32]);
+        getrandom::fill(&mut *bytes).map_err(|e| SignError::SigningFailed(e.to_string()))?;
+        let key = SigningKey::from_bytes(bytes.as_slice())
+            .map_err(|e| SignError::InvalidKey(e.to_string()))?;
+        Ok(Self {
+            key,
+            raw_bytes: bytes,
+        })
+    }
+
+    /// Generate a random signer, panicking on entropy failure.
+    ///
+    /// Thin wrapper over [`try_random`](Self::try_random).
+    ///
     /// # Panics
     ///
     /// Panics if the OS random number generator fails or produces an
@@ -112,16 +136,10 @@ impl SchnorrSigner {
     #[must_use]
     #[allow(
         clippy::expect_used,
-        reason = "getrandom failure is unrecoverable; secp256k1 rejection has p ≈ 2⁻¹²⁸"
+        reason = "panicking wrapper — callers needing graceful handling use try_random"
     )]
     pub fn random() -> Self {
-        let mut bytes = Zeroizing::new([0u8; 32]);
-        getrandom::fill(&mut *bytes).expect("getrandom failed");
-        let key = SigningKey::from_bytes(bytes.as_slice()).expect("invalid random key");
-        Self {
-            key,
-            raw_bytes: bytes,
-        }
+        Self::try_random().expect("SchnorrSigner::random: entropy source failed")
     }
 
     /// Expose the inner [`SigningKey`].

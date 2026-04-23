@@ -17,7 +17,8 @@ mod error;
 pub use ed25519_dalek::Signature;
 pub use error::SignError;
 pub use signer_primitives::{
-    self, EncodeSignedTransaction, ExtractSignableBytes, Sign, SignExt, SignOutput,
+    self, EncodeSignedTransaction, ExtractSignableBytes, Sign, SignExt, SignMessage,
+    SignMessageExt, SignOutput,
 };
 use signer_primitives::{Ed25519Signer, delegate_ed25519_ctors};
 use zeroize::Zeroizing;
@@ -132,18 +133,50 @@ impl Signer {
     }
 
     /// Encode a signed transaction by splicing the signature into the first
-    /// slot.
+    /// slot of the compact-u16 signature array.
     ///
-    /// Also available via the [`EncodeSignedTransaction`] trait.
+    /// Accepts any [`SignOutput::Ed25519`] variant produced by this signer
+    /// (or its `Ed25519WithPubkey` sibling, whose signature bytes are
+    /// structurally identical). Mirrors the [`EncodeSignedTransaction`]
+    /// trait method for callers that already hold a [`SignOutput`].
+    ///
+    /// For direct splicing from the native `ed25519_dalek::Signature`
+    /// representation, use [`Signer::splice_signature`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction is empty, has no signature slots,
+    /// or if `signature` is not an Ed25519 variant.
+    pub fn encode_signed_transaction(
+        tx_bytes: &[u8],
+        signature: &SignOutput,
+    ) -> Result<Vec<u8>, SignError> {
+        let sig_bytes = match *signature {
+            SignOutput::Ed25519(bytes)
+            | SignOutput::Ed25519WithPubkey {
+                signature: bytes, ..
+            } => bytes,
+            _ => {
+                return Err(SignError::invalid_signature(
+                    "expected Ed25519 signature output",
+                ));
+            }
+        };
+        Self::splice_signature(tx_bytes, &sig_bytes)
+    }
+
+    /// Splice a raw 64-byte Ed25519 signature into the first signature slot
+    /// of `tx_bytes`.
+    ///
+    /// Low-level primitive used by [`Signer::encode_signed_transaction`];
+    /// callers who produced a native `ed25519_dalek::Signature` through
+    /// [`Signer::sign_raw`] can pass `&sig.to_bytes()` directly.
     ///
     /// # Errors
     ///
     /// Returns an error if the transaction is empty or has no signature slots.
     #[allow(clippy::indexing_slicing, reason = "bounds are checked before slicing")]
-    pub fn encode_signed_transaction(
-        tx_bytes: &[u8],
-        signature: &Signature,
-    ) -> Result<Vec<u8>, SignError> {
+    pub fn splice_signature(tx_bytes: &[u8], signature: &[u8; 64]) -> Result<Vec<u8>, SignError> {
         if tx_bytes.is_empty() {
             return Err(SignError::invalid_transaction("empty transaction"));
         }
@@ -155,7 +188,7 @@ impl Signer {
             return Err(SignError::invalid_transaction("transaction too short"));
         }
         let mut signed = tx_bytes.to_vec();
-        signed[header_len..header_len + 64].copy_from_slice(&signature.to_bytes());
+        signed[header_len..header_len + 64].copy_from_slice(signature);
         Ok(signed)
     }
 }
@@ -167,12 +200,15 @@ impl Sign for Signer {
         Ok(self.0.sign_output(hash))
     }
 
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        Ok(self.0.sign_output(message))
-    }
-
     fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
         Ok(self.0.sign_output(tx_bytes))
+    }
+}
+
+impl SignMessage for Signer {
+    /// Raw Ed25519 signature over `message` (no prefix or hashing).
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
+        Ok(self.0.sign_output(message))
     }
 }
 
@@ -188,13 +224,7 @@ impl EncodeSignedTransaction for Signer {
         tx_bytes: &[u8],
         signature: &SignOutput,
     ) -> Result<Vec<u8>, SignError> {
-        let SignOutput::Ed25519(sig_bytes) = *signature else {
-            return Err(SignError::invalid_signature(
-                "expected Ed25519 signature output",
-            ));
-        };
-        let sig = Signature::from_bytes(&sig_bytes);
-        Self::encode_signed_transaction(tx_bytes, &sig)
+        Self::encode_signed_transaction(tx_bytes, signature)
     }
 }
 

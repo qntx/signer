@@ -83,6 +83,34 @@ impl Secp256k1Signer {
 
     /// Generate a random signer using OS-provided entropy.
     ///
+    /// Prefer this `try_*` form on embedded / WASM targets where the entropy
+    /// source can legitimately fail; [`random`](Self::random) exists only as
+    /// an ergonomic wrapper for std environments where failure is fatal.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SignError::SigningFailed`] if the OS RNG is unavailable,
+    /// and [`SignError::InvalidKey`] if the sampled scalar falls outside
+    /// the curve order (probability ≈ 2⁻¹²⁸, cryptographically negligible).
+    #[cfg(feature = "getrandom")]
+    pub fn try_random() -> Result<Self, SignError> {
+        use zeroize::Zeroize as _;
+        let mut bytes = [0u8; 32];
+        let result = getrandom::fill(&mut bytes)
+            .map_err(|e| SignError::SigningFailed(e.to_string()))
+            .and_then(|()| {
+                SigningKey::from_slice(&bytes).map_err(|e| SignError::InvalidKey(e.to_string()))
+            });
+        bytes.zeroize();
+        result.map(|key| Self { key })
+    }
+
+    /// Generate a random signer, panicking on entropy failure.
+    ///
+    /// Thin wrapper over [`try_random`](Self::try_random) that panics if the
+    /// OS RNG fails. For library code targeting embedded / WASM environments,
+    /// prefer [`try_random`](Self::try_random) directly.
+    ///
     /// # Panics
     ///
     /// Panics if the OS random number generator fails or produces an
@@ -91,15 +119,10 @@ impl Secp256k1Signer {
     #[must_use]
     #[allow(
         clippy::expect_used,
-        reason = "getrandom failure is unrecoverable; secp256k1 rejection has p ≈ 2⁻¹²⁸"
+        reason = "panicking wrapper — callers needing graceful handling use try_random"
     )]
     pub fn random() -> Self {
-        use zeroize::Zeroize as _;
-        let mut bytes = [0u8; 32];
-        getrandom::fill(&mut bytes).expect("getrandom failed");
-        let key = SigningKey::from_slice(&bytes).expect("invalid random key");
-        bytes.zeroize();
-        Self { key }
+        Self::try_random().expect("Secp256k1Signer::random: entropy source failed")
     }
 
     /// Expose the inner [`SigningKey`].
@@ -174,35 +197,94 @@ impl Secp256k1Signer {
         Ok(SignOutput::EcdsaDer(sig.to_der().as_bytes().to_vec()))
     }
 
-    /// Verify a recoverable / compact ECDSA signature against a 32-byte
+    /// Verify a compact ECDSA signature (`r || s`) against a 32-byte
     /// pre-hashed digest.
     ///
-    /// Accepts either 64-byte (`r || s`) or 65-byte (`r || s || v`) input;
-    /// the recovery id is ignored for verification purposes.
+    /// This is the strict, single-shape entry point. For recoverable
+    /// signatures where the caller holds 65 bytes, use
+    /// [`verify_prehash_recoverable`](Self::verify_prehash_recoverable); for
+    /// DER-encoded signatures use
+    /// [`verify_prehash_der`](Self::verify_prehash_der).
     ///
     /// # Errors
     ///
-    /// Returns [`SignError::InvalidSignature`] if the bytes are malformed or
-    /// fail verification.
+    /// Returns [`SignError::InvalidSignature`] if the bytes are not a valid
+    /// compact signature or fail verification.
     pub fn verify_prehash(
         &self,
         hash: &[u8; DIGEST_LEN],
-        signature: &[u8],
+        signature: &[u8; 64],
     ) -> Result<(), SignError> {
-        let sig_bytes = match signature.len() {
-            64 | 65 => signature.get(..64).unwrap_or_default(),
-            n => {
-                return Err(SignError::InvalidSignature(format!(
-                    "expected 64 or 65 bytes, got {n}"
-                )));
-            }
-        };
-        let sig = Signature::from_slice(sig_bytes)
+        let sig = Signature::from_slice(signature)
             .map_err(|e| SignError::InvalidSignature(e.to_string()))?;
         self.key
             .verifying_key()
             .verify_prehash(hash, &sig)
             .map_err(|e| SignError::InvalidSignature(e.to_string()))
+    }
+
+    /// Verify a 65-byte recoverable ECDSA signature (`r || s || v`) against
+    /// a 32-byte pre-hashed digest.
+    ///
+    /// The trailing `v` byte is ignored — only the leading 64 bytes are
+    /// checked. Callers that need to *recover* a public key from the
+    /// signature should use the `k256::ecdsa::VerifyingKey::recover_*` APIs
+    /// directly.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SignError::InvalidSignature`] on malformed scalars or
+    /// verification failure.
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "signature has a compile-time size of 65 so [..64] is infallible"
+    )]
+    pub fn verify_prehash_recoverable(
+        &self,
+        hash: &[u8; DIGEST_LEN],
+        signature: &[u8; 65],
+    ) -> Result<(), SignError> {
+        let mut compact = [0u8; 64];
+        compact.copy_from_slice(&signature[..64]);
+        self.verify_prehash(hash, &compact)
+    }
+
+    /// Verify a compact (64 B) or recoverable (65 B) signature, dispatching
+    /// on the input length.
+    ///
+    /// Convenience entry point for chain-level `Signer::verify_hash` helpers
+    /// that want to accept both wire shapes. For strict typing, prefer
+    /// [`verify_prehash`](Self::verify_prehash) or
+    /// [`verify_prehash_recoverable`](Self::verify_prehash_recoverable).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SignError::InvalidSignature`] if `signature.len()` is
+    /// neither 64 nor 65, or if verification fails.
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "length is exhaustively matched before every slice operation"
+    )]
+    pub fn verify_prehash_any(
+        &self,
+        hash: &[u8; DIGEST_LEN],
+        signature: &[u8],
+    ) -> Result<(), SignError> {
+        match signature.len() {
+            64 => {
+                let mut buf = [0u8; 64];
+                buf.copy_from_slice(signature);
+                self.verify_prehash(hash, &buf)
+            }
+            65 => {
+                let mut buf = [0u8; 65];
+                buf.copy_from_slice(signature);
+                self.verify_prehash_recoverable(hash, &buf)
+            }
+            n => Err(SignError::InvalidSignature(format!(
+                "expected 64 or 65 bytes, got {n}"
+            ))),
+        }
     }
 
     /// Verify a DER-encoded ECDSA signature against a 32-byte pre-hashed

@@ -2,7 +2,7 @@
 
 use clap::{Args, Subcommand};
 use sha2::{Digest as _, Sha256};
-use signer_nostr::{Sign, SignError, Signer};
+use signer_nostr::{Sign, SignError, SignMessage, Signer};
 
 use super::parse_hex;
 use crate::output::{self, CliResult};

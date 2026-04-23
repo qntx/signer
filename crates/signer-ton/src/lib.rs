@@ -10,7 +10,9 @@ extern crate alloc;
 use alloc::{string::String, vec::Vec};
 
 pub use ed25519_dalek::Signature;
-pub use signer_primitives::{self, Sign, SignError, SignExt, SignOutput};
+pub use signer_primitives::{
+    self, Sign, SignError, SignExt, SignMessage, SignMessageExt, SignOutput,
+};
 use signer_primitives::{Ed25519Signer, delegate_ed25519_ctors};
 
 /// TON transaction signer.
@@ -72,12 +74,15 @@ impl Sign for Signer {
         Ok(self.0.sign_output(hash))
     }
 
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        Ok(self.0.sign_output(message))
-    }
-
     fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
         Ok(self.0.sign_output(tx_bytes))
+    }
+}
+
+impl SignMessage for Signer {
+    /// Raw Ed25519 signature over the message bytes (no prefix or hashing).
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
+        Ok(self.0.sign_output(message))
     }
 }
 

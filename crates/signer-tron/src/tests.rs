@@ -11,7 +11,7 @@ use sha2::Sha256;
 use sha3::{Digest, Keccak256};
 use signer_primitives::testing::verify_secp256k1_recoverable;
 
-use super::{Sign, SignOutput, Signer};
+use super::{Sign, SignMessage, SignOutput, Signer};
 
 const TEST_KEY: &str = "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318";
 

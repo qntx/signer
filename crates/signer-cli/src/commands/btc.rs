@@ -1,7 +1,7 @@
 //! Bitcoin signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_btc::{Sign, Signer};
+use signer_btc::{Sign, SignMessage, Signer};
 
 use super::{parse_hex, parse_hex32};
 use crate::output::{self, CliResult};

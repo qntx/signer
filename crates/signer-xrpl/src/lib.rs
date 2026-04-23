@@ -90,16 +90,6 @@ impl Sign for Signer {
         self.0.sign_prehash_der(hash)
     }
 
-    /// XRPL has no canonical off-chain message signing standard.
-    ///
-    /// Always returns an error. Once the community adopts a convention, this
-    /// can be implemented.
-    fn sign_message(&self, _message: &[u8]) -> Result<SignOutput, SignError> {
-        Err(SignError::SigningFailed(
-            "XRPL has no canonical message signing standard".into(),
-        ))
-    }
-
     /// Sign an unsigned XRPL transaction.
     ///
     /// `tx_bytes` must be the raw binary-encoded unsigned transaction fields
@@ -116,6 +106,11 @@ impl Sign for Signer {
         self.0.sign_prehash_der(&hash)
     }
 }
+
+// XRPL intentionally does **not** implement `SignMessage`: the ledger has no
+// canonical off-chain message-signing standard (no EIP-191 equivalent), so a
+// runtime `Err` would be a type-system lie. Users who need a custom scheme
+// hash their own preimage and call `Sign::sign_hash`.
 
 #[cfg(feature = "kobe")]
 impl Signer {

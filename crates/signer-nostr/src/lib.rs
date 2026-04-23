@@ -35,7 +35,7 @@ use alloc::vec::Vec;
 
 use bech32::{Bech32, Hrp};
 use sha2::{Digest as _, Sha256};
-pub use signer_primitives::{self, Sign, SignExt, SignOutput};
+pub use signer_primitives::{self, Sign, SignExt, SignMessage, SignMessageExt, SignOutput};
 use signer_primitives::{SchnorrSigner, delegate_schnorr_ctors};
 use zeroize::Zeroizing;
 
@@ -132,6 +132,19 @@ impl Sign for Signer {
         self.0.sign_prehash(event_id).map_err(Into::into)
     }
 
+    /// Sign a serialized NIP-01 event: computes SHA-256 then Schnorr-signs.
+    ///
+    /// `serialized_event` is the UTF-8 JSON-serialized form of
+    /// `[0, pubkey, created_at, kind, tags, content]` as specified in
+    /// NIP-01. The returned 64-byte signature is valid for the event whose
+    /// id equals `sha256(serialized_event)`.
+    fn sign_transaction(&self, serialized_event: &[u8]) -> Result<SignOutput, SignError> {
+        let event_id: [u8; 32] = Sha256::digest(serialized_event).into();
+        self.sign_hash(&event_id)
+    }
+}
+
+impl SignMessage for Signer {
     /// Sign arbitrary bytes with BIP-340 Schnorr (deterministic).
     ///
     /// # Semantic warning
@@ -143,26 +156,15 @@ impl Sign for Signer {
     ///
     /// For on-protocol Nostr events, always prefer:
     ///
-    /// - [`sign_hash`](Self::sign_hash) with the NIP-01 `event.id`
+    /// - [`Sign::sign_hash`] with the NIP-01 `event.id`
     ///   (32-byte SHA-256 of the canonical serialization), or
-    /// - [`sign_transaction`](Self::sign_transaction) with the
-    ///   serialized event JSON — it computes `sha256(event)` for you.
+    /// - [`Sign::sign_transaction`] with the serialized event JSON — it
+    ///   computes `sha256(event)` for you.
     ///
     /// Use this method only for bespoke off-protocol challenges where both
     /// signer and verifier agree on the exact input bytes.
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         self.0.sign(message).map_err(Into::into)
-    }
-
-    /// Sign a serialized NIP-01 event: computes SHA-256 then Schnorr-signs.
-    ///
-    /// `serialized_event` is the UTF-8 JSON-serialized form of
-    /// `[0, pubkey, created_at, kind, tags, content]` as specified in
-    /// NIP-01. The returned 64-byte signature is valid for the event whose
-    /// id equals `sha256(serialized_event)`.
-    fn sign_transaction(&self, serialized_event: &[u8]) -> Result<SignOutput, SignError> {
-        let event_id: [u8; 32] = Sha256::digest(serialized_event).into();
-        self.sign_hash(&event_id)
     }
 }
 

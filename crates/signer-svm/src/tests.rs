@@ -10,7 +10,7 @@
 
 use signer_primitives::SignOutput;
 
-use super::{EncodeSignedTransaction, Sign, Signer};
+use super::{EncodeSignedTransaction, Sign, SignMessage, Signer};
 
 /// RFC 8032 Test Vector 1.
 const TEST_KEY: &str = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
@@ -68,7 +68,7 @@ fn sign_wrong_message_fails() {
 #[test]
 fn sign_trait_verify() {
     let s = test_signer();
-    let out = Sign::sign_message(&s, b"hello").unwrap();
+    let out = SignMessage::sign_message(&s, b"hello").unwrap();
     let sig_bytes = out.to_bytes();
     assert_eq!(sig_bytes.len(), 64);
     assert!(out.v().is_none());
@@ -108,10 +108,17 @@ fn encode_signed_transaction_splices_sig() {
     tx.extend_from_slice(msg);
 
     let sig = s.sign_raw(msg);
-    let signed = Signer::encode_signed_transaction(&tx, &sig).unwrap();
+    let sig_bytes = sig.to_bytes();
 
-    assert_eq!(&signed[1..65], &sig.to_bytes());
-    assert_eq!(&signed[65..], msg);
+    // Low-level splicer: accepts raw 64-byte compact signature.
+    let signed_raw = Signer::splice_signature(&tx, &sig_bytes).unwrap();
+    assert_eq!(&signed_raw[1..65], &sig_bytes);
+    assert_eq!(&signed_raw[65..], msg);
+
+    // High-level entry: accepts the unified SignOutput enum.
+    let sig_output = SignOutput::Ed25519(sig_bytes);
+    let signed_output = Signer::encode_signed_transaction(&tx, &sig_output).unwrap();
+    assert_eq!(signed_raw, signed_output);
 }
 
 #[test]

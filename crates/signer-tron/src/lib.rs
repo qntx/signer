@@ -12,7 +12,9 @@ use alloc::{format, string::String, vec::Vec};
 
 use sha2::Sha256;
 use sha3::{Digest, Keccak256};
-pub use signer_primitives::{self, Sign, SignError, SignExt, SignOutput};
+pub use signer_primitives::{
+    self, Sign, SignError, SignExt, SignMessage, SignMessageExt, SignOutput,
+};
 use signer_primitives::{Secp256k1Signer, delegate_secp256k1_ctors};
 
 /// TRON transaction signer.
@@ -65,7 +67,7 @@ impl Signer {
     /// Returns [`SignError::InvalidSignature`] on malformed input or
     /// failed verification.
     pub fn verify_hash(&self, hash: &[u8; 32], signature: &[u8]) -> Result<(), SignError> {
-        self.0.verify_prehash(hash, signature)
+        self.0.verify_prehash_any(hash, signature)
     }
 }
 
@@ -76,6 +78,13 @@ impl Sign for Signer {
         self.0.sign_prehash_recoverable(hash)
     }
 
+    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
+        let digest: [u8; 32] = Sha256::digest(tx_bytes).into();
+        self.0.sign_prehash_recoverable(&digest)
+    }
+}
+
+impl SignMessage for Signer {
     /// Sign a message with TRON's message-signing convention.
     ///
     /// `digest = keccak256("\x19TRON Signed Message:\n" || len || message)`.
@@ -88,11 +97,6 @@ impl Sign for Signer {
         let digest: [u8; 32] = Keccak256::digest(&data).into();
         let out = self.0.sign_prehash_recoverable(&digest)?;
         Ok(bump_v_by_27(out))
-    }
-
-    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
-        let digest: [u8; 32] = Sha256::digest(tx_bytes).into();
-        self.0.sign_prehash_recoverable(&digest)
     }
 }
 

@@ -24,14 +24,12 @@ enum CosmosSubcommand {
         #[arg(short = 'x', long)]
         hash: String,
     },
-    /// Sign a message (SHA-256 then sign).
-    SignMessage {
-        #[arg(short, long)]
-        key: String,
-        #[arg(short, long)]
-        message: String,
-    },
-    /// Sign transaction bytes (SHA-256 then sign).
+    /// Sign a Cosmos SDK `SignDoc` (proto direct mode or amino JSON,
+    /// hex-encoded). The bytes are SHA-256'd and signed with secp256k1.
+    ///
+    /// For off-chain message signing use ADR-036: build the `StdSignDoc`
+    /// externally (or with `kobe cosmos adr036-doc`) and feed the canonical
+    /// bytes into this subcommand.
     SignTx {
         #[arg(short, long)]
         key: String,
@@ -55,16 +53,6 @@ impl CosmosCommand {
                     .address(signer.address())
                     .from_output(&out)
                     .message(hash)
-                    .render(json)
-            }
-            CosmosSubcommand::SignMessage { key, message } => {
-                let signer = Signer::from_hex(&key)?;
-                let out = signer.sign_message(message.as_bytes())?;
-                output::sign(CHAIN, "message (SHA-256)")
-                    .address(signer.address())
-                    .from_output(&out)
-                    .public_key_bytes(&signer.public_key_bytes())
-                    .message(message)
                     .render(json)
             }
             CosmosSubcommand::SignTx { key, tx } => {

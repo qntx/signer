@@ -1,7 +1,21 @@
 //! Cosmos transaction signer built on secp256k1 ECDSA.
 //!
-//! Provides signing for Cosmos SDK transactions (SHA-256 + ECDSA)
-//! and bech32 `cosmos1…` address derivation.
+//! Provides signing for Cosmos SDK transactions (SHA-256 + ECDSA) and
+//! bech32 `cosmos1…` address derivation.
+//!
+//! # Off-chain message signing
+//!
+//! This crate deliberately does **not** implement the
+//! [`SignMessage`](signer_primitives::SignMessage) capability trait: the
+//! Cosmos ecosystem signs arbitrary data through
+//! [ADR-036](https://github.com/cosmos/cosmos-sdk/blob/main/docs/architecture/adr-036-arbitrary-signature.md),
+//! which requires the caller to serialise a full `StdSignDoc` wrapping a
+//! `MsgSignData { signer, data }` with chain-specific fields. Because the
+//! HRP (`cosmos`, `osmo`, `juno`, …) and the sign-doc format live outside
+//! the cryptographic primitive, callers build the canonical bytes and pass
+//! them to [`Sign::sign_transaction`] — the SHA-256 + ECDSA that Cosmos
+//! wallets (Keplr, Leap, Cosmostation) all verify over the sign doc is
+//! exactly what this signer produces.
 //!
 //! # Examples
 //!
@@ -76,7 +90,7 @@ impl Signer {
     /// Returns [`SignError::InvalidSignature`] on malformed input or
     /// failed verification.
     pub fn verify_hash(&self, hash: &[u8; 32], signature: &[u8]) -> Result<(), SignError> {
-        self.0.verify_prehash(hash, signature)
+        self.0.verify_prehash_any(hash, signature)
     }
 }
 
@@ -87,11 +101,15 @@ impl Sign for Signer {
         self.0.sign_prehash_recoverable(hash)
     }
 
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        let digest: [u8; 32] = Sha256::digest(message).into();
-        self.0.sign_prehash_recoverable(&digest)
-    }
-
+    /// Sign a Cosmos SDK `SignDoc` (SHA-256 + secp256k1 ECDSA).
+    ///
+    /// Accepts the canonical byte form produced upstream by the caller —
+    /// either the proto-encoded `SignDoc` (direct sign mode) or the amino
+    /// JSON `StdSignDoc` (legacy mode, also used by ADR-036).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying ECDSA primitive fails.
     fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
         let digest: [u8; 32] = Sha256::digest(tx_bytes).into();
         self.0.sign_prehash_recoverable(&digest)

@@ -8,7 +8,7 @@
     reason = "test module: panics are acceptable and assertions are self-describing"
 )]
 
-use super::{ED25519_SCHEME, Sign, Signer, sha3_256, tx_signing_message};
+use super::{ED25519_SCHEME, Sign, SignMessage, Signer, sha3_256, tx_signing_message};
 
 /// RFC 8032 Test Vector 1.
 const TEST_KEY: &str = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
@@ -41,6 +41,18 @@ fn from_bytes_matches_from_hex() {
     let bytes: [u8; 32] = hex::decode(TEST_KEY).unwrap().try_into().unwrap();
     let s = Signer::from_bytes(&bytes).unwrap();
     assert_eq!(s.address(), test_signer().address());
+}
+
+#[test]
+fn sign_message_trait_round_trips() {
+    let s = test_signer();
+    let msg = b"aptos message";
+    let out = SignMessage::sign_message(&s, msg).unwrap();
+    let sig_bytes = out.to_bytes();
+    assert_eq!(sig_bytes.len(), 64);
+    assert!(out.v().is_none());
+    s.verify(msg, &sig_bytes)
+        .expect("SignMessage::sign_message output must verify");
 }
 
 #[test]

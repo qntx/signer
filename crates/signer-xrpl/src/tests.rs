@@ -57,12 +57,12 @@ fn sign_transaction_rejects_empty() {
     assert!(s.sign_transaction(b"").is_err());
 }
 
+/// XRPL intentionally does not implement `SignMessage`: the ledger has no
+/// canonical off-chain message-signing standard, so the capability lives on
+/// a separate trait that this crate leaves unimplemented. The fact that this
+/// file compiles without a `SignMessage` impl for `Signer` is the test.
 #[test]
-fn sign_message_returns_error() {
-    let s = test_signer();
-    let result = s.sign_message(b"hello xrpl");
-    assert!(result.is_err());
-}
+const fn sign_message_capability_is_unimplemented() {}
 
 #[test]
 fn deterministic_signature() {

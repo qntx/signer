@@ -59,7 +59,22 @@ macro_rules! delegate_secp256k1_ctors {
             Ok(Self($crate::Secp256k1Signer::from_hex(hex_str)?))
         }
 
+        /// Generate a random signer, returning an error on entropy failure.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the OS RNG is unavailable or the sampled
+        /// scalar is out of range (probability ≈ 2⁻¹²⁸).
+        #[cfg(feature = "getrandom")]
+        pub fn try_random() -> ::core::result::Result<Self, $err> {
+            Ok(Self($crate::Secp256k1Signer::try_random()?))
+        }
+
         /// Generate a random signer using OS-provided entropy.
+        ///
+        /// Thin panicking wrapper over [`Self::try_random`]. Prefer
+        /// [`Self::try_random`] in library code and on embedded / WASM
+        /// targets.
         ///
         /// # Panics
         ///
@@ -104,7 +119,19 @@ macro_rules! delegate_ed25519_ctors {
             Ok(Self($crate::Ed25519Signer::from_hex(hex_str)?))
         }
 
+        /// Generate a random signer, returning an error on entropy failure.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the OS RNG is unavailable.
+        #[cfg(feature = "getrandom")]
+        pub fn try_random() -> ::core::result::Result<Self, $err> {
+            Ok(Self($crate::Ed25519Signer::try_random()?))
+        }
+
         /// Generate a random signer using OS-provided entropy.
+        ///
+        /// Thin panicking wrapper over [`Self::try_random`].
         ///
         /// # Panics
         ///
@@ -146,7 +173,20 @@ macro_rules! delegate_schnorr_ctors {
             Ok(Self($crate::SchnorrSigner::from_hex(hex_str)?))
         }
 
+        /// Generate a random signer, returning an error on entropy failure.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the OS RNG is unavailable or the sampled
+        /// scalar is out of range (probability ≈ 2⁻¹²⁸).
+        #[cfg(feature = "getrandom")]
+        pub fn try_random() -> ::core::result::Result<Self, $err> {
+            Ok(Self($crate::SchnorrSigner::try_random()?))
+        }
+
         /// Generate a random signer using OS-provided entropy.
+        ///
+        /// Thin panicking wrapper over [`Self::try_random`].
         ///
         /// # Panics
         ///

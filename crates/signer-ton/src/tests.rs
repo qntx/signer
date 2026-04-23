@@ -8,7 +8,7 @@
     reason = "test module: panics are acceptable and assertions are self-describing"
 )]
 
-use super::{Sign, Signer};
+use super::{SignMessage, Signer};
 
 /// RFC 8032 Test Vector 1.
 const TEST_KEY: &str = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
@@ -49,7 +49,7 @@ fn sign_wrong_message_fails() {
 #[test]
 fn sign_trait_verify() {
     let s = test_signer();
-    let out = Sign::sign_message(&s, b"test").unwrap();
+    let out = SignMessage::sign_message(&s, b"test").unwrap();
     let sig_bytes = out.to_bytes();
     assert_eq!(sig_bytes.len(), 64);
     assert!(out.v().is_none());

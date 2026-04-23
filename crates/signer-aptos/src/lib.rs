@@ -14,7 +14,9 @@ use alloc::{format, string::String, vec::Vec};
 
 pub use ed25519_dalek::Signature;
 use sha3::Digest as _;
-pub use signer_primitives::{self, Sign, SignError, SignExt, SignOutput};
+pub use signer_primitives::{
+    self, Sign, SignError, SignExt, SignMessage, SignMessageExt, SignOutput,
+};
 use signer_primitives::{Ed25519Signer, delegate_ed25519_ctors};
 
 /// Ed25519 single-key authentication scheme byte used by Aptos.
@@ -82,11 +84,6 @@ impl Sign for Signer {
         Ok(self.0.sign_output_with_pubkey(hash))
     }
 
-    /// Sign an arbitrary message with raw Ed25519 (no Aptos domain prefix).
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        Ok(self.0.sign_output_with_pubkey(message))
-    }
-
     /// Sign a BCS-serialized `RawTransaction`.
     ///
     /// Computes `SHA3-256("APTOS::RawTransaction")` as the 32-byte prefix,
@@ -94,6 +91,13 @@ impl Sign for Signer {
     fn sign_transaction(&self, bcs_raw_tx: &[u8]) -> Result<SignOutput, SignError> {
         let signing_msg = tx_signing_message(bcs_raw_tx);
         Ok(self.0.sign_output_with_pubkey(&signing_msg))
+    }
+}
+
+impl SignMessage for Signer {
+    /// Sign an arbitrary message with raw Ed25519 (no Aptos domain prefix).
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
+        Ok(self.0.sign_output_with_pubkey(message))
     }
 }
 
