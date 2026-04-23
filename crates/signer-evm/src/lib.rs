@@ -12,7 +12,7 @@
 //!
 //! let signer = Signer::random();
 //! let out = signer.sign_message(b"hello").unwrap();
-//! assert_eq!(out.signature.len(), 65); // r(32) + s(32) + v(1)
+//! assert_eq!(out.to_bytes().len(), 65); // r(32) + s(32) + v(1)
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -99,105 +99,129 @@ impl Signer {
         self.inner.compressed_public_key()
     }
 
-    /// Sign a 32-byte hash. Returns 65 bytes: `r(32) || s(32) || v(1)`.
+    /// Sign a 32-byte digest with recoverable ECDSA.
     ///
-    /// `v` is the raw recovery ID (0 or 1).
+    /// The returned [`SignOutput::Ecdsa`] carries the raw recovery id
+    /// (`0` or `1`). Use [`sign_message`](Self::sign_message) or
+    /// [`sign_typed_data`](Self::sign_typed_data) if you need EIP-191
+    /// semantics (`v = 27 | 28`).
     ///
     /// # Errors
     ///
-    /// Returns an error if `hash` is not exactly 32 bytes.
-    pub fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
+    /// Returns an error if the signing primitive fails.
+    pub fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
         Ok(self.inner.sign_prehash_recoverable(hash)?)
     }
 
-    /// EIP-191 `personal_sign`. Returns 65 bytes with `v = 27 | 28`.
+    /// EIP-191 `personal_sign`. Returns a [`SignOutput::Ecdsa`] with
+    /// `recovery_id = 27 | 28`.
+    ///
+    /// The EVM wire format stores `v = 27 + parity`; the returned
+    /// `recovery_id` field already reflects that.
     ///
     /// # Errors
     ///
     /// Returns an error if signing fails.
-    #[allow(
-        clippy::indexing_slicing,
-        reason = "signature is always 65 bytes from sign_hash"
-    )]
     pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         let prefix = format!("\x19Ethereum Signed Message:\n{}", message.len());
         let mut data = Vec::with_capacity(prefix.len() + message.len());
         data.extend_from_slice(prefix.as_bytes());
         data.extend_from_slice(message);
-        let hash = Keccak256::digest(&data);
-
-        let mut out = self.sign_hash(&hash)?;
-        out.signature[64] += 27; // v = 27 + recovery_id
-        out.recovery_id = out.recovery_id.map(|r| r + 27);
-        Ok(out)
+        let digest: [u8; 32] = Keccak256::digest(&data).into();
+        Ok(bump_v_by_27(self.sign_hash(&digest)?))
     }
 
-    /// Sign EIP-712 typed structured data (JSON input).
-    /// Returns 65 bytes with `v = 27 | 28`.
+    /// Sign EIP-712 typed structured data (JSON input). Returns a
+    /// [`SignOutput::Ecdsa`] with `recovery_id = 27 | 28`.
     ///
     /// # Errors
     ///
     /// Returns an error if the JSON is malformed or signing fails.
-    #[allow(
-        clippy::indexing_slicing,
-        reason = "signature is always 65 bytes from sign_hash"
-    )]
     pub fn sign_typed_data(&self, typed_data_json: &str) -> Result<SignOutput, SignError> {
-        let hash = eip712::hash_typed_data_json(typed_data_json)?;
-        let mut out = self.sign_hash(&hash)?;
-        out.signature[64] += 27;
-        out.recovery_id = out.recovery_id.map(|r| r + 27);
-        Ok(out)
+        let digest = eip712::hash_typed_data_json(typed_data_json)?;
+        Ok(bump_v_by_27(self.sign_hash(&digest)?))
     }
 
     /// Sign an unsigned typed transaction (EIP-1559 / EIP-2930).
-    /// Returns 65 bytes: `r(32) || s(32) || v(1)` where `v` is raw recovery ID.
+    ///
+    /// Returns a [`SignOutput::Ecdsa`] with the **raw** recovery id
+    /// (`0 | 1`) — do **not** add 27 when using this output directly in
+    /// signed-transaction RLP encoding via
+    /// [`encode_signed_transaction`](Self::encode_signed_transaction).
     ///
     /// # Errors
     ///
     /// Returns an error if the transaction bytes are malformed.
     pub fn sign_transaction(&self, unsigned_tx: &[u8]) -> Result<SignOutput, SignError> {
-        let hash = Keccak256::digest(unsigned_tx);
-        self.sign_hash(&hash)
+        let digest: [u8; 32] = Keccak256::digest(unsigned_tx).into();
+        self.sign_hash(&digest)
     }
 
     /// Encode a signed typed transaction: `type || RLP([…fields, v, r, s])`.
     ///
+    /// `signature` must be an [`SignOutput::Ecdsa`] produced by
+    /// [`sign_transaction`](Self::sign_transaction) (with raw `recovery_id`).
+    ///
     /// # Errors
     ///
-    /// Returns an error if the unsigned tx or signature is malformed.
-    #[allow(
-        clippy::indexing_slicing,
-        reason = "signature length is checked to be exactly 65 before slicing"
-    )]
+    /// Returns an error if the unsigned tx or signature variant is malformed.
     pub fn encode_signed_transaction(
         unsigned_tx: &[u8],
-        signature: &[u8],
+        signature: &SignOutput,
     ) -> Result<Vec<u8>, SignError> {
-        if signature.len() != 65 {
+        let SignOutput::Ecdsa {
+            signature: sig,
+            recovery_id,
+        } = *signature
+        else {
             return Err(SignError::InvalidSignature(
-                "expected 65-byte signature".into(),
+                "expected Ecdsa signature output".into(),
             ));
-        }
-        let v = signature[64];
-        let r: [u8; 32] = signature[..32]
-            .try_into()
-            .map_err(|_| SignError::InvalidSignature("bad r component".into()))?;
-        let s: [u8; 32] = signature[32..64]
-            .try_into()
-            .map_err(|_| SignError::InvalidSignature("bad s component".into()))?;
-        rlp::encode_signed_typed_tx(unsigned_tx, v, &r, &s)
+        };
+        let mut r = [0u8; 32];
+        let mut s = [0u8; 32];
+        r.copy_from_slice(&sig[..32]);
+        s.copy_from_slice(&sig[32..]);
+        rlp::encode_signed_typed_tx(unsigned_tx, recovery_id, &r, &s)
             .map_err(|e| SignError::InvalidTransaction(String::from(e)))
     }
 }
 
-signer_primitives::impl_sign_delegate! {
+/// Bump the `recovery_id` of an [`SignOutput::Ecdsa`] by 27 (EIP-191 v).
+fn bump_v_by_27(out: SignOutput) -> SignOutput {
+    match out {
+        SignOutput::Ecdsa {
+            signature,
+            recovery_id,
+        } => SignOutput::Ecdsa {
+            signature,
+            recovery_id: recovery_id.wrapping_add(27),
+        },
+        other => other,
+    }
+}
+
+impl Sign for Signer {
+    type Error = SignError;
+
+    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, Self::Error> {
+        Self::sign_hash(self, hash)
+    }
+
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Self::Error> {
+        Self::sign_message(self, message)
+    }
+
+    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Self::Error> {
+        Self::sign_transaction(self, tx_bytes)
+    }
+
     fn encode_signed_transaction(
         &self,
         tx_bytes: &[u8],
         signature: &SignOutput,
-    ) -> Result<Vec<u8>, SignError> {
-        Self::encode_signed_transaction(tx_bytes, &signature.signature)
+    ) -> Result<Vec<u8>, Self::Error> {
+        Self::encode_signed_transaction(tx_bytes, signature)
     }
 }
 
@@ -209,10 +233,7 @@ impl Signer {
     ///
     /// Returns an error if the private key is invalid.
     pub fn from_derived(account: &kobe_evm::DerivedAccount) -> Result<Self, SignError> {
-        let bytes = account
-            .private_key_bytes()
-            .map_err(|e| SignError::InvalidKey(alloc::format!("{e}")))?;
-        Self::from_bytes(&bytes)
+        Self::from_bytes(account.private_key_bytes())
     }
 }
 

@@ -104,13 +104,13 @@ impl Signer {
 
     /// Sign a 32-byte pre-hashed digest with secp256k1.
     ///
-    /// Returns a **DER-encoded** signature (variable length, typically 70-72 bytes).
-    /// Recovery ID is not included — XRPL does not use it.
+    /// Returns a [`SignOutput::EcdsaDer`] (variable length, typically 70–72 bytes).
+    /// Recovery id is not included — XRPL does not use it.
     ///
     /// # Errors
     ///
-    /// Returns an error if `hash` is not 32 bytes or signing fails.
-    pub fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
+    /// Returns an error if the signing primitive fails.
+    pub fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
         Ok(self.inner.sign_prehash_der(hash)?)
     }
 
@@ -149,7 +149,21 @@ impl Signer {
     }
 }
 
-signer_primitives::impl_sign_delegate!();
+impl Sign for Signer {
+    type Error = SignError;
+
+    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, Self::Error> {
+        Self::sign_hash(self, hash)
+    }
+
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Self::Error> {
+        Self::sign_message(self, message)
+    }
+
+    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Self::Error> {
+        Self::sign_transaction(self, tx_bytes)
+    }
+}
 
 #[cfg(feature = "kobe")]
 impl Signer {
@@ -159,10 +173,7 @@ impl Signer {
     ///
     /// Returns an error if the private key is invalid.
     pub fn from_derived(account: &kobe_xrpl::DerivedAccount) -> Result<Self, SignError> {
-        let bytes = account
-            .private_key_bytes()
-            .map_err(|e| SignError::InvalidKey(alloc::format!("{e}")))?;
-        Self::from_bytes(&bytes)
+        Self::from_bytes(account.private_key_bytes())
     }
 }
 

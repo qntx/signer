@@ -23,7 +23,7 @@
 //! // Sign a NIP-01 event id (32-byte SHA-256 of the canonical serialization).
 //! let event_id = [0u8; 32];
 //! let out = signer.sign_hash(&event_id).unwrap();
-//! assert_eq!(out.signature.len(), 64); // BIP-340 Schnorr
+//! assert_eq!(out.to_bytes().len(), 64); // BIP-340 Schnorr
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -162,7 +162,7 @@ impl Signer {
     ///
     /// Returns [`SignError::InvalidMessage`] if `event_id` is not 32 bytes,
     /// or [`SignError::SigningFailed`] if the primitive fails.
-    pub fn sign_hash(&self, event_id: &[u8]) -> Result<SignOutput, SignError> {
+    pub fn sign_hash(&self, event_id: &[u8; 32]) -> Result<SignOutput, SignError> {
         Ok(self.inner.sign_prehash(event_id)?)
     }
 
@@ -203,7 +203,7 @@ impl Signer {
     ///
     /// Returns [`SignError::SigningFailed`] if the primitive fails.
     pub fn sign_transaction(&self, serialized_event: &[u8]) -> Result<SignOutput, SignError> {
-        let event_id = Sha256::digest(serialized_event);
+        let event_id: [u8; 32] = Sha256::digest(serialized_event).into();
         self.sign_hash(&event_id)
     }
 
@@ -219,24 +219,35 @@ impl Signer {
     }
 }
 
-signer_primitives::impl_sign_delegate!();
+impl Sign for Signer {
+    type Error = SignError;
+
+    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, Self::Error> {
+        Self::sign_hash(self, hash)
+    }
+
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Self::Error> {
+        Self::sign_message(self, message)
+    }
+
+    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Self::Error> {
+        Self::sign_transaction(self, tx_bytes)
+    }
+}
 
 #[cfg(feature = "kobe")]
 impl Signer {
     /// Create from a [`kobe_nostr::DerivedAccount`].
     ///
-    /// Decodes the 32-byte private key directly from the derived account's
-    /// raw bytes (no hex or bech32 round-trip).
+    /// Uses the raw 32-byte private key directly (no hex or bech32
+    /// round-trip).
     ///
     /// # Errors
     ///
-    /// Returns [`SignError::InvalidKey`] if the derived bytes are malformed
-    /// or not a valid secp256k1 scalar.
+    /// Returns [`SignError::InvalidKey`] if the derived bytes are not a
+    /// valid secp256k1 scalar.
     pub fn from_derived(account: &kobe_nostr::DerivedAccount) -> Result<Self, SignError> {
-        let bytes = account
-            .private_key_bytes()
-            .map_err(|e| SignError::InvalidKey(alloc::format!("{e}")))?;
-        Self::from_bytes(&bytes)
+        Self::from_bytes(account.private_key_bytes())
     }
 }
 

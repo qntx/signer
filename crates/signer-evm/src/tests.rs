@@ -42,17 +42,18 @@ fn known_address_from_bytes() {
 #[test]
 fn sign_hash_verify() {
     let s = test_signer();
-    let hash = Keccak256::digest(b"test message");
-    let out = s.sign_hash(&hash).unwrap();
+    let digest: [u8; 32] = Keccak256::digest(b"test message").into();
+    let out = s.sign_hash(&digest).unwrap();
 
-    assert_eq!(out.signature.len(), 65);
-    let rid = out.recovery_id.expect("recovery id must be present");
+    let sig_bytes = out.to_bytes();
+    assert_eq!(sig_bytes.len(), 65);
+    let rid = out.recovery_id().expect("recovery id must be present");
     assert!(
         rid == 0 || rid == 1,
         "raw recovery_id must be 0 or 1, got {rid}"
     );
 
-    verify_secp256k1_recoverable(&s.public_key_bytes(), &hash, &out.signature);
+    verify_secp256k1_recoverable(&s.public_key_bytes(), &digest, &sig_bytes);
 }
 
 #[test]
@@ -61,29 +62,31 @@ fn sign_message_eip191_verify() {
     let msg = b"Hello World";
     let out = s.sign_message(msg).unwrap();
 
-    assert_eq!(out.signature.len(), 65);
-    let v = out.signature[64];
+    let sig_bytes = out.to_bytes();
+    assert_eq!(sig_bytes.len(), 65);
+    let v = sig_bytes[64];
     assert!(v == 27 || v == 28, "EIP-191 v must be 27 or 28, got {v}");
 
     let prefix = format!("\x19Ethereum Signed Message:\n{}", msg.len());
     let mut prefixed = Vec::new();
     prefixed.extend_from_slice(prefix.as_bytes());
     prefixed.extend_from_slice(msg);
-    let hash = Keccak256::digest(&prefixed);
+    let digest: [u8; 32] = Keccak256::digest(&prefixed).into();
 
-    // EIP-191 signatures use v = 27 | 28, but the underlying ECDSA is still 0|1.
-    // Reconstruct a 65-byte recoverable sig with raw recovery_id for verification.
-    let mut recoverable = out.signature.clone();
+    // EIP-191 signatures carry v = 27 | 28, but the underlying ECDSA verifier
+    // wants the raw parity byte (0 | 1). Subtract 27 before verifying.
+    let mut recoverable = sig_bytes.clone();
     recoverable[64] -= 27;
-    verify_secp256k1_recoverable(&s.public_key_bytes(), &hash, &recoverable);
+    verify_secp256k1_recoverable(&s.public_key_bytes(), &digest, &recoverable);
 }
 
 #[test]
 fn sign_message_recovery_id_matches_v() {
     let s = test_signer();
     let out = s.sign_message(b"recovery test").unwrap();
-    let v = out.signature[64];
-    let rid = out.recovery_id.unwrap();
+    let sig_bytes = out.to_bytes();
+    let v = sig_bytes[64];
+    let rid = out.recovery_id().unwrap();
     assert_eq!(v, rid, "v byte must equal recovery_id");
     assert!(rid == 27 || rid == 28);
 }
@@ -91,17 +94,10 @@ fn sign_message_recovery_id_matches_v() {
 #[test]
 fn deterministic_signature() {
     let s = test_signer();
-    let hash = Keccak256::digest(b"deterministic");
-    let out1 = s.sign_hash(&hash).unwrap();
-    let out2 = s.sign_hash(&hash).unwrap();
-    assert_eq!(out1.signature, out2.signature);
-}
-
-#[test]
-fn rejects_non_32_byte_hash() {
-    let s = test_signer();
-    assert!(s.sign_hash(b"short").is_err());
-    assert!(s.sign_hash(&[0u8; 33]).is_err());
+    let digest: [u8; 32] = Keccak256::digest(b"deterministic").into();
+    let out1 = s.sign_hash(&digest).unwrap();
+    let out2 = s.sign_hash(&digest).unwrap();
+    assert_eq!(out1.to_bytes(), out2.to_bytes());
 }
 
 #[test]
@@ -128,12 +124,18 @@ mod kobe_integration {
     /// BIP-39 seed "abandon abandon ... about" at `m/44'/60'/0'/0/0`,
     /// cross-verified with Python coincurve + keccak256 + EIP-55 (KAT from kobe-evm).
     fn kat_derived_account() -> kobe_evm::DerivedAccount {
+        let mut sk = Zeroizing::new([0u8; 32]);
+        hex::decode_to_slice(
+            "1ab42cc412b618bdea3a599e3c9bae199ebf030895b039e9db1e30dafb12b727",
+            sk.as_mut_slice(),
+        )
+        .unwrap();
+        let pk = hex::decode("0237b0bb7a8288d38ed49a524b5dc98cff3eb5ca824c9f9dc0dfdb3d9cd600f299")
+            .unwrap();
         kobe_evm::DerivedAccount::new(
             String::from("m/44'/60'/0'/0/0"),
-            Zeroizing::new(String::from(
-                "1ab42cc412b618bdea3a599e3c9bae199ebf030895b039e9db1e30dafb12b727",
-            )),
-            String::from("0237b0bb7a8288d38ed49a524b5dc98cff3eb5ca824c9f9dc0dfdb3d9cd600f299"),
+            sk,
+            pk,
             String::from("0x9858EfFD232B4033E47d90003D41EC34EcaEda94"),
         )
     }
@@ -142,7 +144,7 @@ mod kobe_integration {
     fn from_derived_matches_from_hex() {
         let acct = kat_derived_account();
         let via_bytes = Signer::from_derived(&acct).unwrap();
-        let via_hex = Signer::from_hex(&acct.private_key).unwrap();
+        let via_hex = Signer::from_hex(&acct.private_key_hex()).unwrap();
         assert_eq!(via_bytes.address(), via_hex.address());
     }
 

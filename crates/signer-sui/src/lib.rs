@@ -48,11 +48,14 @@ impl core::fmt::Debug for Signer {
 
 impl Signer {
     /// Create from raw 32-byte secret key bytes.
-    #[must_use]
-    pub fn from_bytes(bytes: &[u8; 32]) -> Self {
-        Self {
-            inner: Ed25519Signer::from_bytes(bytes),
-        }
+    ///
+    /// # Errors
+    ///
+    /// Reserved for future compatibility; currently never fails.
+    pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
+        Ok(Self {
+            inner: Ed25519Signer::from_bytes(bytes)?,
+        })
     }
 
     /// Create from a hex-encoded 32-byte private key (with or without `0x`).
@@ -123,14 +126,13 @@ impl Signer {
         self.inner.sign_raw(&digest)
     }
 
-    /// Verify an Ed25519 signature.
+    /// Verify a 64-byte Ed25519 signature.
     ///
     /// # Errors
     ///
-    /// Returns an error if the signature is invalid.
-    pub fn verify(&self, message: &[u8], signature: &Signature) -> Result<(), SignError> {
-        self.inner.verify(message, signature)?;
-        Ok(())
+    /// Returns [`SignError::InvalidSignature`] on verification failure.
+    pub fn verify(&self, message: &[u8], signature: &[u8]) -> Result<(), SignError> {
+        Ok(self.inner.verify(message, signature)?)
     }
 
     /// Encode a Sui wire signature: `flag(0x00) || sig(64) || pubkey(32)`.
@@ -147,28 +149,19 @@ impl Signer {
 impl Sign for Signer {
     type Error = SignError;
 
-    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
-        let sig = self.inner.sign_raw(hash);
-        Ok(SignOutput::ed25519_with_pubkey(
-            sig.to_bytes().to_vec(),
-            self.inner.public_key_bytes(),
-        ))
+    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
+        Ok(self.inner.sign_output_with_pubkey(hash))
     }
 
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        let sig = self.sign_message_intent(message);
-        Ok(SignOutput::ed25519_with_pubkey(
-            sig.to_bytes().to_vec(),
-            self.inner.public_key_bytes(),
-        ))
+        let bcs = bcs_serialize_bytes(message);
+        let digest = intent_hash(MSG_INTENT, &bcs);
+        Ok(self.inner.sign_output_with_pubkey(&digest))
     }
 
     fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
-        let sig = self.sign_transaction_intent(tx_bytes);
-        Ok(SignOutput::ed25519_with_pubkey(
-            sig.to_bytes().to_vec(),
-            self.inner.public_key_bytes(),
-        ))
+        let digest = intent_hash(TX_INTENT, tx_bytes);
+        Ok(self.inner.sign_output_with_pubkey(&digest))
     }
 }
 
@@ -180,10 +173,7 @@ impl Signer {
     ///
     /// Returns an error if the private key is invalid.
     pub fn from_derived(account: &kobe_sui::DerivedAccount) -> Result<Self, SignError> {
-        let bytes = account
-            .private_key_bytes()
-            .map_err(|e| SignError::InvalidKey(alloc::format!("{e}")))?;
-        Ok(Self::from_bytes(&bytes))
+        Self::from_bytes(account.private_key_bytes())
     }
 }
 

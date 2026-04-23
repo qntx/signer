@@ -53,8 +53,7 @@ impl BtcCommand {
                 let out = signer.sign_hash(&parse_hex32(&hash)?)?;
                 output::sign(CHAIN, "raw hash")
                     .address(signer.address())
-                    .signature(&out.signature)
-                    .recovery_id(out.recovery_id)
+                    .from_output(&out)
                     .message(hash)
                     .render(json)
             }
@@ -63,8 +62,7 @@ impl BtcCommand {
                 let out = signer.sign_message(message.as_bytes())?;
                 output::sign(CHAIN, "Bitcoin Signed Message")
                     .address(signer.address())
-                    .signature(&out.signature)
-                    .recovery_id(out.recovery_id)
+                    .from_output(&out)
                     .public_key_bytes(&signer.public_key_bytes())
                     .message(message)
                     .render(json)
@@ -74,8 +72,7 @@ impl BtcCommand {
                 let out = signer.sign_transaction(&parse_hex(&tx)?)?;
                 output::sign(CHAIN, "transaction")
                     .address(signer.address())
-                    .signature(&out.signature)
-                    .recovery_id(out.recovery_id)
+                    .from_output(&out)
                     .render(json)
             }
             BtcSubcommand::Address { key } => {

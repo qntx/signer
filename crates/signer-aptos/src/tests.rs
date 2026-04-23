@@ -39,7 +39,7 @@ fn address_is_sha3_of_pubkey_with_scheme() {
 #[test]
 fn from_bytes_matches_from_hex() {
     let bytes: [u8; 32] = hex::decode(TEST_KEY).unwrap().try_into().unwrap();
-    let s = Signer::from_bytes(&bytes);
+    let s = Signer::from_bytes(&bytes).unwrap();
     assert_eq!(s.address(), test_signer().address());
 }
 
@@ -48,14 +48,15 @@ fn sign_and_verify() {
     let s = test_signer();
     let msg = b"hello aptos";
     let sig = s.sign_raw(msg);
-    s.verify(msg, &sig).expect("signature must verify");
+    s.verify(msg, sig.to_bytes().as_slice())
+        .expect("signature must verify");
 }
 
 #[test]
 fn sign_wrong_message_fails() {
     let s = test_signer();
     let sig = s.sign_raw(b"correct");
-    assert!(s.verify(b"wrong", &sig).is_err());
+    assert!(s.verify(b"wrong", sig.to_bytes().as_slice()).is_err());
 }
 
 #[test]
@@ -64,7 +65,7 @@ fn sign_transaction_bcs_verify() {
     let bcs_tx = b"fake bcs raw transaction";
     let sig = s.sign_transaction_bcs(bcs_tx);
     let signing_msg = tx_signing_message(bcs_tx);
-    s.verify(&signing_msg, &sig)
+    s.verify(&signing_msg, sig.to_bytes().as_slice())
         .expect("transaction signature must verify against signing message");
 }
 
@@ -82,8 +83,8 @@ fn tx_signing_message_prefix_is_correct() {
 fn sign_trait_includes_pubkey() {
     let s = test_signer();
     let out = Sign::sign_transaction(&s, b"tx").unwrap();
-    assert_eq!(out.signature.len(), 64);
-    let pk = out.public_key.as_ref().expect("must include pubkey");
+    assert_eq!(out.to_bytes().len(), 64);
+    let pk = out.public_key().expect("must include pubkey");
     assert_eq!(pk.len(), 32);
     assert_eq!(hex::encode(pk), TEST_PUBKEY);
 }

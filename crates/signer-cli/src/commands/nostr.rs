@@ -65,8 +65,7 @@ impl NostrCommand {
                 let out = signer.sign_hash(&digest)?;
                 output::sign(CHAIN, "event id (BIP-340 Schnorr)")
                     .address(signer.address())
-                    .signature(&out.signature)
-                    .public_key_opt_bytes(out.public_key)
+                    .from_output(&out)
                     .message(event_id)
                     .render(json)
             }
@@ -75,20 +74,18 @@ impl NostrCommand {
                 let out = signer.sign_message(message.as_bytes())?;
                 output::sign(CHAIN, "raw message (BIP-340 Schnorr)")
                     .address(signer.address())
-                    .signature(&out.signature)
-                    .public_key_opt_bytes(out.public_key)
+                    .from_output(&out)
                     .message(message)
                     .render(json)
             }
             NostrSubcommand::SignTx { key, tx } => {
                 let signer = load_signer(&key)?;
                 let serialized = parse_hex(&tx)?;
-                let event_id = Sha256::digest(&serialized);
+                let event_id: [u8; 32] = Sha256::digest(&serialized).into();
                 let out = signer.sign_hash(&event_id)?;
                 output::sign(CHAIN, "NIP-01 serialized event")
                     .address(signer.address())
-                    .signature(&out.signature)
-                    .public_key_opt_bytes(out.public_key)
+                    .from_output(&out)
                     .message(hex::encode(event_id))
                     .render(json)
             }

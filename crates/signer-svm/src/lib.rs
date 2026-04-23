@@ -38,11 +38,14 @@ impl core::fmt::Debug for Signer {
 
 impl Signer {
     /// Create from raw 32-byte secret key bytes.
-    #[must_use]
-    pub fn from_bytes(bytes: &[u8; 32]) -> Self {
-        Self {
-            inner: Ed25519Signer::from_bytes(bytes),
-        }
+    ///
+    /// # Errors
+    ///
+    /// Reserved for future compatibility; currently never fails.
+    pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
+        Ok(Self {
+            inner: Ed25519Signer::from_bytes(bytes)?,
+        })
     }
 
     /// Create from a hex-encoded 32-byte private key (with or without `0x`).
@@ -79,7 +82,7 @@ impl Signer {
         }
         let mut secret = [0u8; 32];
         secret.copy_from_slice(&decoded[..32]);
-        let signer = Self::from_bytes(&secret);
+        let signer = Self::from_bytes(&secret)?;
         secret.fill(0);
         Ok(signer)
     }
@@ -127,14 +130,13 @@ impl Signer {
         self.sign_raw(message_bytes)
     }
 
-    /// Verify an Ed25519 signature.
+    /// Verify a 64-byte Ed25519 signature.
     ///
     /// # Errors
     ///
-    /// Returns an error if the signature is invalid.
-    pub fn verify(&self, msg: &[u8], signature: &Signature) -> Result<(), SignError> {
-        self.inner.verify(msg, signature)?;
-        Ok(())
+    /// Returns [`SignError::InvalidSignature`] on verification failure.
+    pub fn verify(&self, msg: &[u8], signature: &[u8]) -> Result<(), SignError> {
+        Ok(self.inner.verify(msg, signature)?)
     }
 
     /// Export keypair as Base58 (64 bytes: secret || public).
@@ -201,17 +203,16 @@ impl Signer {
 impl Sign for Signer {
     type Error = SignError;
 
-    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
-        let sig = self.inner.sign_raw(hash);
-        Ok(SignOutput::ed25519(sig.to_bytes().to_vec()))
+    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
+        Ok(self.inner.sign_output(hash))
     }
 
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        self.sign_hash(message)
+        Ok(self.inner.sign_output(message))
     }
 
     fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
-        self.sign_hash(tx_bytes)
+        Ok(self.inner.sign_output(tx_bytes))
     }
 
     fn extract_signable_bytes<'a>(&self, tx_bytes: &'a [u8]) -> Result<&'a [u8], SignError> {
@@ -223,24 +224,25 @@ impl Sign for Signer {
         tx_bytes: &[u8],
         signature: &SignOutput,
     ) -> Result<Vec<u8>, SignError> {
-        let sig = Signature::from_slice(&signature.signature)
-            .map_err(|e| SignError::InvalidTransaction(e.to_string()))?;
+        let SignOutput::Ed25519(sig_bytes) = *signature else {
+            return Err(SignError::InvalidSignature(
+                "expected Ed25519 signature output".into(),
+            ));
+        };
+        let sig = Signature::from_bytes(&sig_bytes);
         Self::encode_signed_transaction(tx_bytes, &sig)
     }
 }
 
 #[cfg(feature = "kobe")]
 impl Signer {
-    /// Create from a [`kobe_svm::DerivedAddress`].
+    /// Create from a [`kobe_svm::SvmAccount`].
     ///
     /// # Errors
     ///
     /// Returns an error if the private key is invalid.
-    pub fn from_derived(derived: &kobe_svm::DerivedAddress) -> Result<Self, SignError> {
-        let bytes = derived
-            .private_key_bytes()
-            .map_err(|e| SignError::InvalidKey(alloc::format!("{e}")))?;
-        Ok(Self::from_bytes(&bytes))
+    pub fn from_derived(account: &kobe_svm::SvmAccount) -> Result<Self, SignError> {
+        Self::from_bytes(account.private_key_bytes())
     }
 }
 

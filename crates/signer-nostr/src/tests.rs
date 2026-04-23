@@ -23,12 +23,18 @@ mod kobe_integration {
 
     /// Hand-built `DerivedAccount` using NIP-06 test vector 1 material.
     fn tv1_derived_account() -> kobe_nostr::DerivedAccount {
+        let mut sk = Zeroizing::new([0u8; 32]);
+        hex::decode_to_slice(
+            "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a",
+            sk.as_mut_slice(),
+        )
+        .unwrap();
+        let pk = hex::decode("17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917")
+            .unwrap();
         kobe_nostr::DerivedAccount::new(
             String::from("m/44'/1237'/0'/0/0"),
-            Zeroizing::new(String::from(
-                "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a",
-            )),
-            String::from("17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917"),
+            sk,
+            pk,
             String::from("npub1zutzeysacnf9rru6zqwmxd54mud0k44tst6l70ja5mhv8jjumytsd2x7nu"),
         )
     }
@@ -37,7 +43,7 @@ mod kobe_integration {
     fn from_derived_matches_from_hex() {
         let acct = tv1_derived_account();
         let via_bytes = Signer::from_derived(&acct).unwrap();
-        let via_hex = Signer::from_hex(&acct.private_key).unwrap();
+        let via_hex = Signer::from_hex(acct.private_key_hex().as_str()).unwrap();
         assert_eq!(via_bytes.address(), via_hex.address());
         assert_eq!(
             via_bytes.address(),
@@ -153,17 +159,17 @@ fn sign_hash_roundtrip() {
     let event_id = [0x42u8; 32];
     let out = s.sign_hash(&event_id).unwrap();
 
-    assert_eq!(out.signature.len(), 64, "BIP-340 signature is 64 bytes");
-    assert!(out.recovery_id.is_none(), "Schnorr has no recovery id");
-    assert_eq!(
-        out.public_key.as_deref().map(<[u8]>::len),
-        Some(32),
-        "x-only public key is 32 bytes",
-    );
-    assert_eq!(out.public_key.as_deref(), Some(&s.public_key_bytes()[..]));
+    let sig_bytes = out.to_bytes();
+    assert_eq!(sig_bytes.len(), 64, "BIP-340 signature is 64 bytes");
+    assert!(out.recovery_id().is_none(), "Schnorr has no recovery id");
+    let pk = out
+        .public_key()
+        .expect("Schnorr output carries x-only pubkey");
+    assert_eq!(pk.len(), 32);
+    assert_eq!(pk, &s.public_key_bytes()[..]);
 
     // Signature must verify against the same 32-byte message.
-    s.verify(&event_id, &out.signature).unwrap();
+    s.verify(&event_id, &sig_bytes).unwrap();
 }
 
 #[test]
@@ -172,14 +178,7 @@ fn sign_hash_is_deterministic() {
     let event_id = [0u8; 32];
     let a = s.sign_hash(&event_id).unwrap();
     let b = s.sign_hash(&event_id).unwrap();
-    assert_eq!(a.signature, b.signature, "deterministic signing");
-}
-
-#[test]
-fn sign_hash_rejects_non_32_byte_input() {
-    let s = tv1_signer();
-    assert!(s.sign_hash(&[0u8; 31]).is_err());
-    assert!(s.sign_hash(&[0u8; 33]).is_err());
+    assert_eq!(a.to_bytes(), b.to_bytes(), "deterministic signing");
 }
 
 #[test]
@@ -187,8 +186,9 @@ fn sign_message_roundtrip() {
     let s = tv1_signer();
     let msg = b"a Nostr message";
     let out = s.sign_message(msg).unwrap();
-    assert_eq!(out.signature.len(), 64);
-    s.verify(msg, &out.signature).unwrap();
+    let sig_bytes = out.to_bytes();
+    assert_eq!(sig_bytes.len(), 64);
+    s.verify(msg, &sig_bytes).unwrap();
 }
 
 #[test]
@@ -198,10 +198,10 @@ fn sign_transaction_matches_sign_hash_of_sha256() {
         br#"[0,"17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917",1700000000,1,[],"hi"]"#;
 
     let via_transaction = s.sign_transaction(event_json).unwrap();
-    let digest = Sha256::digest(event_json);
+    let digest: [u8; 32] = Sha256::digest(event_json).into();
     let via_hash = s.sign_hash(&digest).unwrap();
 
-    assert_eq!(via_transaction.signature, via_hash.signature);
+    assert_eq!(via_transaction.to_bytes(), via_hash.to_bytes());
 }
 
 #[test]
@@ -209,15 +209,16 @@ fn verify_rejects_wrong_signature() {
     let s = tv1_signer();
     let msg = b"authentic message";
     let out = s.sign_message(msg).unwrap();
+    let sig_bytes = out.to_bytes();
 
-    let mut tampered = out.signature.clone();
+    let mut tampered = sig_bytes.clone();
     tampered[0] ^= 0x01;
     assert!(
         s.verify(msg, &tampered).is_err(),
         "tampered signature must not verify",
     );
     assert!(
-        s.verify(b"different message", &out.signature).is_err(),
+        s.verify(b"different message", &sig_bytes).is_err(),
         "original signature must not verify for a different message",
     );
 }
@@ -227,10 +228,10 @@ fn sign_output_public_key_is_xonly() {
     let s = tv1_signer();
     let out = s.sign_hash(&[0u8; 32]).unwrap();
     let pk = out
-        .public_key
+        .public_key()
         .expect("schnorr output carries x-only pubkey");
     assert_eq!(pk.len(), 32);
-    assert_eq!(hex::encode(&pk), TV1_PUB_HEX);
+    assert_eq!(hex::encode(pk), TV1_PUB_HEX);
 }
 
 #[cfg(feature = "getrandom")]
@@ -241,7 +242,7 @@ fn random_signer_produces_valid_signatures() {
     assert!(s.address().starts_with("npub1"));
     let msg = b"random-key message";
     let out = s.sign_message(msg).unwrap();
-    s.verify(msg, &out.signature).unwrap();
+    s.verify(msg, &out.to_bytes()).unwrap();
 }
 
 mod sign_trait {
@@ -255,6 +256,6 @@ mod sign_trait {
         let msg = b"delegate";
         let via_trait = <Signer as Sign>::sign_message(&s, msg).unwrap();
         let via_inherent = s.sign_message(msg).unwrap();
-        assert_eq!(via_trait.signature, via_inherent.signature);
+        assert_eq!(via_trait.to_bytes(), via_inherent.to_bytes());
     }
 }

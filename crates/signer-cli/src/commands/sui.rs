@@ -47,8 +47,7 @@ impl SuiCommand {
                 let out = Sign::sign_message(&signer, message.as_bytes())?;
                 output::sign(CHAIN, "personal message (BCS + intent)")
                     .address(signer.address())
-                    .signature(&out.signature)
-                    .public_key_opt_bytes(out.public_key)
+                    .from_output(&out)
                     .message(message)
                     .render(json)
             }
@@ -57,8 +56,7 @@ impl SuiCommand {
                 let out = Sign::sign_transaction(&signer, &parse_hex(&tx)?)?;
                 output::sign(CHAIN, "transaction (intent digest)")
                     .address(signer.address())
-                    .signature(&out.signature)
-                    .public_key_opt_bytes(out.public_key)
+                    .from_output(&out)
                     .render(json)
             }
             SuiSubcommand::Address { key } => {

@@ -18,17 +18,17 @@ fn test_signer() -> Signer {
     Signer::from_hex(TEST_KEY).unwrap()
 }
 
-fn verify(s: &Signer, hash: &[u8], out: &SignOutput) {
-    verify_secp256k1_recoverable(&s.public_key_bytes(), hash, &out.signature);
+fn verify(s: &Signer, hash: &[u8; 32], out: &SignOutput) {
+    verify_secp256k1_recoverable(&s.public_key_bytes(), hash, &out.to_bytes());
 }
 
 #[test]
 fn sign_hash_verify() {
     let s = test_signer();
-    let hash = Blake2b256::digest(b"filecoin test");
+    let hash: [u8; 32] = Blake2b256::digest(b"filecoin test").into();
     let out = s.sign_hash(&hash).unwrap();
-    assert_eq!(out.signature.len(), 65);
-    assert!(out.recovery_id.is_some());
+    assert_eq!(out.to_bytes().len(), 65);
+    assert!(out.recovery_id().is_some());
     verify(&s, &hash, &out);
 }
 
@@ -37,7 +37,7 @@ fn sign_transaction_blake2b_verify() {
     let s = test_signer();
     let tx = b"fil tx bytes";
     let out = s.sign_transaction(tx).unwrap();
-    let expected = Blake2b256::digest(tx);
+    let expected: [u8; 32] = Blake2b256::digest(tx).into();
     verify(&s, &expected, &out);
 }
 
@@ -46,7 +46,7 @@ fn deterministic_signature() {
     let s = test_signer();
     let out1 = s.sign_message(b"same").unwrap();
     let out2 = s.sign_message(b"same").unwrap();
-    assert_eq!(out1.signature, out2.signature);
+    assert_eq!(out1.to_bytes(), out2.to_bytes());
 }
 
 #[test]
@@ -54,11 +54,6 @@ fn from_bytes_roundtrip() {
     let bytes: [u8; 32] = hex::decode(TEST_KEY).unwrap().try_into().unwrap();
     let s = Signer::from_bytes(&bytes).unwrap();
     assert_eq!(s.public_key_bytes(), test_signer().public_key_bytes());
-}
-
-#[test]
-fn rejects_non_32_byte_hash() {
-    assert!(test_signer().sign_hash(b"short").is_err());
 }
 
 #[test]

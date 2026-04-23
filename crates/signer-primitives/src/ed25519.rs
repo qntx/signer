@@ -17,7 +17,7 @@ use alloc::{format, vec::Vec};
 
 use ed25519_dalek::{Signature, Signer as _, SigningKey, Verifier as _, VerifyingKey};
 
-use crate::SignError;
+use crate::{SignError, SignOutput};
 
 /// Shared Ed25519 signer.
 ///
@@ -41,7 +41,7 @@ use crate::SignError;
 /// );
 ///
 /// let sig = signer.sign_raw(b"hello");
-/// signer.verify(b"hello", &sig).unwrap();
+/// signer.verify(b"hello", sig.to_bytes().as_slice()).unwrap();
 /// ```
 pub struct Ed25519Signer {
     key: SigningKey,
@@ -57,11 +57,20 @@ impl core::fmt::Debug for Ed25519Signer {
 
 impl Ed25519Signer {
     /// Create from raw 32-byte secret key bytes.
-    #[must_use]
-    pub fn from_bytes(bytes: &[u8; 32]) -> Self {
-        Self {
+    ///
+    /// Returns a `Result` for API symmetry with
+    /// [`Secp256k1Signer::from_bytes`](crate::Secp256k1Signer::from_bytes) and
+    /// [`SchnorrSigner::from_bytes`](crate::SchnorrSigner::from_bytes); this
+    /// constructor never actually fails because every 32-byte input is a
+    /// valid Ed25519 secret key.
+    ///
+    /// # Errors
+    ///
+    /// Reserved for future signature compatibility; currently always returns `Ok`.
+    pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
+        Ok(Self {
             key: SigningKey::from_bytes(bytes),
-        }
+        })
     }
 
     /// Create from a hex-encoded 32-byte secret key (with or without `0x`).
@@ -76,7 +85,7 @@ impl Ed25519Signer {
         let bytes: [u8; 32] = decoded.try_into().map_err(|v: Vec<u8>| {
             SignError::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
         })?;
-        Ok(Self::from_bytes(&bytes))
+        Self::from_bytes(&bytes)
     }
 
     /// Generate a random signer using OS-provided entropy.
@@ -90,7 +99,7 @@ impl Ed25519Signer {
     pub fn random() -> Self {
         let mut bytes = [0u8; 32];
         getrandom::fill(&mut bytes).expect("getrandom failed");
-        let signer = Self::from_bytes(&bytes);
+        let signer = Self::from_bytes(&bytes).expect("ed25519 from_bytes is infallible");
         bytes.fill(0);
         signer
     }
@@ -125,16 +134,46 @@ impl Ed25519Signer {
         self.key.sign(message)
     }
 
-    /// Verify an Ed25519 signature against this signer's public key.
+    /// Produce a [`SignOutput::Ed25519`] over `message`.
+    ///
+    /// Convenience wrapper over [`sign_raw`](Self::sign_raw) that packages
+    /// the signature into the unified enum used by the [`Sign`](crate::Sign)
+    /// trait.
+    #[must_use]
+    pub fn sign_output(&self, message: &[u8]) -> SignOutput {
+        SignOutput::Ed25519(self.sign_raw(message).to_bytes())
+    }
+
+    /// Produce a [`SignOutput::Ed25519WithPubkey`] over `message`.
+    ///
+    /// Used by chains whose wire format bundles the public key with the
+    /// signature (e.g. Sui, Aptos).
+    #[must_use]
+    pub fn sign_output_with_pubkey(&self, message: &[u8]) -> SignOutput {
+        SignOutput::Ed25519WithPubkey {
+            signature: self.sign_raw(message).to_bytes(),
+            public_key: *self.key.verifying_key().as_bytes(),
+        }
+    }
+
+    /// Verify a 64-byte Ed25519 signature against `message` using this
+    /// signer's public key.
     ///
     /// # Errors
     ///
-    /// Returns an error if the signature is invalid.
-    pub fn verify(
-        &self,
-        message: &[u8],
-        signature: &Signature,
-    ) -> Result<(), ed25519_dalek::SignatureError> {
-        self.key.verifying_key().verify(message, signature)
+    /// Returns [`SignError::InvalidSignature`] if the bytes are not a valid
+    /// 64-byte signature or fail verification.
+    pub fn verify(&self, message: &[u8], signature: &[u8]) -> Result<(), SignError> {
+        let sig_bytes: [u8; 64] = signature.try_into().map_err(|_| {
+            SignError::InvalidSignature(format!(
+                "expected 64-byte signature, got {}",
+                signature.len()
+            ))
+        })?;
+        let sig = Signature::from_bytes(&sig_bytes);
+        self.key
+            .verifying_key()
+            .verify(message, &sig)
+            .map_err(|e| SignError::InvalidSignature(e.to_string()))
     }
 }

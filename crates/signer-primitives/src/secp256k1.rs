@@ -10,11 +10,14 @@
 use alloc::string::ToString;
 use alloc::{format, vec::Vec};
 
-use k256::ecdsa::signature::hazmat::PrehashSigner;
+use k256::ecdsa::signature::hazmat::{PrehashSigner, PrehashVerifier};
 use k256::ecdsa::{Signature, SigningKey, VerifyingKey};
 use zeroize::ZeroizeOnDrop;
 
 use crate::{SignError, SignOutput};
+
+/// Digest length (all chains sign 32-byte hashes).
+pub(crate) const DIGEST_LEN: usize = 32;
 
 /// Shared secp256k1 ECDSA signer.
 ///
@@ -33,7 +36,7 @@ use crate::{SignError, SignOutput};
 /// assert_eq!(signer.uncompressed_public_key().len(), 65);
 ///
 /// let out = signer.sign_prehash_recoverable(&[0u8; 32])?;
-/// assert_eq!(out.signature.len(), 65); // r(32) + s(32) + recovery_id(1)
+/// assert_eq!(out.to_bytes().len(), 65); // r(32) + s(32) + recovery_id(1)
 /// # Ok::<_, signer_primitives::SignError>(())
 /// ```
 pub struct Secp256k1Signer {
@@ -133,49 +136,72 @@ impl Secp256k1Signer {
 
     /// Sign a 32-byte pre-hashed digest with recoverable ECDSA.
     ///
-    /// Returns 65 bytes: `r(32) || s(32) || recovery_id(1)` where
-    /// `recovery_id ∈ {0, 1}`.
+    /// Returns a [`SignOutput::Ecdsa`] variant with a 64-byte compact signature
+    /// and a `0 | 1` recovery id.
     ///
     /// # Errors
     ///
-    /// Returns [`SignError::InvalidMessage`] if `hash` is not exactly 32
-    /// bytes, or [`SignError::SigningFailed`] if the signing primitive fails.
-    pub fn sign_prehash_recoverable(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
-        if hash.len() != 32 {
-            return Err(SignError::InvalidMessage(format!(
-                "expected 32-byte hash, got {}",
-                hash.len()
-            )));
-        }
+    /// Returns [`SignError::SigningFailed`] if the signing primitive fails.
+    pub fn sign_prehash_recoverable(
+        &self,
+        hash: &[u8; DIGEST_LEN],
+    ) -> Result<SignOutput, SignError> {
         let (sig, rid) = self
             .key
             .sign_prehash_recoverable(hash)
             .map_err(|e| SignError::SigningFailed(e.to_string()))?;
-        let mut out = sig.to_bytes().to_vec();
-        out.push(rid.to_byte());
-        Ok(SignOutput::secp256k1(out, rid.to_byte()))
+        let sig_bytes = sig.to_bytes();
+        let mut signature = [0u8; 64];
+        signature.copy_from_slice(&sig_bytes);
+        Ok(SignOutput::Ecdsa {
+            signature,
+            recovery_id: rid.to_byte(),
+        })
     }
 
     /// Sign a 32-byte pre-hashed digest and return a DER-encoded signature.
     ///
-    /// Variable length (typically 70–72 bytes). No recovery ID.
+    /// Variable length (typically 70–72 bytes). No recovery id.
     ///
     /// # Errors
     ///
-    /// Returns [`SignError::InvalidMessage`] if `hash` is not exactly 32
-    /// bytes, or [`SignError::SigningFailed`] if the signing primitive fails.
-    pub fn sign_prehash_der(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
-        let digest: [u8; 32] = hash.try_into().map_err(|_| {
-            SignError::InvalidMessage(format!("expected 32-byte hash, got {}", hash.len()))
-        })?;
+    /// Returns [`SignError::SigningFailed`] if the signing primitive fails.
+    pub fn sign_prehash_der(&self, hash: &[u8; DIGEST_LEN]) -> Result<SignOutput, SignError> {
         let sig: Signature = self
             .key
-            .sign_prehash(&digest)
+            .sign_prehash(hash)
             .map_err(|e| SignError::SigningFailed(e.to_string()))?;
-        Ok(SignOutput {
-            signature: sig.to_der().as_bytes().to_vec(),
-            recovery_id: None,
-            public_key: None,
-        })
+        Ok(SignOutput::EcdsaDer(sig.to_der().as_bytes().to_vec()))
+    }
+
+    /// Verify a recoverable / compact ECDSA signature against a 32-byte
+    /// pre-hashed digest.
+    ///
+    /// Accepts either 64-byte (`r || s`) or 65-byte (`r || s || v`) input;
+    /// the recovery id is ignored for verification purposes.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SignError::InvalidSignature`] if the bytes are malformed or
+    /// fail verification.
+    pub fn verify_prehash(
+        &self,
+        hash: &[u8; DIGEST_LEN],
+        signature: &[u8],
+    ) -> Result<(), SignError> {
+        let sig_bytes = match signature.len() {
+            64 | 65 => signature.get(..64).unwrap_or_default(),
+            n => {
+                return Err(SignError::InvalidSignature(format!(
+                    "expected 64 or 65 bytes, got {n}"
+                )));
+            }
+        };
+        let sig = Signature::from_slice(sig_bytes)
+            .map_err(|e| SignError::InvalidSignature(e.to_string()))?;
+        self.key
+            .verifying_key()
+            .verify_prehash(hash, &sig)
+            .map_err(|e| SignError::InvalidSignature(e.to_string()))
     }
 }

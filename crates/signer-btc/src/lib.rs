@@ -14,7 +14,7 @@
 //! let signer = Signer::random();
 //! let hash = [0u8; 32];
 //! let out = signer.sign_hash(&hash).unwrap();
-//! assert_eq!(out.signature.len(), 65); // r(32) + s(32) + recovery_id(1)
+//! assert_eq!(out.to_bytes().len(), 65); // r(32) + s(32) + recovery_id(1)
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -108,12 +108,13 @@ impl Signer {
         self.inner.compressed_public_key()
     }
 
-    /// Sign a 32-byte sighash. Returns 65 bytes: `r(32) || s(32) || recovery_id(1)`.
+    /// Sign a 32-byte sighash. Returns a [`SignOutput::Ecdsa`]
+    /// with a 0 / 1 recovery id.
     ///
     /// # Errors
     ///
-    /// Returns an error if `hash` is not 32 bytes or the signing primitive fails.
-    pub fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
+    /// Returns an error if the signing primitive fails.
+    pub fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
         Ok(self.inner.sign_prehash_recoverable(hash)?)
     }
 
@@ -123,13 +124,13 @@ impl Signer {
     ///
     /// Returns an error if the signing primitive fails.
     pub fn sign_transaction(&self, sighash_preimage: &[u8]) -> Result<SignOutput, SignError> {
-        let hash = Sha256::digest(Sha256::digest(sighash_preimage));
-        self.sign_hash(&hash)
+        let digest: [u8; 32] = Sha256::digest(Sha256::digest(sighash_preimage)).into();
+        self.sign_hash(&digest)
     }
 
-    /// Sign a message using Bitcoin message signing convention.
+    /// Sign a message using Bitcoin's message-signing convention.
     ///
-    /// `hash = SHA256(SHA256(prefix || varint(len) || message))`
+    /// `digest = SHA256(SHA256(prefix || varint(len) || message))`
     ///
     /// # Errors
     ///
@@ -140,25 +141,36 @@ impl Signer {
         data.extend_from_slice(prefix);
         encode_compact_size(&mut data, message.len());
         data.extend_from_slice(message);
-        let hash = Sha256::digest(Sha256::digest(&data));
-        self.sign_hash(&hash)
+        let digest: [u8; 32] = Sha256::digest(Sha256::digest(&data)).into();
+        self.sign_hash(&digest)
     }
 }
 
-signer_primitives::impl_sign_delegate!();
+impl Sign for Signer {
+    type Error = SignError;
+
+    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, Self::Error> {
+        Self::sign_hash(self, hash)
+    }
+
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Self::Error> {
+        Self::sign_message(self, message)
+    }
+
+    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Self::Error> {
+        Self::sign_transaction(self, tx_bytes)
+    }
+}
 
 #[cfg(feature = "kobe")]
 impl Signer {
-    /// Create from a [`kobe_btc::DerivedAddress`].
+    /// Create from a [`kobe_btc::BtcAccount`].
     ///
     /// # Errors
     ///
     /// Returns an error if the private key is invalid.
-    pub fn from_derived(addr: &kobe_btc::DerivedAddress) -> Result<Self, SignError> {
-        let bytes = addr
-            .private_key_bytes()
-            .map_err(|e| SignError::InvalidKey(alloc::format!("{e}")))?;
-        Self::from_bytes(&bytes)
+    pub fn from_derived(account: &kobe_btc::BtcAccount) -> Result<Self, SignError> {
+        Self::from_bytes(account.private_key_bytes())
     }
 }
 

@@ -7,8 +7,8 @@
     reason = "test module: panics are acceptable and assertions are self-describing"
 )]
 
-use sha2::{Digest, Sha256};
-use sha3::Keccak256;
+use sha2::Sha256;
+use sha3::{Digest, Keccak256};
 use signer_primitives::testing::verify_secp256k1_recoverable;
 
 use super::{SignOutput, Signer};
@@ -19,17 +19,17 @@ fn test_signer() -> Signer {
     Signer::from_hex(TEST_KEY).unwrap()
 }
 
-fn verify(s: &Signer, hash: &[u8], out: &SignOutput) {
-    verify_secp256k1_recoverable(&s.public_key_bytes(), hash, &out.signature);
+fn verify(s: &Signer, hash: &[u8; 32], out: &SignOutput) {
+    verify_secp256k1_recoverable(&s.public_key_bytes(), hash, &out.to_bytes());
 }
 
 #[test]
 fn sign_hash_verify() {
     let s = test_signer();
-    let hash = Sha256::digest(b"tron test");
+    let hash: [u8; 32] = Sha256::digest(b"tron test").into();
     let out = s.sign_hash(&hash).unwrap();
-    assert_eq!(out.signature.len(), 65);
-    assert!(out.recovery_id.is_some());
+    assert_eq!(out.to_bytes().len(), 65);
+    assert!(out.recovery_id().is_some());
     verify(&s, &hash, &out);
 }
 
@@ -38,7 +38,7 @@ fn sign_transaction_sha256_verify() {
     let s = test_signer();
     let tx = b"tron tx bytes";
     let out = s.sign_transaction(tx).unwrap();
-    let expected = Sha256::digest(tx);
+    let expected: [u8; 32] = Sha256::digest(tx).into();
     verify(&s, &expected, &out);
 }
 
@@ -48,14 +48,15 @@ fn sign_message_tron_prefix_verify() {
     let msg = b"Hello TRON";
     let out = s.sign_message(msg).unwrap();
 
-    let v = out.signature[64];
+    let sig_bytes = out.to_bytes();
+    let v = sig_bytes[64];
     assert!(v == 27 || v == 28, "TRON v must be 27 or 28, got {v}");
 
     let prefix = format!("\x19TRON Signed Message:\n{}", msg.len());
     let mut data = Vec::new();
     data.extend_from_slice(prefix.as_bytes());
     data.extend_from_slice(msg);
-    let hash = Keccak256::digest(&data);
+    let hash: [u8; 32] = Keccak256::digest(&data).into();
     verify(&s, &hash, &out);
 }
 
@@ -64,7 +65,7 @@ fn deterministic_signature() {
     let s = test_signer();
     let out1 = s.sign_hash(&[0u8; 32]).unwrap();
     let out2 = s.sign_hash(&[0u8; 32]).unwrap();
-    assert_eq!(out1.signature, out2.signature);
+    assert_eq!(out1.to_bytes(), out2.to_bytes());
 }
 
 #[test]
@@ -72,11 +73,6 @@ fn from_bytes_roundtrip() {
     let bytes: [u8; 32] = hex::decode(TEST_KEY).unwrap().try_into().unwrap();
     let s = Signer::from_bytes(&bytes).unwrap();
     assert_eq!(s.public_key_bytes(), test_signer().public_key_bytes());
-}
-
-#[test]
-fn rejects_non_32_byte_hash() {
-    assert!(test_signer().sign_hash(b"short").is_err());
 }
 
 #[test]

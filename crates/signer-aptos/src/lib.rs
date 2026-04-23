@@ -45,11 +45,14 @@ impl core::fmt::Debug for Signer {
 
 impl Signer {
     /// Create from raw 32-byte secret key bytes.
-    #[must_use]
-    pub fn from_bytes(bytes: &[u8; 32]) -> Self {
-        Self {
-            inner: Ed25519Signer::from_bytes(bytes),
-        }
+    ///
+    /// # Errors
+    ///
+    /// Reserved for future compatibility; currently never fails.
+    pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
+        Ok(Self {
+            inner: Ed25519Signer::from_bytes(bytes)?,
+        })
     }
 
     /// Create from a hex-encoded 32-byte private key (with or without `0x`).
@@ -113,38 +116,31 @@ impl Signer {
         self.inner.sign_raw(&signing_msg)
     }
 
-    /// Verify an Ed25519 signature.
+    /// Verify a 64-byte Ed25519 signature.
     ///
     /// # Errors
     ///
-    /// Returns an error if the signature is invalid.
-    pub fn verify(&self, message: &[u8], signature: &Signature) -> Result<(), SignError> {
-        self.inner.verify(message, signature)?;
-        Ok(())
+    /// Returns [`SignError::InvalidSignature`] if the bytes are not a valid
+    /// 64-byte signature or fail verification.
+    pub fn verify(&self, message: &[u8], signature: &[u8]) -> Result<(), SignError> {
+        Ok(self.inner.verify(message, signature)?)
     }
 }
 
 impl Sign for Signer {
     type Error = SignError;
 
-    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
-        let sig = self.inner.sign_raw(hash);
-        Ok(SignOutput::ed25519_with_pubkey(
-            sig.to_bytes().to_vec(),
-            self.inner.public_key_bytes(),
-        ))
+    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
+        Ok(self.inner.sign_output_with_pubkey(hash))
     }
 
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        self.sign_hash(message)
+        Ok(self.inner.sign_output_with_pubkey(message))
     }
 
     fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
-        let sig = self.sign_transaction_bcs(tx_bytes);
-        Ok(SignOutput::ed25519_with_pubkey(
-            sig.to_bytes().to_vec(),
-            self.inner.public_key_bytes(),
-        ))
+        let signing_msg = tx_signing_message(tx_bytes);
+        Ok(self.inner.sign_output_with_pubkey(&signing_msg))
     }
 }
 
@@ -156,10 +152,7 @@ impl Signer {
     ///
     /// Returns [`SignError::InvalidKey`] if the derived bytes are malformed.
     pub fn from_derived(account: &kobe_aptos::DerivedAccount) -> Result<Self, SignError> {
-        let bytes = account
-            .private_key_bytes()
-            .map_err(|e| SignError::InvalidKey(format!("{e}")))?;
-        Ok(Self::from_bytes(&bytes))
+        Self::from_bytes(account.private_key_bytes())
     }
 }
 

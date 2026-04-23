@@ -8,7 +8,7 @@
     reason = "test module: panics are acceptable and assertions are self-describing"
 )]
 
-use super::{Sign, Signature, Signer};
+use super::{Sign, Signer};
 
 /// RFC 8032 Test Vector 1.
 const TEST_KEY: &str = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
@@ -26,7 +26,7 @@ fn rfc8032_pubkey() {
 #[test]
 fn from_bytes_matches_from_hex() {
     let bytes: [u8; 32] = hex::decode(TEST_KEY).unwrap().try_into().unwrap();
-    let s = Signer::from_bytes(&bytes);
+    let s = Signer::from_bytes(&bytes).unwrap();
     assert_eq!(s.public_key_bytes(), test_signer().public_key_bytes());
 }
 
@@ -35,24 +35,25 @@ fn sign_and_verify() {
     let s = test_signer();
     let msg = b"hello TON";
     let sig = s.sign_raw(msg);
-    s.verify(msg, &sig).expect("signature must verify");
+    s.verify(msg, sig.to_bytes().as_slice())
+        .expect("signature must verify");
 }
 
 #[test]
 fn sign_wrong_message_fails() {
     let s = test_signer();
     let sig = s.sign_raw(b"correct");
-    assert!(s.verify(b"wrong", &sig).is_err());
+    assert!(s.verify(b"wrong", sig.to_bytes().as_slice()).is_err());
 }
 
 #[test]
 fn sign_trait_verify() {
     let s = test_signer();
     let out = Sign::sign_message(&s, b"test").unwrap();
-    assert_eq!(out.signature.len(), 64);
-    assert!(out.recovery_id.is_none());
-    let sig = Signature::from_slice(&out.signature).unwrap();
-    s.verify(b"test", &sig)
+    let sig_bytes = out.to_bytes();
+    assert_eq!(sig_bytes.len(), 64);
+    assert!(out.recovery_id().is_none());
+    s.verify(b"test", &sig_bytes)
         .expect("trait signature must verify");
 }
 

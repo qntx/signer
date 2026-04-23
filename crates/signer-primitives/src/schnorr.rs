@@ -51,9 +51,9 @@ use crate::{SignError, SignOutput};
 ///
 /// let msg = b"hello, nostr";
 /// let out = signer.sign(msg)?;
-/// assert_eq!(out.signature.len(), 64);
-/// assert!(out.recovery_id.is_none());
-/// signer.verify(msg, &out.signature)?;
+/// let sig_bytes = out.to_bytes();
+/// assert_eq!(sig_bytes.len(), 64);
+/// signer.verify(msg, &sig_bytes)?;
 /// # Ok::<_, signer_primitives::SignError>(())
 /// ```
 pub struct SchnorrSigner {
@@ -224,6 +224,9 @@ impl SchnorrSigner {
     }
 
     fn output(&self, sig: Signature) -> SignOutput {
-        SignOutput::schnorr(sig.to_bytes().to_vec(), self.xonly_public_key().to_vec())
+        SignOutput::Schnorr {
+            signature: sig.to_bytes(),
+            xonly_public_key: self.xonly_public_key(),
+        }
     }
 }

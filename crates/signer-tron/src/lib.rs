@@ -13,8 +13,8 @@ use alloc::{format, string::String, vec::Vec};
 mod error;
 
 pub use error::SignError;
-use sha2::{Digest, Sha256};
-use sha3::Keccak256;
+use sha2::Sha256;
+use sha3::{Digest, Keccak256};
 use signer_primitives::Secp256k1Signer;
 pub use signer_primitives::{self, Sign, SignExt, SignOutput};
 
@@ -94,12 +94,13 @@ impl Signer {
         self.inner.compressed_public_key()
     }
 
-    /// Sign a 32-byte hash. Returns 65 bytes: `r(32) || s(32) || recovery_id(1)`.
+    /// Sign a 32-byte digest. Returns a [`SignOutput::Ecdsa`] with a
+    /// `0 | 1` recovery id.
     ///
     /// # Errors
     ///
-    /// Returns an error if `hash` is not 32 bytes or signing fails.
-    pub fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, SignError> {
+    /// Returns an error if the signing primitive fails.
+    pub fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
         Ok(self.inner.sign_prehash_recoverable(hash)?)
     }
 
@@ -109,36 +110,58 @@ impl Signer {
     ///
     /// Returns an error if signing fails.
     pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
-        let hash = Sha256::digest(tx_bytes);
-        self.sign_hash(&hash)
+        let digest: [u8; 32] = Sha256::digest(tx_bytes).into();
+        self.sign_hash(&digest)
     }
 
-    /// Sign a message with TRON message signing convention.
+    /// Sign a message with TRON's message-signing convention.
     ///
-    /// `hash = keccak256("\x19TRON Signed Message:\n" || len || message)`.
-    /// The resulting `v` follows EVM convention: `27 + recovery_id`.
+    /// `digest = keccak256("\x19TRON Signed Message:\n" || len || message)`.
+    /// The returned `recovery_id` follows EVM convention (`27 | 28`).
     ///
     /// # Errors
     ///
     /// Returns an error if signing fails.
-    #[allow(
-        clippy::indexing_slicing,
-        reason = "signature is always 65 bytes from sign_hash"
-    )]
     pub fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         let prefix = format!("\x19TRON Signed Message:\n{}", message.len());
         let mut data = Vec::with_capacity(prefix.len() + message.len());
         data.extend_from_slice(prefix.as_bytes());
         data.extend_from_slice(message);
-        let hash = Keccak256::digest(&data);
-        let mut out = self.sign_hash(&hash)?;
-        out.signature[64] += 27;
-        out.recovery_id = out.recovery_id.map(|r| r + 27);
-        Ok(out)
+        let digest: [u8; 32] = Keccak256::digest(&data).into();
+        let out = self.sign_hash(&digest)?;
+        Ok(bump_v_by_27(out))
     }
 }
 
-signer_primitives::impl_sign_delegate!();
+/// Bump the `recovery_id` of an [`SignOutput::Ecdsa`] by 27 (TRON v encoding).
+fn bump_v_by_27(out: SignOutput) -> SignOutput {
+    match out {
+        SignOutput::Ecdsa {
+            signature,
+            recovery_id,
+        } => SignOutput::Ecdsa {
+            signature,
+            recovery_id: recovery_id.wrapping_add(27),
+        },
+        other => other,
+    }
+}
+
+impl Sign for Signer {
+    type Error = SignError;
+
+    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, Self::Error> {
+        Self::sign_hash(self, hash)
+    }
+
+    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, Self::Error> {
+        Self::sign_message(self, message)
+    }
+
+    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, Self::Error> {
+        Self::sign_transaction(self, tx_bytes)
+    }
+}
 
 #[cfg(feature = "kobe")]
 impl Signer {
@@ -148,10 +171,7 @@ impl Signer {
     ///
     /// Returns an error if the private key is invalid.
     pub fn from_derived(account: &kobe_tron::DerivedAccount) -> Result<Self, SignError> {
-        let bytes = account
-            .private_key_bytes()
-            .map_err(|e| SignError::InvalidKey(alloc::format!("{e}")))?;
-        Self::from_bytes(&bytes)
+        Self::from_bytes(account.private_key_bytes())
     }
 }
 

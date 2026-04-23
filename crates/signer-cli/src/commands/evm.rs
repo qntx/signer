@@ -60,8 +60,7 @@ impl EvmCommand {
                 let out = signer.sign_message(message.as_bytes())?;
                 output::sign(CHAIN, "EIP-191 personal_sign")
                     .address(signer.address())
-                    .signature(&out.signature)
-                    .recovery_id(out.recovery_id)
+                    .from_output(&out)
                     .message(message)
                     .render(json)
             }
@@ -70,8 +69,7 @@ impl EvmCommand {
                 let out = signer.sign_hash(&parse_hex32(&hash)?)?;
                 output::sign(CHAIN, "raw hash")
                     .address(signer.address())
-                    .signature(&out.signature)
-                    .recovery_id(out.recovery_id)
+                    .from_output(&out)
                     .message(hash)
                     .render(json)
             }
@@ -80,8 +78,7 @@ impl EvmCommand {
                 let out = signer.sign_transaction(&parse_hex(&tx)?)?;
                 output::sign(CHAIN, "transaction")
                     .address(signer.address())
-                    .signature(&out.signature)
-                    .recovery_id(out.recovery_id)
+                    .from_output(&out)
                     .render(json)
             }
             EvmSubcommand::Address { key } => {

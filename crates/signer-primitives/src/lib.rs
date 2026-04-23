@@ -1,29 +1,33 @@
 //! Unified signing trait and types for multi-chain transaction signers.
 //!
-//! This crate defines the [`Sign`] trait that all chain-specific signer crates
-//! implement, plus shared types like [`SignOutput`] and [`SignError`].
-//!
-//! Mirrors the role of `kobe-core` for derivation — this is the equivalent
-//! for signing.
+//! This crate defines the [`Sign`] / [`Verify`] traits that every
+//! chain-specific signer crate implements, plus a discriminated [`SignOutput`]
+//! enum covering every wire format the workspace produces.
 //!
 //! # Design
 //!
 //! - **Stateful signers** — each `Signer` holds its private key internally.
-//! - **`Send + Sync`** — signers are safe to share across threads and async runtimes.
-//! - **No address derivation** — that's `kobe`'s responsibility.
-//! - **Associated error type** — matches kobe's `Derive` trait pattern.
-//! - **[`SignExt`]** — blanket extension trait (like kobe's `DeriveExt`).
+//! - **Type-safe hashing** — `sign_hash` requires a `&[u8; 32]` digest; ragged
+//!   byte slices are rejected at compile time rather than run time.
+//! - **Discriminated output** — [`SignOutput`] is an enum; callers pattern-match
+//!   on the variant to reach the exact bytes they need, with no `Option`
+//!   boilerplate.
+//! - **`Send + Sync`** — signers are safe to share across threads and async
+//!   runtimes.
+//! - **No address derivation** — that responsibility lives in `kobe`.
+//! - **[`SignExt`]** — blanket extension trait that provides convenience
+//!   conversions (hex / flat bytes).
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
+use alloc::vec::Vec;
 
 #[cfg(feature = "ed25519")]
 mod ed25519;
 mod error;
-mod macros;
 #[cfg(feature = "schnorr")]
 mod schnorr;
 #[cfg(feature = "secp256k1")]
@@ -39,126 +43,150 @@ pub use schnorr::SchnorrSigner;
 #[cfg(feature = "secp256k1")]
 pub use secp256k1::Secp256k1Signer;
 
-/// Internal re-exports used by exported macros. Not a stable public API.
-#[doc(hidden)]
-pub mod __private {
-    pub use alloc::string::String;
-
-    pub use hex::FromHexError;
-}
-
-/// Output of a signing operation.
+/// Signature output across every scheme the workspace supports.
 ///
-/// Unified across all chains. Secp256k1 chains populate `recovery_id`;
-/// Ed25519 chains leave it `None`. Chains like Sui that include the public
-/// key in their wire format populate `public_key`.
+/// Each variant mirrors a concrete wire format; callers pattern-match on the
+/// variant rather than inspect optional metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SignOutput {
-    /// Raw signature bytes (65 for secp256k1 r‖s‖v, 64 for Ed25519).
-    pub signature: Vec<u8>,
-    /// Recovery ID (secp256k1 only; `None` for Ed25519).
-    pub recovery_id: Option<u8>,
-    /// Public key bytes (only set by chains that need it in the wire format).
-    pub public_key: Option<Vec<u8>>,
+pub enum SignOutput {
+    /// secp256k1 ECDSA with recovery id (EVM, BTC, Cosmos, Filecoin, Tron, Spark).
+    ///
+    /// Flat bytes: `signature || recovery_id` (65 B total).
+    Ecdsa {
+        /// 64-byte compact `r || s`.
+        signature: [u8; 64],
+        /// Recovery id, `0` or `1`.
+        recovery_id: u8,
+    },
+    /// secp256k1 ECDSA encoded as ASN.1 DER (XRPL).
+    ///
+    /// Variable length (typically 70–72 B).
+    EcdsaDer(Vec<u8>),
+    /// Ed25519 signature (Solana, TON).
+    Ed25519([u8; 64]),
+    /// Ed25519 signature accompanied by the signer's public key (Sui, Aptos).
+    Ed25519WithPubkey {
+        /// 64-byte Ed25519 signature.
+        signature: [u8; 64],
+        /// 32-byte Ed25519 public key.
+        public_key: [u8; 32],
+    },
+    /// BIP-340 Schnorr signature accompanied by the x-only public key (Nostr / Taproot).
+    Schnorr {
+        /// 64-byte BIP-340 Schnorr signature.
+        signature: [u8; 64],
+        /// 32-byte x-only public key.
+        xonly_public_key: [u8; 32],
+    },
 }
 
 impl SignOutput {
-    /// Create a secp256k1 sign output (65 bytes: r‖s‖v).
-    #[must_use]
-    pub const fn secp256k1(signature: Vec<u8>, recovery_id: u8) -> Self {
-        Self {
-            signature,
-            recovery_id: Some(recovery_id),
-            public_key: None,
-        }
-    }
-
-    /// Create an Ed25519 sign output (64 bytes).
-    #[must_use]
-    pub const fn ed25519(signature: Vec<u8>) -> Self {
-        Self {
-            signature,
-            recovery_id: None,
-            public_key: None,
-        }
-    }
-
-    /// Create an Ed25519 sign output with public key attached.
-    #[must_use]
-    pub const fn ed25519_with_pubkey(signature: Vec<u8>, public_key: Vec<u8>) -> Self {
-        Self {
-            signature,
-            recovery_id: None,
-            public_key: Some(public_key),
-        }
-    }
-
-    /// Create a BIP-340 Schnorr sign output (64 bytes) with x-only public key attached.
+    /// Flat signature bytes in the chain's native wire layout.
     ///
-    /// Used by chains like Nostr (NIP-01) and Bitcoin Taproot. The attached
-    /// `xonly_public_key` is always 32 bytes.
+    /// - `Ecdsa` → 65 bytes (`r || s || v`).
+    /// - `EcdsaDer` → DER-encoded (variable length).
+    /// - `Ed25519` → 64 bytes.
+    /// - `Ed25519WithPubkey` → 64 bytes (the public key is carried separately).
+    /// - `Schnorr` → 64 bytes (the x-only public key is carried separately).
     #[must_use]
-    pub const fn schnorr(signature: Vec<u8>, xonly_public_key: Vec<u8>) -> Self {
-        Self {
-            signature,
-            recovery_id: None,
-            public_key: Some(xonly_public_key),
+    pub fn to_bytes(&self) -> Vec<u8> {
+        match *self {
+            Self::Ecdsa {
+                signature,
+                recovery_id,
+            } => {
+                let mut out = Vec::with_capacity(65);
+                out.extend_from_slice(&signature);
+                out.push(recovery_id);
+                out
+            }
+            Self::EcdsaDer(ref der) => der.clone(),
+            Self::Ed25519(sig) | Self::Ed25519WithPubkey { signature: sig, .. } => sig.to_vec(),
+            Self::Schnorr { signature, .. } => signature.to_vec(),
         }
     }
 
-    /// Hex-encode the raw signature bytes.
+    /// Hex-encode the flat signature bytes returned by [`to_bytes`](Self::to_bytes).
     #[must_use]
-    pub fn signature_hex(&self) -> String {
-        hex::encode(&self.signature)
+    pub fn to_hex(&self) -> String {
+        hex::encode(self.to_bytes())
     }
 
-    /// Hex-encode the attached public key, if present.
+    /// The public key attached to the signature, if any.
+    ///
+    /// Only `Ed25519WithPubkey` and `Schnorr` carry a public key; other
+    /// variants return `None`.
     #[must_use]
-    pub fn public_key_hex(&self) -> Option<String> {
-        self.public_key.as_ref().map(hex::encode)
+    pub const fn public_key(&self) -> Option<&[u8]> {
+        match self {
+            Self::Ed25519WithPubkey { public_key, .. } => Some(public_key.as_slice()),
+            Self::Schnorr {
+                xonly_public_key, ..
+            } => Some(xonly_public_key.as_slice()),
+            _ => None,
+        }
+    }
+
+    /// Recovery id (secp256k1 ECDSA only).
+    #[must_use]
+    pub const fn recovery_id(&self) -> Option<u8> {
+        match self {
+            Self::Ecdsa { recovery_id, .. } => Some(*recovery_id),
+            _ => None,
+        }
     }
 }
 
-/// Unified signing trait implemented by all chain signers.
+/// Unified signing trait implemented by every chain signer.
 ///
-/// Each chain crate (`signer-evm`, `signer-btc`, etc.) implements this
-/// trait on its `Signer` type. The signer holds the private key internally.
+/// Signers hold their private key internally and expose three signing entry
+/// points. `sign_hash` is the type-safe low-level primitive (exactly 32 bytes
+/// in, wire-format [`SignOutput`] out). `sign_message` and `sign_transaction`
+/// are chain-aware wrappers that apply the appropriate prefix / hash /
+/// serialization before signing.
 ///
-/// **Thread-safety**: all signers must be `Send + Sync` for use in async
+/// **Thread-safety**: implementors must be `Send + Sync` to fit async
 /// runtimes and multi-threaded applications.
-///
-/// Extension methods are provided by the blanket [`SignExt`] trait.
 ///
 /// # Example
 ///
 /// ```
 /// use signer_primitives::{Sign, SignOutput};
 ///
-/// fn sign_with_any<S: Sign>(signer: &S, msg: &[u8]) -> SignOutput {
-///     signer.sign_message(msg).unwrap()
+/// fn sign_with_any<S: Sign>(signer: &S, msg: &[u8]) -> Result<SignOutput, S::Error> {
+///     signer.sign_message(msg)
 /// }
 /// ```
 pub trait Sign: Send + Sync {
     /// The error type returned by signing operations.
     type Error: core::fmt::Debug + core::fmt::Display + From<SignError> + Send + Sync;
 
-    /// Sign a pre-hashed digest.
+    /// Sign a pre-hashed 32-byte digest.
     ///
-    /// For secp256k1: expects exactly 32 bytes.
-    /// For Ed25519: signs the raw bytes (no pre-hashing required).
+    /// All workspace chains use 32-byte digests (SHA-256 / SHA3-256 /
+    /// BLAKE2b-256 / Keccak-256). Consumers that already hold a digest should
+    /// call this directly; chains that need domain-specific prefixing go
+    /// through [`sign_message`](Self::sign_message) or
+    /// [`sign_transaction`](Self::sign_transaction) instead.
     ///
     /// # Errors
     ///
-    /// Returns an error if the hash length is wrong or the signing primitive fails.
-    fn sign_hash(&self, hash: &[u8]) -> Result<SignOutput, Self::Error>;
+    /// Returns an error if the underlying signing primitive fails.
+    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, Self::Error>;
 
-    /// Sign an arbitrary message with chain-specific prefixing/hashing.
+    /// Sign an arbitrary message with chain-specific prefixing / hashing.
     ///
-    /// - EVM: EIP-191 `personal_sign`
-    /// - Bitcoin: `\x18Bitcoin Signed Message:\n` prefix
-    /// - TRON: `\x19TRON Signed Message:\n` prefix
-    /// - Solana/TON: raw Ed25519 sign
-    /// - Sui: intent prefix + BCS + BLAKE2b-256
+    /// - EVM: EIP-191 `personal_sign` (`v = 27 | 28`).
+    /// - Bitcoin: `\x18Bitcoin Signed Message:\n` prefix + compact-size length.
+    /// - Tron: `\x19TRON Signed Message:\n` prefix.
+    /// - Cosmos: SHA-256 of the raw message.
+    /// - Solana / TON: raw Ed25519 sign (no prefix).
+    /// - Sui: intent prefix + BCS + BLAKE2b-256.
+    /// - Aptos: raw Ed25519 sign.
+    /// - Nostr: raw BIP-340 Schnorr (off-protocol).
+    /// - XRPL: SHA-512 half + DER.
+    ///
+    /// Each chain crate documents its exact semantics on its `Signer`.
     ///
     /// # Errors
     ///
@@ -167,8 +195,9 @@ pub trait Sign: Send + Sync {
 
     /// Sign an unsigned transaction.
     ///
-    /// Each chain hashes the transaction bytes according to its own rules
-    /// before signing.
+    /// Each chain crate documents the exact expected input format on its
+    /// `Signer::sign_transaction` method (e.g. EVM expects an unsigned RLP
+    /// payload, BTC a sighash preimage, Cosmos a `SignDoc`).
     ///
     /// # Errors
     ///
@@ -179,9 +208,8 @@ pub trait Sign: Send + Sync {
     ///
     /// Some wire formats include non-signed metadata (e.g. Solana prepends
     /// signature-slot placeholders). This method strips that metadata and
-    /// returns only the bytes that must be signed.
-    ///
-    /// The default implementation returns the input unchanged.
+    /// returns only the bytes that must be signed. The default implementation
+    /// returns the input unchanged.
     ///
     /// # Errors
     ///
@@ -192,9 +220,7 @@ pub trait Sign: Send + Sync {
 
     /// Encode a signed transaction from unsigned bytes + signature output.
     ///
-    /// Returns bytes suitable for broadcasting to the network.
-    ///
-    /// The default returns `Err` — chains that support encoding must override.
+    /// The default returns `Err` — chains that support encoding override it.
     ///
     /// # Errors
     ///
@@ -211,26 +237,60 @@ pub trait Sign: Send + Sync {
     }
 }
 
+/// Unified verification trait.
+///
+/// Implementors verify signatures produced by the paired [`Sign`] impl using
+/// the public key material stored on the signer.
+pub trait Verify: Send + Sync {
+    /// The error type returned by verification operations.
+    type Error: core::fmt::Debug + core::fmt::Display + From<SignError> + Send + Sync;
+
+    /// Verify that `signature` is valid over a pre-hashed 32-byte digest.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SignError::InvalidSignature`] (or the chain-specific
+    /// equivalent) if verification fails.
+    fn verify_hash(&self, hash: &[u8; 32], signature: &[u8]) -> Result<(), Self::Error>;
+
+    /// Verify that `signature` is valid over `message`, applying the
+    /// chain-specific prefix / hash used by [`Sign::sign_message`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a verification error on mismatch.
+    fn verify_message(&self, message: &[u8], signature: &[u8]) -> Result<(), Self::Error>;
+}
+
 /// Extension trait providing additional operations for all [`Sign`] implementors.
 ///
 /// Automatically implemented for any type implementing `Sign`.
 pub trait SignExt: Sign {
-    /// Sign a hash and return only the raw signature bytes (discarding metadata).
+    /// Sign a 32-byte digest and return the flat signature bytes.
     ///
     /// # Errors
     ///
     /// Returns an error if signing fails.
-    fn sign_hash_bytes(&self, hash: &[u8]) -> Result<Vec<u8>, Self::Error> {
-        self.sign_hash(hash).map(|out| out.signature)
+    fn sign_hash_bytes(&self, hash: &[u8; 32]) -> Result<Vec<u8>, Self::Error> {
+        self.sign_hash(hash).map(|out| out.to_bytes())
     }
 
-    /// Sign a transaction and return only the raw signature bytes.
+    /// Sign a message and return the flat signature bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if signing fails.
+    fn sign_message_bytes(&self, message: &[u8]) -> Result<Vec<u8>, Self::Error> {
+        self.sign_message(message).map(|out| out.to_bytes())
+    }
+
+    /// Sign a transaction and return the flat signature bytes.
     ///
     /// # Errors
     ///
     /// Returns an error if signing fails.
     fn sign_transaction_bytes(&self, tx_bytes: &[u8]) -> Result<Vec<u8>, Self::Error> {
-        self.sign_transaction(tx_bytes).map(|out| out.signature)
+        self.sign_transaction(tx_bytes).map(|out| out.to_bytes())
     }
 }
 

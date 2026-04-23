@@ -47,7 +47,7 @@ impl AptosCommand {
                 let out = Sign::sign_message(&signer, message.as_bytes())?;
                 output::sign(CHAIN, "Ed25519")
                     .address(signer.address())
-                    .signature(&out.signature)
+                    .from_output(&out)
                     .public_key_hex(signer.public_key_hex())
                     .message(message)
                     .render(json)
@@ -57,7 +57,7 @@ impl AptosCommand {
                 let out = Sign::sign_transaction(&signer, &parse_hex(&tx)?)?;
                 output::sign(CHAIN, "transaction")
                     .address(signer.address())
-                    .signature(&out.signature)
+                    .from_output(&out)
                     .public_key_hex(signer.public_key_hex())
                     .render(json)
             }

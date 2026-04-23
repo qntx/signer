@@ -739,9 +739,7 @@ dependencies = [
 
 [[package]]
 name = "kobe-aptos"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9371b3f7fae1b3ad3e19ff80c8d8b9b10ca4181912146e3725ad2dba44c489f1"
+version = "1.0.0"
 dependencies = [
  "hex",
  "kobe-primitives",
@@ -751,12 +749,9 @@ dependencies = [
 
 [[package]]
 name = "kobe-btc"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "add78ba56e71ee91919aa9c3c3beac19cb1b9a0cd27d5c8588a1b181ccb7cefa"
+version = "1.0.0"
 dependencies = [
  "bitcoin",
- "hex",
  "kobe-primitives",
  "thiserror",
  "zeroize",
@@ -764,9 +759,7 @@ dependencies = [
 
 [[package]]
 name = "kobe-cosmos"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a44faa2bbd0c359c4b384f71c06d1379c720a12bacd991a839c818a736eaa9e4"
+version = "1.0.0"
 dependencies = [
  "bech32",
  "kobe-primitives",
@@ -777,9 +770,7 @@ dependencies = [
 
 [[package]]
 name = "kobe-evm"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b12a5eadf04d2aad38747c2facba0bbb689131239cd86b501e22b11593904d53"
+version = "1.0.0"
 dependencies = [
  "alloy-primitives",
  "kobe-primitives",
@@ -788,9 +779,7 @@ dependencies = [
 
 [[package]]
 name = "kobe-fil"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5925deae46d66d6ff01c8d5015818a74f4ce19eeb5d8e62793eed857ad2409b8"
+version = "1.0.0"
 dependencies = [
  "blake2",
  "kobe-primitives",
@@ -799,12 +788,9 @@ dependencies = [
 
 [[package]]
 name = "kobe-nostr"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0db0ba0a3b262dd2031743621b2ea47201b55f351882f6c6535ad828ac91fdfd"
+version = "1.0.0"
 dependencies = [
  "bech32",
- "hex",
  "kobe-primitives",
  "thiserror",
  "zeroize",
@@ -812,9 +798,7 @@ dependencies = [
 
 [[package]]
 name = "kobe-primitives"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68900ba5630897999b793f2925e926e1f75733ba603fd7f1b2dfda4db6e199ec"
+version = "1.0.0"
 dependencies = [
  "bip32",
  "bip39",
@@ -829,18 +813,14 @@ dependencies = [
 
 [[package]]
 name = "kobe-spark"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a94456826fc9dcd71b031001ca2aac8ae9dd8a3f2f8955d291859ea16e3bee6"
+version = "1.0.0"
 dependencies = [
  "kobe-primitives",
 ]
 
 [[package]]
 name = "kobe-sui"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d809c0824a4cbdb9d71b174203c16f66cbd53939b1eb253e0d875342bf6cef6"
+version = "1.0.0"
 dependencies = [
  "blake2",
  "hex",
@@ -851,12 +831,9 @@ dependencies = [
 
 [[package]]
 name = "kobe-svm"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef2de433c2c0c1a8ff74a3baf2140561078529542a9246c9653fb558090aa143"
+version = "1.0.0"
 dependencies = [
  "bs58",
- "hex",
  "kobe-primitives",
  "thiserror",
  "zeroize",
@@ -864,12 +841,9 @@ dependencies = [
 
 [[package]]
 name = "kobe-ton"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a11ff68ac9bc30cc8ed27397309a691b54d0c879e82e4fdae4c42567e9ce132c"
+version = "1.0.0"
 dependencies = [
  "base64",
- "hex",
  "kobe-primitives",
  "sha2 0.11.0",
  "zeroize",
@@ -877,9 +851,7 @@ dependencies = [
 
 [[package]]
 name = "kobe-tron"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94759e4524e32dbbff4a615d5607c16fb6c28df679512895c499d57b79e2f9ed"
+version = "1.0.0"
 dependencies = [
  "bs58",
  "kobe-primitives",
@@ -888,9 +860,7 @@ dependencies = [
 
 [[package]]
 name = "kobe-xrpl"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00d16631421057238a58f49747cecf69335c9d891370b694c74c60ccf9728b02"
+version = "1.0.0"
 dependencies = [
  "bs58",
  "kobe-primitives",
@@ -1280,7 +1250,7 @@ dependencies = [
 
 [[package]]
 name = "signer"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "signer-aptos",
  "signer-btc",
@@ -1299,7 +1269,7 @@ dependencies = [
 
 [[package]]
 name = "signer-aptos"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "ed25519-dalek",
  "hex",
@@ -1311,7 +1281,7 @@ dependencies = [
 
 [[package]]
 name = "signer-btc"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "bs58",
  "hex",
@@ -1324,7 +1294,7 @@ dependencies = [
 
 [[package]]
 name = "signer-cli"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "clap",
  "colored",
@@ -1349,7 +1319,7 @@ dependencies = [
 
 [[package]]
 name = "signer-cosmos"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "bech32",
  "hex",
@@ -1362,7 +1332,7 @@ dependencies = [
 
 [[package]]
 name = "signer-evm"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "hex",
  "kobe-evm",
@@ -1375,7 +1345,7 @@ dependencies = [
 
 [[package]]
 name = "signer-fil"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "blake2",
  "hex",
@@ -1386,7 +1356,7 @@ dependencies = [
 
 [[package]]
 name = "signer-nostr"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "bech32",
  "hex",
@@ -1399,7 +1369,7 @@ dependencies = [
 
 [[package]]
 name = "signer-primitives"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "ed25519-dalek",
  "getrandom",
@@ -1411,7 +1381,7 @@ dependencies = [
 
 [[package]]
 name = "signer-spark"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "bs58",
  "hex",
@@ -1424,7 +1394,7 @@ dependencies = [
 
 [[package]]
 name = "signer-sui"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "blake2",
  "ed25519-dalek",
@@ -1436,7 +1406,7 @@ dependencies = [
 
 [[package]]
 name = "signer-svm"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "bs58",
  "ed25519-dalek",
@@ -1449,7 +1419,7 @@ dependencies = [
 
 [[package]]
 name = "signer-ton"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "ed25519-dalek",
  "hex",
@@ -1460,7 +1430,7 @@ dependencies = [
 
 [[package]]
 name = "signer-tron"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "bs58",
  "hex",
@@ -1473,7 +1443,7 @@ dependencies = [
 
 [[package]]
 name = "signer-xrpl"
-version = "0.8.0"
+version = "1.0.0"
 dependencies = [
  "bs58",
  "hex",

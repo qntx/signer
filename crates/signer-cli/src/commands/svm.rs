@@ -66,7 +66,7 @@ impl SvmCommand {
                 let out = signer.sign_message(&msg_bytes)?;
                 output::sign(CHAIN, "Ed25519")
                     .address(signer.address())
-                    .signature(&out.signature)
+                    .from_output(&out)
                     .public_key_bytes(&signer.public_key_bytes())
                     .message(message)
                     .render(json)
@@ -76,7 +76,7 @@ impl SvmCommand {
                 let out = signer.sign_transaction(&parse_hex(&tx)?)?;
                 output::sign(CHAIN, "transaction")
                     .address(signer.address())
-                    .signature(&out.signature)
+                    .from_output(&out)
                     .render(json)
             }
             SvmSubcommand::Address { key } => {

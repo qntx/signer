@@ -18,17 +18,18 @@ fn test_signer() -> Signer {
     Signer::from_hex(TEST_KEY).unwrap()
 }
 
-fn verify(s: &Signer, hash: &[u8], out: &SignOutput) {
-    verify_secp256k1_recoverable(&s.public_key_bytes(), hash, &out.signature);
+fn verify(s: &Signer, hash: &[u8; 32], out: &SignOutput) {
+    verify_secp256k1_recoverable(&s.public_key_bytes(), hash, &out.to_bytes());
 }
 
 #[test]
 fn sign_hash_verify() {
     let s = test_signer();
-    let hash = Sha256::digest(b"test message");
+    let hash: [u8; 32] = Sha256::digest(b"test message").into();
     let out = s.sign_hash(&hash).unwrap();
-    assert_eq!(out.signature.len(), 65);
-    assert!(out.recovery_id.is_some());
+    let sig_bytes = out.to_bytes();
+    assert_eq!(sig_bytes.len(), 65);
+    assert!(out.recovery_id().is_some());
     verify(&s, &hash, &out);
 }
 
@@ -37,7 +38,7 @@ fn sign_transaction_double_sha256_verify() {
     let s = test_signer();
     let tx = b"bitcoin tx bytes";
     let out = s.sign_transaction(tx).unwrap();
-    let expected = Sha256::digest(Sha256::digest(tx));
+    let expected: [u8; 32] = Sha256::digest(Sha256::digest(tx)).into();
     verify(&s, &expected, &out);
 }
 
@@ -69,7 +70,7 @@ fn sign_message_short_verify() {
     )]
     data.push(msg.len() as u8);
     data.extend_from_slice(msg);
-    let expected = Sha256::digest(Sha256::digest(&data));
+    let expected: [u8; 32] = Sha256::digest(Sha256::digest(&data)).into();
     verify(&s, &expected, &out);
 }
 
@@ -84,7 +85,7 @@ fn sign_message_long_varint_verify() {
     data.push(0xFD);
     data.extend_from_slice(&300u16.to_le_bytes());
     data.extend_from_slice(&msg);
-    let expected = Sha256::digest(Sha256::digest(&data));
+    let expected: [u8; 32] = Sha256::digest(Sha256::digest(&data)).into();
     verify(&s, &expected, &out);
 }
 
@@ -99,7 +100,7 @@ fn sign_message_varint_boundary_253() {
     data.push(0xFD);
     data.extend_from_slice(&253u16.to_le_bytes());
     data.extend_from_slice(&msg);
-    let expected = Sha256::digest(Sha256::digest(&data));
+    let expected: [u8; 32] = Sha256::digest(Sha256::digest(&data)).into();
     verify(&s, &expected, &out);
 }
 
@@ -108,13 +109,7 @@ fn deterministic_signature() {
     let s = test_signer();
     let out1 = s.sign_transaction(b"same data").unwrap();
     let out2 = s.sign_transaction(b"same data").unwrap();
-    assert_eq!(out1.signature, out2.signature);
-}
-
-#[test]
-fn rejects_non_32_byte_hash() {
-    assert!(test_signer().sign_hash(b"short").is_err());
-    assert!(test_signer().sign_hash(&[0u8; 33]).is_err());
+    assert_eq!(out1.to_bytes(), out2.to_bytes());
 }
 
 #[test]

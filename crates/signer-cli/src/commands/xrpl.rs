@@ -46,7 +46,7 @@ impl XrplCommand {
                 let out = signer.sign_hash(&parse_hex32(&hash)?)?;
                 output::sign(CHAIN, "raw hash (DER)")
                     .address(signer.address())
-                    .signature(&out.signature)
+                    .from_output(&out)
                     .message(hash)
                     .render(json)
             }
@@ -55,7 +55,7 @@ impl XrplCommand {
                 let out = signer.sign_transaction(&parse_hex(&tx)?)?;
                 output::sign(CHAIN, "transaction (SHA-512-half + DER)")
                     .address(signer.address())
-                    .signature(&out.signature)
+                    .from_output(&out)
                     .render(json)
             }
             XrplSubcommand::Address { key } => {

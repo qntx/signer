@@ -25,12 +25,13 @@ fn sign_hash_returns_der() {
     let hash = sha512_half_prefixed(b"", b"xrpl test data");
     let out = s.sign_hash(&hash).unwrap();
     // DER signatures are variable-length, typically 70-72 bytes
+    let sig_bytes = out.to_bytes();
     assert!(
-        (68..=72).contains(&out.signature.len()),
+        (68..=72).contains(&sig_bytes.len()),
         "DER sig should be 68-72 bytes, got {}",
-        out.signature.len()
+        sig_bytes.len()
     );
-    assert!(out.recovery_id.is_none());
+    assert!(out.recovery_id().is_none());
 }
 
 #[test]
@@ -38,7 +39,7 @@ fn sign_hash_verifies() {
     let s = test_signer();
     let hash = sha512_half_prefixed(b"", b"verify me");
     let out = s.sign_hash(&hash).unwrap();
-    verify_secp256k1_der(&s.public_key_bytes(), &hash, &out.signature);
+    verify_secp256k1_der(&s.public_key_bytes(), &hash, &out.to_bytes());
 }
 
 #[test]
@@ -47,7 +48,7 @@ fn sign_transaction_uses_stx_prefix() {
     let tx = b"some serialized tx fields";
     let out = s.sign_transaction(tx).unwrap();
     let expected_hash = sha512_half_prefixed(&STX_PREFIX, tx);
-    verify_secp256k1_der(&s.public_key_bytes(), &expected_hash, &out.signature);
+    verify_secp256k1_der(&s.public_key_bytes(), &expected_hash, &out.to_bytes());
 }
 
 #[test]
@@ -68,7 +69,7 @@ fn deterministic_signature() {
     let s = test_signer();
     let out1 = s.sign_transaction(b"same tx").unwrap();
     let out2 = s.sign_transaction(b"same tx").unwrap();
-    assert_eq!(out1.signature, out2.signature);
+    assert_eq!(out1.to_bytes(), out2.to_bytes());
 }
 
 #[test]
@@ -76,7 +77,7 @@ fn different_data_different_signature() {
     let s = test_signer();
     let out1 = s.sign_transaction(b"tx a").unwrap();
     let out2 = s.sign_transaction(b"tx b").unwrap();
-    assert_ne!(out1.signature, out2.signature);
+    assert_ne!(out1.to_bytes(), out2.to_bytes());
 }
 
 #[test]
@@ -91,11 +92,6 @@ fn from_bytes_roundtrip() {
     let bytes: [u8; 32] = hex::decode(TEST_KEY).unwrap().try_into().unwrap();
     let s = Signer::from_bytes(&bytes).unwrap();
     assert_eq!(s.public_key_bytes(), test_signer().public_key_bytes());
-}
-
-#[test]
-fn rejects_non_32_byte_hash() {
-    assert!(test_signer().sign_hash(b"short").is_err());
 }
 
 #[test]

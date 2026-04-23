@@ -8,7 +8,9 @@
     reason = "test module: panics are acceptable and assertions are self-describing"
 )]
 
-use super::{Sign, Signature, Signer};
+use signer_primitives::SignOutput;
+
+use super::{Sign, Signer};
 
 /// RFC 8032 Test Vector 1.
 const TEST_KEY: &str = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
@@ -34,7 +36,7 @@ fn address_is_base58_pubkey() {
 #[test]
 fn from_bytes_matches_from_hex() {
     let bytes: [u8; 32] = hex::decode(TEST_KEY).unwrap().try_into().unwrap();
-    let s1 = Signer::from_bytes(&bytes);
+    let s1 = Signer::from_bytes(&bytes).unwrap();
     assert_eq!(s1.address(), test_signer().address());
 }
 
@@ -52,33 +54,35 @@ fn sign_and_verify() {
     let s = test_signer();
     let msg = b"test message for solana";
     let sig = s.sign_raw(msg);
-    s.verify(msg, &sig).expect("signature must verify");
+    s.verify(msg, sig.to_bytes().as_slice())
+        .expect("signature must verify");
 }
 
 #[test]
 fn sign_wrong_message_fails() {
     let s = test_signer();
     let sig = s.sign_raw(b"correct");
-    assert!(s.verify(b"wrong", &sig).is_err());
+    assert!(s.verify(b"wrong", sig.to_bytes().as_slice()).is_err());
 }
 
 #[test]
 fn sign_trait_verify() {
     let s = test_signer();
     let out = Sign::sign_message(&s, b"hello").unwrap();
-    assert_eq!(out.signature.len(), 64);
-    assert!(out.recovery_id.is_none());
-    let sig = Signature::from_slice(&out.signature).unwrap();
-    s.verify(b"hello", &sig)
+    let sig_bytes = out.to_bytes();
+    assert_eq!(sig_bytes.len(), 64);
+    assert!(out.recovery_id().is_none());
+    s.verify(b"hello", &sig_bytes)
         .expect("trait signature must verify");
 }
 
 #[test]
 fn deterministic_signature() {
     let s = test_signer();
-    let out1 = Sign::sign_hash(&s, b"deterministic").unwrap();
-    let out2 = Sign::sign_hash(&s, b"deterministic").unwrap();
-    assert_eq!(out1.signature, out2.signature);
+    let digest = [0u8; 32];
+    let out1 = Sign::sign_hash(&s, &digest).unwrap();
+    let out2 = Sign::sign_hash(&s, &digest).unwrap();
+    assert_eq!(out1.to_bytes(), out2.to_bytes());
 }
 
 #[test]
@@ -108,6 +112,31 @@ fn encode_signed_transaction_splices_sig() {
 
     assert_eq!(&signed[1..65], &sig.to_bytes());
     assert_eq!(&signed[65..], msg);
+}
+
+#[test]
+fn sign_trait_encode_signed_transaction_requires_ed25519_variant() {
+    let s = test_signer();
+    let digest = [0u8; 32];
+    let out = Sign::sign_hash(&s, &digest).unwrap();
+    // Trait-level encode_signed_transaction accepts the unified SignOutput enum.
+    let mut tx = vec![1u8];
+    tx.extend_from_slice(&[0u8; 64]);
+    tx.extend_from_slice(b"body");
+    let encoded = Sign::encode_signed_transaction(&s, &tx, &out).unwrap();
+    assert_eq!(&encoded[1..65], &out.to_bytes());
+}
+
+#[test]
+fn sign_trait_encode_signed_transaction_rejects_non_ed25519() {
+    let s = test_signer();
+    let wrong = SignOutput::Ecdsa {
+        signature: [0u8; 64],
+        recovery_id: 0,
+    };
+    let mut tx = vec![1u8];
+    tx.extend_from_slice(&[0u8; 64]);
+    assert!(Sign::encode_signed_transaction(&s, &tx, &wrong).is_err());
 }
 
 #[test]

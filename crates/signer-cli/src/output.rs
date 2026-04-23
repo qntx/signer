@@ -112,15 +112,23 @@ impl SignBuilder {
         self
     }
 
-    /// Attach an optional hex-encoded public key produced by the signer.
-    pub fn public_key_opt_bytes(mut self, pk: Option<Vec<u8>>) -> Self {
-        self.public_key = pk.map(hex::encode);
-        self
-    }
-
     /// Attach the original human-readable message.
     pub fn message(mut self, msg: impl Into<String>) -> Self {
         self.message = Some(msg.into());
+        self
+    }
+
+    /// Populate signature / recovery id / public key from a [`signer_primitives::SignOutput`].
+    ///
+    /// Works for every variant; ECDSA emits the full 65-byte wire form,
+    /// Ed25519 emits 64 bytes, Schnorr / Ed25519-with-pubkey also propagate
+    /// the attached public key.
+    pub fn from_output(mut self, out: &signer_primitives::SignOutput) -> Self {
+        self.signature = out.to_hex();
+        self.recovery_id = out.recovery_id();
+        if let Some(pk) = out.public_key() {
+            self.public_key = Some(hex::encode(pk));
+        }
         self
     }
 

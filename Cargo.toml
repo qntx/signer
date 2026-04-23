@@ -13,26 +13,26 @@ default-members = ["crates/signer"]
 resolver = "3"
 
 [workspace.package]
-version = "0.8.0"
+version = "1.0.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/qntx/signer"
 description = "Lightweight multi-chain transaction signer."
 
 [workspace.dependencies]
-signer-primitives = { version = "0.8", path = "crates/signer-primitives", default-features = false }
-signer-btc = { version = "0.8", path = "crates/signer-btc", default-features = false }
-signer-evm = { version = "0.8", path = "crates/signer-evm", default-features = false }
-signer-svm = { version = "0.8", path = "crates/signer-svm", default-features = false }
-signer-cosmos = { version = "0.8", path = "crates/signer-cosmos", default-features = false }
-signer-tron = { version = "0.8", path = "crates/signer-tron", default-features = false }
-signer-spark = { version = "0.8", path = "crates/signer-spark", default-features = false }
-signer-fil = { version = "0.8", path = "crates/signer-fil", default-features = false }
-signer-ton = { version = "0.8", path = "crates/signer-ton", default-features = false }
-signer-sui = { version = "0.8", path = "crates/signer-sui", default-features = false }
-signer-xrpl = { version = "0.8", path = "crates/signer-xrpl", default-features = false }
-signer-aptos = { version = "0.8", path = "crates/signer-aptos", default-features = false }
-signer-nostr = { version = "0.8", path = "crates/signer-nostr", default-features = false }
+signer-primitives = { version = "1.0", path = "crates/signer-primitives", default-features = false }
+signer-btc = { version = "1.0", path = "crates/signer-btc", default-features = false }
+signer-evm = { version = "1.0", path = "crates/signer-evm", default-features = false }
+signer-svm = { version = "1.0", path = "crates/signer-svm", default-features = false }
+signer-cosmos = { version = "1.0", path = "crates/signer-cosmos", default-features = false }
+signer-tron = { version = "1.0", path = "crates/signer-tron", default-features = false }
+signer-spark = { version = "1.0", path = "crates/signer-spark", default-features = false }
+signer-fil = { version = "1.0", path = "crates/signer-fil", default-features = false }
+signer-ton = { version = "1.0", path = "crates/signer-ton", default-features = false }
+signer-sui = { version = "1.0", path = "crates/signer-sui", default-features = false }
+signer-xrpl = { version = "1.0", path = "crates/signer-xrpl", default-features = false }
+signer-aptos = { version = "1.0", path = "crates/signer-aptos", default-features = false }
+signer-nostr = { version = "1.0", path = "crates/signer-nostr", default-features = false }
 
 # Cryptography (versions aligned with kobe)
 k256 = { version = "0.13.4", default-features = false, features = ["ecdsa", "arithmetic"] }
@@ -60,21 +60,20 @@ getrandom = { version = "0.4", default-features = false }
 zeroize = { version = "1.8.2", default-features = false, features = ["derive"] }
 thiserror = { version = "2.0.18", default-features = false }
 
-# Kobe (optional bridge) — requires >= 0.8.2 for the zero-copy bytes accessors
-# used by `Signer::from_derived`.
-kobe-primitives = { version = "0.8.2", default-features = false, features = ["std"] }
-kobe-btc = { version = "0.8.2", default-features = false, features = ["std"] }
-kobe-evm = { version = "0.8.2", default-features = false, features = ["std"] }
-kobe-svm = { version = "0.8.2", default-features = false, features = ["std"] }
-kobe-cosmos = { version = "0.8.2", default-features = false, features = ["std"] }
-kobe-tron = { version = "0.8.2", default-features = false, features = ["std"] }
-kobe-spark = { version = "0.8.2", default-features = false, features = ["std"] }
-kobe-fil = { version = "0.8.2", default-features = false, features = ["std"] }
-kobe-ton = { version = "0.8.2", default-features = false, features = ["std"] }
-kobe-sui = { version = "0.8.2", default-features = false, features = ["std"] }
-kobe-xrpl = { version = "0.8.2", default-features = false, features = ["std"] }
-kobe-aptos = { version = "0.8.2", default-features = false, features = ["std"] }
-kobe-nostr = { version = "0.8.2", default-features = false, features = ["std"] }
+# Kobe (optional bridge) — same 1.0 release train, developed locally via path.
+kobe-primitives = { version = "1.0", path = "../kobe/crates/kobe-primitives", default-features = false, features = ["std"] }
+kobe-btc = { version = "1.0", path = "../kobe/crates/kobe-btc", default-features = false, features = ["std"] }
+kobe-evm = { version = "1.0", path = "../kobe/crates/kobe-evm", default-features = false, features = ["std"] }
+kobe-svm = { version = "1.0", path = "../kobe/crates/kobe-svm", default-features = false, features = ["std"] }
+kobe-cosmos = { version = "1.0", path = "../kobe/crates/kobe-cosmos", default-features = false, features = ["std"] }
+kobe-tron = { version = "1.0", path = "../kobe/crates/kobe-tron", default-features = false, features = ["std"] }
+kobe-spark = { version = "1.0", path = "../kobe/crates/kobe-spark", default-features = false, features = ["std"] }
+kobe-fil = { version = "1.0", path = "../kobe/crates/kobe-fil", default-features = false, features = ["std"] }
+kobe-ton = { version = "1.0", path = "../kobe/crates/kobe-ton", default-features = false, features = ["std"] }
+kobe-sui = { version = "1.0", path = "../kobe/crates/kobe-sui", default-features = false, features = ["std"] }
+kobe-xrpl = { version = "1.0", path = "../kobe/crates/kobe-xrpl", default-features = false, features = ["std"] }
+kobe-aptos = { version = "1.0", path = "../kobe/crates/kobe-aptos", default-features = false, features = ["std"] }
+kobe-nostr = { version = "1.0", path = "../kobe/crates/kobe-nostr", default-features = false, features = ["std"] }
 
 [profile.release]
 codegen-units = 1

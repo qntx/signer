@@ -42,7 +42,7 @@ fn address_is_blake2b_of_flagged_pubkey() {
 #[test]
 fn from_bytes_matches_from_hex() {
     let bytes: [u8; 32] = hex::decode(TEST_KEY).unwrap().try_into().unwrap();
-    let s = Signer::from_bytes(&bytes);
+    let s = Signer::from_bytes(&bytes).unwrap();
     assert_eq!(s.address(), test_signer().address());
 }
 
@@ -52,7 +52,8 @@ fn sign_transaction_intent_verify() {
     let tx = b"bcs transaction data";
     let sig = s.sign_transaction_intent(tx);
     let digest = intent_hash(TX_INTENT, tx);
-    s.verify(&digest, &sig).expect("intent digest must verify");
+    s.verify(&digest, sig.to_bytes().as_slice())
+        .expect("intent digest must verify");
 }
 
 #[test]
@@ -62,7 +63,7 @@ fn sign_message_bcs_intent_verify() {
     let sig = s.sign_message_intent(msg);
     let bcs = bcs_serialize_bytes(msg);
     let digest = intent_hash(MSG_INTENT, &bcs);
-    s.verify(&digest, &sig)
+    s.verify(&digest, sig.to_bytes().as_slice())
         .expect("personal msg digest must verify");
 }
 
@@ -82,8 +83,8 @@ fn encode_signature_wire_format() {
 fn sign_trait_includes_pubkey() {
     let s = test_signer();
     let out = Sign::sign_transaction(&s, b"tx").unwrap();
-    assert_eq!(out.signature.len(), 64);
-    let pk = out.public_key.as_ref().expect("must include pubkey");
+    assert_eq!(out.to_bytes().len(), 64);
+    let pk = out.public_key().expect("must include pubkey");
     assert_eq!(pk.len(), 32);
     assert_eq!(hex::encode(pk), TEST_PUBKEY);
 }
