@@ -5,7 +5,7 @@ use alloc::borrow::ToOwned;
 use alloc::collections::{BTreeMap, BTreeSet};
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
-use alloc::{format, string::String, vec::Vec};
+use alloc::{format, string::String, vec, vec::Vec};
 
 use sha3::{Digest, Keccak256};
 
@@ -262,7 +262,10 @@ fn encode_uint(ty: &str, bits_str: &str, value: &serde_json::Value) -> Result<[u
     let bytes_be = parse_uint_big_endian(value)?;
 
     // Strip superfluous leading zeros (hex input may be wider than `bits`).
-    let first_nonzero = bytes_be.iter().position(|&b| b != 0).unwrap_or(bytes_be.len());
+    let first_nonzero = bytes_be
+        .iter()
+        .position(|&b| b != 0)
+        .unwrap_or(bytes_be.len());
     let magnitude = &bytes_be[first_nonzero..];
     let byte_width = bits / 8;
 
@@ -435,7 +438,10 @@ fn parse_decimal_big_endian(s: &str) -> Result<Vec<u8>, SignError> {
         let mut carry = u16::from(digit);
         for limb in &mut limbs {
             let v = u16::from(*limb) * 10 + carry;
-            #[allow(clippy::cast_possible_truncation, reason = "low 8 bits by construction")]
+            #[allow(
+                clippy::cast_possible_truncation,
+                reason = "low 8 bits by construction"
+            )]
             {
                 *limb = v as u8;
             }
@@ -451,7 +457,10 @@ fn parse_decimal_big_endian(s: &str) -> Result<Vec<u8>, SignError> {
     }
     limbs.reverse();
     // Strip leading zeros but keep at least one byte.
-    let first_nonzero = limbs.iter().position(|&b| b != 0).unwrap_or(limbs.len() - 1);
+    let first_nonzero = limbs
+        .iter()
+        .position(|&b| b != 0)
+        .unwrap_or(limbs.len() - 1);
     Ok(limbs.get(first_nonzero..).unwrap_or(&[]).to_vec())
 }
 
@@ -586,7 +595,8 @@ mod tests {
         assert!(word[1..].iter().all(|&b| b == 0));
 
         // -(2^255 + 1) must overflow.
-        let under = "-57896044618658097711785492504343953926634992332820282019728792003956564819969";
+        let under =
+            "-57896044618658097711785492504343953926634992332820282019728792003956564819969";
         assert!(encode_int("int256", "256", &serde_json::json!(under)).is_err());
     }
 }

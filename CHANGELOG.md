@@ -2,6 +2,89 @@
 
 All notable changes to this workspace are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.0.0]
+
+Breaking release that splits off-chain message signing into a dedicated [`SignMessage`] capability trait, fixes long-standing correctness gaps in Bitcoin / Spark message signing, strictifies signature verification, and upgrades the [`Sign::Error`] bound to the standard `core::error::Error` contract. All chain crates ship a fallible `try_random` constructor; the panicking `random` is now a thin wrapper.
+
+### Fixed
+
+- **Bitcoin / Spark `sign_message` now emit BIP-137 headers.** `signer_btc::Signer::sign_message` and `signer_spark::Signer::sign_message` default to the compressed-P2PKH header byte (`v = 31 | 32`, i.e. `27 + recid + 4`). Previously the `v` byte was the raw recovery id (`0 | 1`), which Bitcoin Core's `verifymessage`, Electrum, and every BIP-137 verifier reject. See [BIP-137].
+- **EIP-712 `uintN` / `intN` now range-check the encoded value.** Passing `uint8 = 256` or `int8 = 128` silently truncated before; both are rejected now. Negative decimals are parsed with full `int256` precision (no more `u128` truncation at `|x| > 2^127`).
+- Cosmos `sign_message` previously produced a bare `SHA-256(message) + ECDSA` signature that no wallet in the Cosmos ecosystem can verify. The method has been removed; callers sign a canonical `StdSignDoc` (proto direct or amino JSON, including ADR-036) through `sign_transaction`.
+
+### Added
+
+- `signer_primitives::SignMessage` capability trait + `SignMessageExt` flat-bytes helper. Implemented by every chain with a documented off-chain scheme (EVM, BTC, Spark, Tron, Filecoin, SVM, Sui, TON, Aptos, Nostr). Not implemented by XRPL (no canonical spec) or Cosmos (ADR-036 is a separate `SignDoc` pipeline) — callers see the capability gap at the type level instead of a runtime `Err`.
+- `signer_btc::BitcoinMessageAddressType` enum + `signer_btc::Signer::sign_message_with` for choosing the BIP-137 header byte (P2PKH uncompressed / compressed / SegWit-P2SH / SegWit-Bech32).
+- `try_random` constructors on every primitive (`Secp256k1Signer`, `Ed25519Signer`, `SchnorrSigner`) and every chain `Signer`. Returns `Result<Self, SignError>` on entropy failure instead of panicking; the `delegate_*_ctors!` macros also expose `try_random` on the tuple newtypes.
+- `Secp256k1Signer::verify_prehash_recoverable(&[u8; 32], &[u8; 65])` and `verify_prehash_any(&[u8; 32], &[u8])` — the former strict, the latter a length-dispatching helper used by chain-level `verify_hash` wrappers.
+- `signer_svm::Signer::splice_signature(&[u8], &[u8; 64])` — low-level helper that powers `encode_signed_transaction`.
+
+### Changed
+
+- **`Sign` trait is now two methods: `sign_hash` + `sign_transaction`.** `sign_message` moved to the opt-in `SignMessage` trait; chains that implement it continue to expose `signer.sign_message(msg)` as before, but downstream code must import `SignMessage` (or use `signer::*`) to call it.
+- **`Sign::Error` now requires `core::error::Error`** (stable since Rust 1.81) on top of `From<SignError> + Send + Sync + 'static`. Implicit `Debug + Display` bounds are gone — they follow from `Error`. All workspace errors already satisfy the new bound because they use `thiserror`.
+- **`Secp256k1Signer::verify_prehash` is now strict 64-byte compact only.** For recoverable input use `verify_prehash_recoverable`; for either shape use the new `verify_prehash_any`. Chain-level `Signer::verify_hash(&[u8; 32], &[u8])` now dispatches through `verify_prehash_any` and therefore keeps accepting both wire shapes.
+- `signer_svm::Signer::encode_signed_transaction` now takes `&SignOutput` (matching `EncodeSignedTransaction`); callers that still want to splice a raw `ed25519_dalek::Signature` use `Signer::splice_signature` on its bytes.
+- `random()` on every primitive and chain `Signer` is now a thin panicking wrapper over `try_random()`. Semantics are unchanged for std consumers; embedded / WASM targets should prefer the fallible form.
+- `SignOutput::Ecdsa.v` docs expanded to cover every producer across the workspace (EVM EIP-191 `27|28`, Tron `27|28`, BTC / Spark BIP-137 `31|32`, all `sign_hash` / `sign_transaction` `0|1`).
+- `signer_cosmos` documents ADR-036 and points users at `sign_transaction(sign_doc_bytes)`.
+- CLI: `signer cosmos sign-message` removed. Build the ADR-036 `StdSignDoc` externally (or via `kobe cosmos`) and feed it to `signer cosmos sign-tx`.
+- Workspace bumped to `3.0.0`.
+
+### Removed
+
+- `Sign::sign_message` (moved to `SignMessage::sign_message`).
+- `SignExt::sign_message_bytes` (now on `SignMessageExt`).
+- `signer_cosmos::Signer::sign_message` and `signer_xrpl::Signer::sign_message` — both were runtime `Err` sentinels in spirit; with capability traits the gap is now compile-time.
+- `signer_svm::Signer::encode_signed_transaction(tx_bytes, &ed25519_dalek::Signature)` inherent signature — see `splice_signature` for the native-signature path.
+
+### Migration
+
+```rust
+// 2.x — sign_message on every chain, callable through `Sign`.
+use signer_evm::{Sign, Signer};
+let signer = Signer::from_hex(key)?;
+let out = signer.sign_message(b"hi")?;
+
+// 3.x — same call site, import SignMessage.
+use signer_evm::{SignMessage, Signer};           // or `use signer_evm::*;`
+let signer = Signer::from_hex(key)?;
+let out = signer.sign_message(b"hi")?;
+```
+
+```rust
+// 2.x — BTC sign_message returned v = 0 | 1 (raw parity), incompatible
+// with Bitcoin Core's verifymessage.
+let out = btc_signer.sign_message(b"hi")?;       // v ∈ {0, 1}
+
+// 3.x — v is now 31 | 32 (compressed P2PKH per BIP-137); call
+// `sign_message_with` to target a different address type.
+use signer_btc::{BitcoinMessageAddressType, SignMessage, Signer};
+let out = btc_signer.sign_message(b"hi")?;                             // 31 | 32
+let out = btc_signer.sign_message_with(BitcoinMessageAddressType::SegwitBech32, b"hi")?; // 39 | 40
+```
+
+```rust
+// 2.x — Cosmos sign_message was a bare SHA-256 + ECDSA with no wire format.
+let sig = cosmos_signer.sign_message(b"hello")?; // unusable
+
+// 3.x — build a canonical StdSignDoc (e.g. ADR-036) and feed it to sign_transaction.
+let sign_doc = build_adr036_sign_doc("cosmos1…", b"hello");
+let sig = cosmos_signer.sign_transaction(sign_doc.as_bytes())?;
+```
+
+```rust
+// 2.x — random() panicked on entropy failure.
+let s = Signer::random();
+
+// 3.x — try_random() surfaces the failure; random() still works for std code.
+let s = Signer::try_random()?;
+```
+
+[BIP-137]: https://github.com/bitcoin/bips/blob/master/bip-0137.mediawiki
+[`SignMessage`]: https://docs.rs/signer-primitives
+
 ## [2.0.0]
 
 Breaking release that tightens the API surface, fixes a signature-verification bug in XRPL, and removes more than 2000 lines of duplicated boilerplate across the thirteen chain crates.

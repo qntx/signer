@@ -75,8 +75,8 @@ The umbrella `signer` crate provides fine-grained feature control:
 
 | Hash | Library | Chains |
 | --- | --- | --- |
-| SHA-256 / SHA-512 | [sha2](https://docs.rs/sha2) 0.10 | BTC, Cosmos, Tron, Spark, Sui, XRPL, Nostr |
-| Keccak-256 / SHA3-256 | [sha3](https://docs.rs/sha3) 0.10 | EVM, Tron, Sui, Aptos |
+| SHA-256 / SHA-512 | [sha2](https://docs.rs/sha2) 0.11 | BTC, Cosmos, Tron, Spark, Sui, XRPL, Nostr |
+| Keccak-256 / SHA3-256 | [sha3](https://docs.rs/sha3) 0.11 | EVM, Tron, Sui, Aptos |
 | BLAKE2b-256 | [blake2](https://docs.rs/blake2) 0.10 | Filecoin, Sui |
 | bech32 (NIP-19) | [bech32](https://docs.rs/bech32) 0.11 | Cosmos, Nostr |
 
