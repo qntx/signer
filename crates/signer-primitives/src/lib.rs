@@ -1,8 +1,9 @@
 //! Unified signing trait and types for multi-chain transaction signers.
 //!
-//! This crate defines the [`Sign`] / [`Verify`] traits that every
-//! chain-specific signer crate implements, plus a discriminated [`SignOutput`]
-//! enum covering every wire format the workspace produces.
+//! This crate defines the [`Sign`] trait that every chain-specific signer
+//! crate implements, the blanket [`SignExt`] extension for flat-byte
+//! conversions, and a discriminated [`SignOutput`] enum covering every wire
+//! format the workspace produces.
 //!
 //! # Design
 //!
