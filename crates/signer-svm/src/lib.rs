@@ -151,16 +151,15 @@ impl Signer {
         tx_bytes: &[u8],
         signature: &SignOutput,
     ) -> Result<Vec<u8>, SignError> {
-        let sig_bytes = match *signature {
-            SignOutput::Ed25519(bytes)
-            | SignOutput::Ed25519WithPubkey {
-                signature: bytes, ..
-            } => bytes,
-            _ => {
-                return Err(SignError::invalid_signature(
-                    "expected Ed25519 signature output",
-                ));
-            }
+        let (SignOutput::Ed25519(sig_bytes)
+        | SignOutput::Ed25519WithPubkey {
+            signature: sig_bytes,
+            ..
+        }) = *signature
+        else {
+            return Err(SignError::invalid_signature(
+                "expected Ed25519 signature output",
+            ));
         };
         Self::splice_signature(tx_bytes, &sig_bytes)
     }
