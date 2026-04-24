@@ -17,10 +17,9 @@ kobe = ["dep:kobe-svm"]
 
 [dependencies]
 signer-primitives = { workspace = true, features = ["ed25519"] }
-ed25519-dalek.workspace = true
 bs58.workspace = true
+ed25519-dalek.workspace = true
 zeroize.workspace = true
-thiserror.workspace = true
 
 kobe-svm = { workspace = true, optional = true }
 

@@ -26,7 +26,7 @@
 
 use sha2::{Digest, Sha256};
 
-use super::{Sign, Signer};
+use super::Signer;
 
 /// 32-byte secp256k1 scalar — the same fixture every ECDSA chain uses.
 const PRIV_KEY_HEX: &str = "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318";
@@ -50,6 +50,49 @@ fn signer_fixture() -> Signer {
 #[test]
 fn address_bech32_cosmos_hrp_matches_noble_kat() {
     assert_eq!(signer_fixture().address(), ADDRESS);
+}
+
+/// `address_with_hrp("cosmos")` must agree byte-for-byte with the
+/// zero-arg [`Signer::address`] default. This catches any drift between
+/// the two entry points — they share the underlying hash160 payload and
+/// must route through the same bech32 encoder.
+#[test]
+fn address_with_hrp_cosmos_equals_default_address() {
+    let s = signer_fixture();
+    assert_eq!(s.address_with_hrp("cosmos").unwrap(), s.address());
+}
+
+/// `address_with_hrp` must accept every major Cosmos-SDK chain HRP and
+/// produce a structurally valid bech32 string (correct HRP prefix, same
+/// payload length as the default `cosmos1…` form). The payload after the
+/// HRP separator is always 39 characters for a 20-byte hash160 + 6-byte
+/// bech32 checksum, independent of the HRP.
+#[test]
+fn address_with_hrp_covers_major_cosmos_chains() {
+    let s = signer_fixture();
+    let default = s.address();
+    let default_payload_len = default.len() - "cosmos1".len();
+    for hrp in &["cosmos", "osmo", "juno", "terra", "secret", "kava"] {
+        let addr = s.address_with_hrp(hrp).unwrap();
+        let expected_prefix = alloc::format!("{hrp}1");
+        assert!(
+            addr.starts_with(&expected_prefix),
+            "{hrp}: address {addr} must start with `{expected_prefix}`",
+        );
+        assert_eq!(
+            addr.len() - expected_prefix.len(),
+            default_payload_len,
+            "{hrp}: payload length must match cosmos default (20-byte hash160 + 6-char checksum)",
+        );
+    }
+}
+
+/// `address_with_hrp` must reject an invalid HRP (empty string) rather
+/// than panicking — this is the fallibility contract that distinguishes
+/// it from the `"cosmos"`-defaulting [`Signer::address`].
+#[test]
+fn address_with_hrp_rejects_empty_hrp() {
+    assert!(signer_fixture().address_with_hrp("").is_err());
 }
 
 /// `sign_transaction` must frame `tx_bytes` as `SHA-256(tx_bytes)` and

@@ -14,9 +14,7 @@ use alloc::{format, string::String, vec::Vec};
 
 pub use ed25519_dalek::Signature;
 use sha3::Digest as _;
-pub use signer_primitives::{
-    self, Sign, SignError, SignExt, SignMessage, SignMessageExt, SignOutput,
-};
+pub use signer_primitives::{self, Sign, SignError, SignMessage, SignOutput};
 use signer_primitives::{Ed25519Signer, delegate_ed25519_ctors};
 
 /// Ed25519 single-key authentication scheme byte used by Aptos.
@@ -59,7 +57,8 @@ impl Signer {
     /// Sign arbitrary bytes with raw Ed25519 (no domain prefix).
     ///
     /// Returns the native [`Signature`]. For the unified
-    /// [`SignOutput::Ed25519WithPubkey`] wire form, use [`Sign::sign_message`].
+    /// [`SignOutput::Ed25519WithPubkey`] wire form, use
+    /// [`SignMessage::sign_message`].
     #[must_use]
     pub fn sign_raw(&self, message: &[u8]) -> Signature {
         self.0.sign_raw(message)
@@ -74,28 +73,42 @@ impl Signer {
     pub fn verify(&self, message: &[u8], signature: &[u8]) -> Result<(), SignError> {
         self.0.verify(message, signature)
     }
-}
-
-impl Sign for Signer {
-    type Error = SignError;
-
-    /// Sign a 32-byte digest with Ed25519 (no Aptos domain prefix).
-    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-        Ok(self.0.sign_output_with_pubkey(hash))
-    }
 
     /// Sign a BCS-serialized `RawTransaction`.
     ///
     /// Computes `SHA3-256("APTOS::RawTransaction")` as the 32-byte prefix,
-    /// then signs `prefix || bcs_raw_tx` with Ed25519.
-    fn sign_transaction(&self, bcs_raw_tx: &[u8]) -> Result<SignOutput, SignError> {
+    /// then signs `prefix || bcs_raw_tx` with Ed25519. Returns
+    /// [`SignOutput::Ed25519WithPubkey`].
+    ///
+    /// # Errors
+    ///
+    /// Infallible in practice; the [`Result`] is reserved for future
+    /// compatibility.
+    pub fn sign_transaction(&self, bcs_raw_tx: &[u8]) -> Result<SignOutput, SignError> {
         let signing_msg = tx_signing_message(bcs_raw_tx);
         Ok(self.0.sign_output_with_pubkey(&signing_msg))
     }
 }
 
+impl Sign for Signer {
+    type Error = SignError;
+
+    /// Sign a 32-byte value with raw Ed25519 (no Aptos domain prefix).
+    ///
+    /// ⚠️ **WARNING**: the resulting signature is **NOT on-chain verifiable**
+    /// on Aptos. Aptos's signing message requires the SHA3-256 domain prefix
+    /// `SHA3-256("APTOS::RawTransaction") || bcs_raw_tx`. For on-chain
+    /// correctness use [`Signer::sign_transaction`]; `sign_hash` is exposed
+    /// only as a low-level off-chain primitive.
+    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
+        Ok(self.0.sign_output_with_pubkey(hash))
+    }
+}
+
 impl SignMessage for Signer {
-    /// Sign an arbitrary message with raw Ed25519 (no Aptos domain prefix).
+    /// **Framing**: raw Ed25519 over the message bytes — no Aptos domain
+    /// prefix. Aptos has no canonical off-chain message envelope; callers
+    /// should construct chain-specific preimages themselves if needed.
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         Ok(self.0.sign_output_with_pubkey(message))
     }

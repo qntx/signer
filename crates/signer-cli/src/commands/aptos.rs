@@ -1,7 +1,7 @@
 //! Aptos signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_aptos::{Sign, SignMessage, Signer};
+use signer_aptos::{SignMessage, Signer};
 
 use super::parse_hex;
 use crate::output::{self, CliResult};
@@ -53,7 +53,7 @@ impl AptosCommand {
             }
             AptosSubcommand::SignTx { key, tx } => {
                 let signer = Signer::from_hex(&key)?;
-                let out = Sign::sign_transaction(&signer, &parse_hex(&tx)?)?;
+                let out = signer.sign_transaction(&parse_hex(&tx)?)?;
                 output::sign(CHAIN, "transaction")
                     .address(signer.address())
                     .from_output(&out)

@@ -98,12 +98,12 @@ fn keypair_base58_round_trip_preserves_identity() {
 fn from_keypair_base58_rejects_invalid_inputs() {
     assert!(matches!(
         Signer::from_keypair_base58("invalid!!!"),
-        Err(SignError::InvalidKeypair(_))
+        Err(SignError::InvalidKey(_))
     ));
     // Valid Base58 but wrong length (< 64 bytes decoded).
     assert!(matches!(
         Signer::from_keypair_base58("3J98t1"),
-        Err(SignError::InvalidKeypair(_))
+        Err(SignError::InvalidKey(_))
     ));
 }
 
@@ -120,7 +120,7 @@ fn extract_signable_bytes_strips_compact_u16_header_and_signature_slots() {
 
     assert!(matches!(
         Signer::extract_signable_bytes(&[]),
-        Err(SignError::Core(_))
+        Err(SignError::InvalidTransaction(_))
     ));
 }
 
@@ -159,6 +159,6 @@ fn encode_signed_transaction_rejects_non_ed25519_variant() {
     };
     assert!(matches!(
         EncodeSignedTransaction::encode_signed_transaction(&s, &tx, &wrong),
-        Err(SignError::Core(_))
+        Err(SignError::InvalidSignature(_))
     ));
 }

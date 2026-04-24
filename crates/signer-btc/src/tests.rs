@@ -30,7 +30,7 @@ use k256::ecdsa::{RecoveryId, Signature as K256Sig, VerifyingKey};
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha256};
 
-use super::{BitcoinMessageAddressType, Sign, SignMessage, Signer};
+use super::{BitcoinMessageAddressType, SignMessage, Signer};
 
 const PRIV_KEY_HEX: &str = "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318";
 const TX_HEX: &str = "deadbeef00010203";

@@ -35,13 +35,9 @@ use alloc::vec::Vec;
 
 use bech32::{Bech32, Hrp};
 use sha2::{Digest as _, Sha256};
-pub use signer_primitives::{self, Sign, SignExt, SignMessage, SignMessageExt, SignOutput};
+pub use signer_primitives::{self, Sign, SignError, SignMessage, SignOutput};
 use signer_primitives::{SchnorrSigner, delegate_schnorr_ctors};
 use zeroize::Zeroizing;
-
-mod error;
-
-pub use error::SignError;
 
 /// NIP-19 human-readable part for private keys.
 pub const NSEC_HRP: &str = "nsec";
@@ -57,15 +53,15 @@ pub const NOTE_HRP: &str = "note";
 pub struct Signer(SchnorrSigner);
 
 impl Signer {
-    delegate_schnorr_ctors!(SignError);
+    delegate_schnorr_ctors!();
 
     /// Create from a NIP-19 `nsec1…` bech32-encoded private key.
     ///
     /// # Errors
     ///
-    /// Returns [`SignError::Bech32`] if the string is malformed or has the
-    /// wrong human-readable part, or a core [`SignError::Core`] if the decoded
-    /// bytes are not a valid secp256k1 scalar.
+    /// Returns [`SignError::InvalidKey`] if the string is malformed, has the
+    /// wrong human-readable part, or decodes to bytes that are not a valid
+    /// secp256k1 scalar.
     pub fn from_nsec(nsec: &str) -> Result<Self, SignError> {
         let bytes = decode_bech32_32(nsec, NSEC_HRP)?;
         Self::from_bytes(&bytes)
@@ -111,9 +107,25 @@ impl Signer {
     ///
     /// # Errors
     ///
-    /// Returns [`SignError::Core`] on verification failure.
+    /// Returns [`SignError::InvalidSignature`] on verification failure.
     pub fn verify(&self, message: &[u8], signature: &[u8]) -> Result<(), SignError> {
-        self.0.verify(message, signature).map_err(Into::into)
+        self.0.verify(message, signature)
+    }
+
+    /// Sign a serialized NIP-01 event: computes SHA-256 then Schnorr-signs.
+    ///
+    /// `serialized_event` is the UTF-8 JSON-serialized form of
+    /// `[0, pubkey, created_at, kind, tags, content]` as specified in
+    /// NIP-01. The returned 64-byte Schnorr signature is valid for the
+    /// event whose id equals `sha256(serialized_event)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SignError::SigningFailed`] if the underlying Schnorr
+    /// primitive fails (practically unreachable for well-formed inputs).
+    pub fn sign_transaction(&self, serialized_event: &[u8]) -> Result<SignOutput, SignError> {
+        let event_id: [u8; 32] = Sha256::digest(serialized_event).into();
+        self.sign_hash(&event_id)
     }
 }
 
@@ -129,42 +141,26 @@ impl Sign for Signer {
     /// Returns a 64-byte BIP-340 Schnorr signature with the signer's x-only
     /// public key attached.
     fn sign_hash(&self, event_id: &[u8; 32]) -> Result<SignOutput, SignError> {
-        self.0.sign_prehash(event_id).map_err(Into::into)
-    }
-
-    /// Sign a serialized NIP-01 event: computes SHA-256 then Schnorr-signs.
-    ///
-    /// `serialized_event` is the UTF-8 JSON-serialized form of
-    /// `[0, pubkey, created_at, kind, tags, content]` as specified in
-    /// NIP-01. The returned 64-byte signature is valid for the event whose
-    /// id equals `sha256(serialized_event)`.
-    fn sign_transaction(&self, serialized_event: &[u8]) -> Result<SignOutput, SignError> {
-        let event_id: [u8; 32] = Sha256::digest(serialized_event).into();
-        self.sign_hash(&event_id)
+        self.0.sign_prehash(event_id)
     }
 }
 
 impl SignMessage for Signer {
-    /// Sign arbitrary bytes with BIP-340 Schnorr (deterministic).
-    ///
-    /// # Semantic warning
-    ///
-    /// Unlike EVM (`EIP-191`), Bitcoin (`Bitcoin Signed Message`), or Tron
-    /// (`\x19TRON Signed Message:\n`) flavours, **Nostr has no canonical
-    /// "signed message" standard**. This method passes `message` straight
-    /// into BIP-340 Schnorr **without prefixing or hashing**.
+    /// **Framing**: raw BIP-340 Schnorr over the message bytes — no prefix,
+    /// no hashing. Nostr has no canonical "signed message" envelope (unlike
+    /// EIP-191 / BIP-137 / TRON prefix).
     ///
     /// For on-protocol Nostr events, always prefer:
     ///
     /// - [`Sign::sign_hash`] with the NIP-01 `event.id`
     ///   (32-byte SHA-256 of the canonical serialization), or
-    /// - [`Sign::sign_transaction`] with the serialized event JSON — it
+    /// - [`Signer::sign_transaction`] with the serialized event JSON — it
     ///   computes `sha256(event)` for you.
     ///
     /// Use this method only for bespoke off-protocol challenges where both
     /// signer and verifier agree on the exact input bytes.
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        self.0.sign(message).map_err(Into::into)
+        self.0.sign(message)
     }
 }
 
@@ -177,8 +173,8 @@ impl Signer {
     ///
     /// # Errors
     ///
-    /// Returns [`SignError::Core`] if the derived bytes are not a valid
-    /// secp256k1 scalar.
+    /// Returns [`SignError::InvalidKey`] if the derived bytes are not a
+    /// valid secp256k1 scalar.
     pub fn from_derived(account: &kobe_nostr::DerivedAccount) -> Result<Self, SignError> {
         Self::from_bytes(account.private_key_bytes())
     }
@@ -196,15 +192,19 @@ fn encode_bech32(hrp: &str, data: &[u8]) -> String {
 }
 
 fn decode_bech32_32(s: &str, expected_hrp: &str) -> Result<[u8; 32], SignError> {
-    let (hrp, data) = bech32::decode(s).map_err(|e| SignError::Bech32(alloc::format!("{e}")))?;
+    let (hrp, data) = bech32::decode(s)
+        .map_err(|e| SignError::InvalidKey(alloc::format!("nip-19 bech32: {e}")))?;
     if hrp.as_str() != expected_hrp {
-        return Err(SignError::Bech32(alloc::format!(
-            "expected HRP `{expected_hrp}`, got `{}`",
+        return Err(SignError::InvalidKey(alloc::format!(
+            "nip-19 bech32: expected HRP `{expected_hrp}`, got `{}`",
             hrp.as_str()
         )));
     }
     data.try_into().map_err(|v: Vec<u8>| {
-        SignError::Bech32(alloc::format!("expected 32 bytes, got {}", v.len()))
+        SignError::InvalidKey(alloc::format!(
+            "nip-19 bech32: expected 32 bytes, got {}",
+            v.len()
+        ))
     })
 }
 

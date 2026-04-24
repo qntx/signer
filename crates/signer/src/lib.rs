@@ -34,7 +34,21 @@ pub use signer_fil as fil;
 #[cfg(feature = "nostr")]
 pub use signer_nostr as nostr;
 pub use signer_primitives as primitives;
-pub use signer_primitives::{Sign, SignError, SignExt, SignMessage, SignMessageExt, SignOutput};
+pub use signer_primitives::{
+    EncodeSignedTransaction, ExtractSignableBytes, Sign, SignError, SignMessage, SignOutput,
+};
+
+/// Prelude that imports every capability trait plus [`SignOutput`] and
+/// [`SignError`] in one glob.
+///
+/// ```rust,no_run
+/// use signer::prelude::*;
+/// ```
+pub mod prelude {
+    pub use signer_primitives::{
+        EncodeSignedTransaction, ExtractSignableBytes, Sign, SignError, SignMessage, SignOutput,
+    };
+}
 #[cfg(feature = "spark")]
 pub use signer_spark as spark;
 #[cfg(feature = "sui")]

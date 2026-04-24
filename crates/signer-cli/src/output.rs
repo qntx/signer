@@ -21,6 +21,10 @@ pub struct SignOutput {
     pub operation: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub address: Option<String>,
+    /// Signer identity (used by TON, whose on-chain address requires extra
+    /// wallet-contract context and is therefore not produced by this crate).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub identity: Option<String>,
     pub signature: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub v: Option<u8>,
@@ -37,6 +41,9 @@ pub struct AddressOutput {
     pub chain: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub address: Option<String>,
+    /// Signer identity (see [`SignOutput::identity`]).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub identity: Option<String>,
     pub public_key: String,
 }
 
@@ -52,6 +59,7 @@ pub const fn sign(chain: &'static str, operation: &'static str) -> SignBuilder {
         chain,
         operation,
         address: None,
+        identity: None,
         signature: String::new(),
         v: None,
         public_key: None,
@@ -64,6 +72,7 @@ pub fn address(chain: &'static str, public_key_bytes: &[u8]) -> AddressBuilder {
     AddressBuilder {
         chain,
         address: None,
+        identity: None,
         public_key: hex::encode(public_key_bytes),
     }
 }
@@ -75,6 +84,7 @@ pub struct SignBuilder {
     chain: &'static str,
     operation: &'static str,
     address: Option<String>,
+    identity: Option<String>,
     signature: String,
     v: Option<u8>,
     public_key: Option<String>,
@@ -85,6 +95,13 @@ impl SignBuilder {
     /// Attach the signer's chain-native address.
     pub fn address(mut self, addr: impl Into<String>) -> Self {
         self.address = Some(addr.into());
+        self
+    }
+
+    /// Attach the signer identity (used by TON, where a full wallet address
+    /// is not derivable from the key alone).
+    pub fn identity(mut self, id: impl Into<String>) -> Self {
+        self.identity = Some(id.into());
         self
     }
 
@@ -131,6 +148,7 @@ impl SignBuilder {
             chain: self.chain,
             operation: self.operation,
             address: self.address,
+            identity: self.identity,
             signature: self.signature,
             v: self.v,
             public_key: self.public_key,
@@ -146,6 +164,7 @@ impl SignBuilder {
 pub struct AddressBuilder {
     chain: &'static str,
     address: Option<String>,
+    identity: Option<String>,
     public_key: String,
 }
 
@@ -153,6 +172,12 @@ impl AddressBuilder {
     /// Attach the signer's chain-native address.
     pub fn address(mut self, addr: impl Into<String>) -> Self {
         self.address = Some(addr.into());
+        self
+    }
+
+    /// Attach the signer identity (TON).
+    pub fn identity(mut self, id: impl Into<String>) -> Self {
+        self.identity = Some(id.into());
         self
     }
 
@@ -165,6 +190,7 @@ impl AddressBuilder {
         let out = AddressOutput {
             chain: self.chain,
             address: self.address,
+            identity: self.identity,
             public_key: self.public_key,
         };
         render_address(&out, json)
@@ -180,6 +206,9 @@ fn render_sign(out: &SignOutput, json: bool) -> CliResult {
     println!("      {}   {}", "Operation".cyan().bold(), out.operation);
     if let Some(ref addr) = out.address {
         println!("      {}     {}", "Address".cyan().bold(), addr.green());
+    }
+    if let Some(ref id) = out.identity {
+        println!("      {}    {}", "Identity".cyan().bold(), id.green());
     }
     if let Some(ref msg) = out.message {
         println!("      {}     {}", "Message".cyan().bold(), msg.dimmed());
@@ -203,6 +232,9 @@ fn render_address(out: &AddressOutput, json: bool) -> CliResult {
     println!("      {}       {}", "Chain".cyan().bold(), out.chain);
     if let Some(ref addr) = out.address {
         println!("      {}     {}", "Address".cyan().bold(), addr.green());
+    }
+    if let Some(ref id) = out.identity {
+        println!("      {}    {}", "Identity".cyan().bold(), id.green());
     }
     println!("      {}  {}", "Public Key".cyan().bold(), out.public_key);
     println!();

@@ -26,7 +26,7 @@ use k256::ecdsa::{RecoveryId, Signature as K256Sig, VerifyingKey};
 use sha2::Sha256;
 use sha3::{Digest, Keccak256};
 
-use super::{Sign, SignMessage, Signer};
+use super::{SignMessage, Signer};
 
 const PRIV_KEY_HEX: &str = "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318";
 const TX_HEX: &str = "deadbeef00010203";

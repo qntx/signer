@@ -1,12 +1,12 @@
 //! Solana signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_svm::{Sign, SignMessage, Signer};
+use signer_svm::{SignMessage, Signer};
 
 use super::parse_hex;
 use crate::output::{self, CliResult};
 
-const CHAIN: &str = "solana";
+const CHAIN: &str = "svm";
 
 /// Solana signing operations.
 #[derive(Args)]

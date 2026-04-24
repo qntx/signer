@@ -26,7 +26,7 @@
     reason = "test module: panics are acceptable and assertions self-describe"
 )]
 
-use super::{Sign, SignMessage, Signer};
+use super::{SignMessage, Signer};
 
 /// RFC 8032 Test Vector 1.
 const PRIV_KEY_HEX: &str = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";

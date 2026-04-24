@@ -8,7 +8,7 @@
 //! the input bytes**, leaving the preimage construction to callers.
 //!
 //! Consequently this file has only one chain-specific invariant to pin:
-//! `Signer::address` is the **hex-encoded public key**, not a full
+//! `Signer::identity` is the **hex-encoded public key**, not a full
 //! wallet address (which depends on contract code and workchain ID).
 //! Ed25519 determinism for every entry point is already covered by the
 //! RFC 8032 TV1/TV2/TV3 suite in `signer_primitives::tests`; we only
@@ -32,14 +32,16 @@ fn signer_fixture() -> Signer {
     Signer::from_hex(PRIV_KEY_HEX).unwrap()
 }
 
-/// `Signer::address()` returns the hex public key. The full TON wallet
+/// `Signer::identity()` returns the hex public key. The full TON wallet
 /// address (`user-friendly` or `raw`) depends on the wallet contract
-/// version and workchain ID, both of which live above this crate.
+/// version and workchain ID, both of which live above this crate, so the
+/// signer exposes `identity` (public-key hex) instead of `address` to
+/// avoid a method-name lie.
 #[test]
-fn address_is_hex_public_key() {
+fn identity_is_hex_public_key() {
     let s = signer_fixture();
     assert_eq!(s.public_key_hex(), PUBKEY_HEX);
-    assert_eq!(s.address(), PUBKEY_HEX);
+    assert_eq!(s.identity(), PUBKEY_HEX);
 }
 
 /// Every sign entry point on TON delegates to raw Ed25519. Rather than

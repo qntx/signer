@@ -11,7 +11,7 @@
 //! - **Wire signing**: `DER_ECDSA(SHA-512-half(STX\0 || tx_bytes))`.
 //!   The `STX\0` (`0x53545800`) prefix is lifted verbatim from rippled's
 //!   `HashPrefix::txSign` (see `include/xrpl/protocol/HashPrefix.h`).
-//! - **Verify round-trip**: `verify_hash` must accept the DER signature
+//! - **Verify round-trip**: `verify_hash_der` must accept the DER signature
 //!   against the SHA-512-half digest.
 //! - **Capability absence**: no `SignMessage` impl — the ledger has no
 //!   canonical off-chain scheme.
@@ -25,7 +25,7 @@
 
 use sha2::{Digest, Sha512};
 
-use super::{Sign, SignError, Signer};
+use super::{SignError, Signer};
 
 const PRIV_KEY_HEX: &str = "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318";
 const TX_HEX: &str = "deadbeef00010203";
@@ -88,14 +88,14 @@ fn sign_transaction_verify_hash_der_roundtrip() {
     digest.copy_from_slice(&full[..32]);
 
     let out = signer.sign_transaction(&tx).unwrap();
-    signer.verify_hash(&digest, &out.to_bytes()).unwrap();
+    signer.verify_hash_der(&digest, &out.to_bytes()).unwrap();
 
     // A single flipped DER byte inside the `r` or `s` integer must break
     // verification. The first two bytes are the `30 <len>` SEQUENCE
     // framing, so we mutate byte 5 (inside the `r` integer body).
     let mut tampered = out.to_bytes();
     tampered[5] ^= 0x01;
-    assert!(signer.verify_hash(&digest, &tampered).is_err());
+    assert!(signer.verify_hash_der(&digest, &tampered).is_err());
 }
 
 /// Empty tx is a wire-level error — XRPL can't sign nothing.

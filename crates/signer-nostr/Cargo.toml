@@ -18,10 +18,9 @@ kobe = ["dep:kobe-nostr"]
 
 [dependencies]
 signer-primitives = { workspace = true, features = ["schnorr"] }
-sha2.workspace = true
 bech32.workspace = true
+sha2.workspace = true
 zeroize.workspace = true
-thiserror.workspace = true
 
 kobe-nostr = { workspace = true, optional = true }
 

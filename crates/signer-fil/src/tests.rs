@@ -25,7 +25,7 @@
 
 use blake2::{Blake2b, Digest, digest::consts::U32};
 
-use super::{Sign, SignMessage, Signer};
+use super::{SignMessage, Signer};
 
 type Blake2b256 = Blake2b<U32>;
 

@@ -17,7 +17,10 @@
 //! ## Message signing
 //!
 //! XRPL has no canonical off-chain message signing standard (no EIP-191
-//! equivalent). [`Sign::sign_message`] returns an error.
+//! equivalent), so this crate deliberately does **not** implement
+//! [`SignMessage`](signer_primitives::SignMessage). Users who need a custom
+//! scheme should hash their own preimage and call [`Sign::sign_hash`]
+//! directly.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -27,7 +30,7 @@ use alloc::{string::String, vec::Vec};
 
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha256, Sha512};
-pub use signer_primitives::{self, Sign, SignError, SignExt, SignOutput};
+pub use signer_primitives::{self, Sign, SignError, SignOutput};
 use signer_primitives::{Secp256k1Signer, delegate_secp256k1_ctors};
 
 /// XRPL single-signing hash prefix: `STX\0` (`0x53545800`).
@@ -67,15 +70,44 @@ impl Signer {
     /// digest.
     ///
     /// Matches the DER output of [`Sign::sign_hash`] and
-    /// [`Sign::sign_transaction`]. Callers that produced a signature via this
-    /// signer can round-trip it through `verify_hash` unchanged.
+    /// [`Signer::sign_transaction`]. Callers that produced a signature via
+    /// this signer can round-trip it through `verify_hash_der` unchanged.
+    ///
+    /// This method is named `verify_hash_der` (rather than `verify_hash`) to
+    /// distinguish it from the compact-signature `verify_hash` on other
+    /// secp256k1 chains: XRPL's on-wire format is DER, so the expected
+    /// signature input here is always DER-encoded.
     ///
     /// # Errors
     ///
     /// Returns [`SignError::InvalidSignature`] on malformed DER or failed
     /// verification.
-    pub fn verify_hash(&self, hash: &[u8; 32], signature_der: &[u8]) -> Result<(), SignError> {
+    pub fn verify_hash_der(&self, hash: &[u8; 32], signature_der: &[u8]) -> Result<(), SignError> {
         self.0.verify_prehash_der(hash, signature_der)
+    }
+
+    /// Sign an unsigned XRPL transaction.
+    ///
+    /// `tx_bytes` must be the raw binary-encoded unsigned transaction fields
+    /// (output of the XRPL binary codec, **without** the `STX\0` prefix).
+    /// This method prepends `STX\0`, computes SHA-512-half, then signs with
+    /// secp256k1 ECDSA DER.
+    ///
+    /// Returns a [`SignOutput::EcdsaDer`] (variable length, typically 70–72
+    /// bytes).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SignError::InvalidTransaction`] if `tx_bytes` is empty, or
+    /// propagates signing failures from the underlying primitive.
+    pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
+        if tx_bytes.is_empty() {
+            return Err(SignError::InvalidTransaction(
+                "transaction bytes must not be empty".into(),
+            ));
+        }
+        let hash = sha512_half_prefixed(&STX_PREFIX, tx_bytes);
+        self.0.sign_prehash_der(&hash)
     }
 }
 
@@ -88,22 +120,6 @@ impl Sign for Signer {
     /// bytes). Recovery id is not included — XRPL does not use it.
     fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
         self.0.sign_prehash_der(hash)
-    }
-
-    /// Sign an unsigned XRPL transaction.
-    ///
-    /// `tx_bytes` must be the raw binary-encoded unsigned transaction fields
-    /// (output of the XRPL binary codec, **without** the `STX\0` prefix).
-    ///
-    /// This method prepends `STX\0`, computes SHA-512-half, then signs.
-    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
-        if tx_bytes.is_empty() {
-            return Err(SignError::InvalidTransaction(
-                "transaction bytes must not be empty".into(),
-            ));
-        }
-        let hash = sha512_half_prefixed(&STX_PREFIX, tx_bytes);
-        self.0.sign_prehash_der(&hash)
     }
 }
 

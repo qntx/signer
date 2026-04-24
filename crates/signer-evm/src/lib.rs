@@ -26,8 +26,7 @@ mod rlp;
 
 use sha3::{Digest, Keccak256};
 pub use signer_primitives::{
-    self, EncodeSignedTransaction, Sign, SignError, SignExt, SignMessage, SignMessageExt,
-    SignOutput,
+    self, EncodeSignedTransaction, Sign, SignError, SignMessage, SignOutput,
 };
 use signer_primitives::{Secp256k1Signer, delegate_secp256k1_ctors};
 
@@ -77,6 +76,21 @@ impl Signer {
         self.0.verify_prehash_any(hash, signature)
     }
 
+    /// Sign an unsigned EIP-1559 / EIP-2930 typed transaction.
+    ///
+    /// Hashes the input with Keccak-256 and signs the digest. Returns a
+    /// [`SignOutput::Ecdsa`] with the **raw** `v` byte (`0 | 1`) — do **not**
+    /// add 27 when feeding the result into
+    /// [`Signer::encode_signed_transaction`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if signing fails.
+    pub fn sign_transaction(&self, unsigned_tx: &[u8]) -> Result<SignOutput, SignError> {
+        let digest: [u8; 32] = Keccak256::digest(unsigned_tx).into();
+        self.0.sign_prehash_recoverable(&digest)
+    }
+
     /// Sign EIP-712 typed structured data (JSON input). Returns a
     /// [`SignOutput::Ecdsa`] with `v = 27 | 28`.
     ///
@@ -85,13 +99,13 @@ impl Signer {
     /// Returns an error if the JSON is malformed or signing fails.
     pub fn sign_typed_data(&self, typed_data_json: &str) -> Result<SignOutput, SignError> {
         let digest = eip712::hash_typed_data_json(typed_data_json)?;
-        Ok(bump_v_by_27(self.0.sign_prehash_recoverable(&digest)?))
+        Ok(self.0.sign_prehash_recoverable(&digest)?.with_v_offset(27))
     }
 
     /// Encode a signed typed transaction: `type || RLP([…fields, v, r, s])`.
     ///
     /// `signature` must be a [`SignOutput::Ecdsa`] produced by
-    /// [`sign_transaction`](Sign::sign_transaction) (with raw `v = 0 | 1`).
+    /// [`sign_transaction`](Self::sign_transaction) (with raw `v = 0 | 1`).
     ///
     /// Also available via the [`EncodeSignedTransaction`] trait.
     ///
@@ -122,28 +136,20 @@ impl Sign for Signer {
     fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
         self.0.sign_prehash_recoverable(hash)
     }
-
-    /// Sign an unsigned typed transaction (EIP-1559 / EIP-2930).
-    ///
-    /// Returns a [`SignOutput::Ecdsa`] with the **raw** `v` byte (`0 | 1`) —
-    /// do **not** add 27 when feeding the result into
-    /// [`Signer::encode_signed_transaction`].
-    fn sign_transaction(&self, unsigned_tx: &[u8]) -> Result<SignOutput, SignError> {
-        let digest: [u8; 32] = Keccak256::digest(unsigned_tx).into();
-        self.0.sign_prehash_recoverable(&digest)
-    }
 }
 
 impl SignMessage for Signer {
-    /// EIP-191 `personal_sign`. Returns a [`SignOutput::Ecdsa`] with
-    /// `v = 27 | 28`.
+    /// **Framing**: EIP-191 `personal_sign` — Keccak-256 of
+    /// `"\x19Ethereum Signed Message:\n{len}"` concatenated with the message.
+    ///
+    /// Returns a [`SignOutput::Ecdsa`] with `v = 27 | 28`.
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         let prefix = format!("\x19Ethereum Signed Message:\n{}", message.len());
         let mut data = Vec::with_capacity(prefix.len() + message.len());
         data.extend_from_slice(prefix.as_bytes());
         data.extend_from_slice(message);
         let digest: [u8; 32] = Keccak256::digest(&data).into();
-        Ok(bump_v_by_27(self.0.sign_prehash_recoverable(&digest)?))
+        Ok(self.0.sign_prehash_recoverable(&digest)?.with_v_offset(27))
     }
 }
 
@@ -166,17 +172,6 @@ impl Signer {
     /// Returns an error if the private key is invalid.
     pub fn from_derived(account: &kobe_evm::DerivedAccount) -> Result<Self, SignError> {
         Self::from_bytes(account.private_key_bytes())
-    }
-}
-
-/// Bump the `v` byte of an [`SignOutput::Ecdsa`] by 27 (EIP-191 encoding).
-fn bump_v_by_27(out: SignOutput) -> SignOutput {
-    match out {
-        SignOutput::Ecdsa { signature, v } => SignOutput::Ecdsa {
-            signature,
-            v: v.wrapping_add(27),
-        },
-        other => other,
     }
 }
 

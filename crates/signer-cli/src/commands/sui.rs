@@ -1,7 +1,7 @@
 //! Sui signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_sui::{Sign, SignMessage, Signer};
+use signer_sui::{SignMessage, Signer};
 
 use super::parse_hex;
 use crate::output::{self, CliResult};
@@ -52,7 +52,7 @@ impl SuiCommand {
             }
             SuiSubcommand::SignTx { key, tx } => {
                 let signer = Signer::from_hex(&key)?;
-                let out = Sign::sign_transaction(&signer, &parse_hex(&tx)?)?;
+                let out = signer.sign_transaction(&parse_hex(&tx)?)?;
                 output::sign(CHAIN, "transaction (intent digest)")
                     .address(signer.address())
                     .from_output(&out)

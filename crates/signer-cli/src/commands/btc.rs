@@ -6,7 +6,7 @@ use signer_btc::{Sign, SignMessage, Signer};
 use super::{parse_hex, parse_hex32};
 use crate::output::{self, CliResult};
 
-const CHAIN: &str = "bitcoin";
+const CHAIN: &str = "btc";
 
 /// Bitcoin signing operations.
 #[derive(Args)]

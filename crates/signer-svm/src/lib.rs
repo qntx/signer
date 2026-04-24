@@ -8,17 +8,11 @@
 
 extern crate alloc;
 
-#[cfg(not(feature = "std"))]
-use alloc::string::ToString;
 use alloc::{format, string::String, vec::Vec};
 
-mod error;
-
 pub use ed25519_dalek::Signature;
-pub use error::SignError;
 pub use signer_primitives::{
-    self, EncodeSignedTransaction, ExtractSignableBytes, Sign, SignExt, SignMessage,
-    SignMessageExt, SignOutput,
+    self, EncodeSignedTransaction, ExtractSignableBytes, Sign, SignError, SignMessage, SignOutput,
 };
 use signer_primitives::{Ed25519Signer, delegate_ed25519_ctors};
 use zeroize::Zeroizing;
@@ -31,7 +25,7 @@ use zeroize::Zeroizing;
 pub struct Signer(Ed25519Signer);
 
 impl Signer {
-    delegate_ed25519_ctors!(SignError);
+    delegate_ed25519_ctors!();
 
     /// Create from a Base58-encoded keypair (64 bytes: secret || public).
     ///
@@ -39,7 +33,7 @@ impl Signer {
     ///
     /// # Errors
     ///
-    /// Returns [`SignError::InvalidKeypair`] if the Base58 is invalid or the
+    /// Returns [`SignError::InvalidKey`] if the Base58 is invalid or the
     /// decoded length is not 64 bytes.
     #[allow(
         clippy::indexing_slicing,
@@ -48,10 +42,10 @@ impl Signer {
     pub fn from_keypair_base58(b58: &str) -> Result<Self, SignError> {
         let decoded = bs58::decode(b58)
             .into_vec()
-            .map_err(|e| SignError::InvalidKeypair(e.to_string()))?;
+            .map_err(|e| SignError::InvalidKey(format!("keypair base58: {e}")))?;
         if decoded.len() != 64 {
-            return Err(SignError::InvalidKeypair(format!(
-                "expected 64 bytes, got {}",
+            return Err(SignError::InvalidKey(format!(
+                "keypair: expected 64 bytes, got {}",
                 decoded.len()
             )));
         }
@@ -83,7 +77,7 @@ impl Signer {
     /// Sign arbitrary bytes with raw Ed25519 (no hashing or prefixing).
     ///
     /// Returns the native [`Signature`]. For the unified
-    /// [`SignOutput::Ed25519`] wire form, use [`Sign::sign_message`].
+    /// [`SignOutput::Ed25519`] wire form, use [`SignMessage::sign_message`].
     #[must_use]
     pub fn sign_raw(&self, message: &[u8]) -> Signature {
         self.0.sign_raw(message)
@@ -95,7 +89,7 @@ impl Signer {
     ///
     /// Returns [`SignError::InvalidSignature`] on verification failure.
     pub fn verify(&self, msg: &[u8], signature: &[u8]) -> Result<(), SignError> {
-        Ok(self.0.verify(msg, signature)?)
+        self.0.verify(msg, signature)
     }
 
     /// Export keypair as Base58 (64 bytes: secret || public).
@@ -122,12 +116,14 @@ impl Signer {
     #[allow(clippy::indexing_slicing, reason = "bounds are checked before slicing")]
     pub fn extract_signable_bytes(tx_bytes: &[u8]) -> Result<&[u8], SignError> {
         if tx_bytes.is_empty() {
-            return Err(SignError::invalid_transaction("empty transaction"));
+            return Err(SignError::InvalidTransaction("empty transaction".into()));
         }
         let (num_sigs, header_len) = decode_compact_u16(tx_bytes)?;
         let msg_start = header_len + num_sigs * 64;
         if tx_bytes.len() <= msg_start {
-            return Err(SignError::invalid_transaction("transaction too short"));
+            return Err(SignError::InvalidTransaction(
+                "transaction too short".into(),
+            ));
         }
         Ok(&tx_bytes[msg_start..])
     }
@@ -157,8 +153,8 @@ impl Signer {
             ..
         }) = *signature
         else {
-            return Err(SignError::invalid_signature(
-                "expected Ed25519 signature output",
+            return Err(SignError::InvalidSignature(
+                "expected Ed25519 signature output".into(),
             ));
         };
         Self::splice_signature(tx_bytes, &sig_bytes)
@@ -177,18 +173,33 @@ impl Signer {
     #[allow(clippy::indexing_slicing, reason = "bounds are checked before slicing")]
     pub fn splice_signature(tx_bytes: &[u8], signature: &[u8; 64]) -> Result<Vec<u8>, SignError> {
         if tx_bytes.is_empty() {
-            return Err(SignError::invalid_transaction("empty transaction"));
+            return Err(SignError::InvalidTransaction("empty transaction".into()));
         }
         let (num_sigs, header_len) = decode_compact_u16(tx_bytes)?;
         if num_sigs == 0 {
-            return Err(SignError::invalid_transaction("no signature slots"));
+            return Err(SignError::InvalidTransaction("no signature slots".into()));
         }
         if tx_bytes.len() < header_len + num_sigs * 64 {
-            return Err(SignError::invalid_transaction("transaction too short"));
+            return Err(SignError::InvalidTransaction(
+                "transaction too short".into(),
+            ));
         }
         let mut signed = tx_bytes.to_vec();
         signed[header_len..header_len + 64].copy_from_slice(signature);
         Ok(signed)
+    }
+
+    /// Sign a Solana transaction message (raw Ed25519 over `tx_bytes`).
+    ///
+    /// Solana signs the unsigned transaction message **verbatim** with raw
+    /// Ed25519 (no hashing, no prefixing). Returns [`SignOutput::Ed25519`].
+    ///
+    /// # Errors
+    ///
+    /// This method is infallible in practice; the [`Result`] is reserved for
+    /// future compatibility.
+    pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
+        Ok(self.0.sign_output(tx_bytes))
     }
 }
 
@@ -198,14 +209,12 @@ impl Sign for Signer {
     fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
         Ok(self.0.sign_output(hash))
     }
-
-    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
-        Ok(self.0.sign_output(tx_bytes))
-    }
 }
 
 impl SignMessage for Signer {
-    /// Raw Ed25519 signature over `message` (no prefix or hashing).
+    /// **Framing**: raw Ed25519 over the message bytes — no prefix, no
+    /// hashing. Solana has no canonical off-chain message envelope; this
+    /// matches `nacl.sign.detached` in `@solana/web3.js`.
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         Ok(self.0.sign_output(message))
     }
@@ -244,8 +253,8 @@ fn decode_compact_u16(data: &[u8]) -> Result<(usize, usize), SignError> {
     let mut shift: u32 = 0;
     for (i, &byte) in data.iter().enumerate() {
         if i >= 3 {
-            return Err(SignError::invalid_transaction(
-                "compact-u16 exceeds 3 bytes",
+            return Err(SignError::InvalidTransaction(
+                "compact-u16 exceeds 3 bytes".into(),
             ));
         }
         value |= ((byte & 0x7F) as usize) << shift;
@@ -254,7 +263,9 @@ fn decode_compact_u16(data: &[u8]) -> Result<(usize, usize), SignError> {
         }
         shift += 7;
     }
-    Err(SignError::invalid_transaction("truncated compact-u16"))
+    Err(SignError::InvalidTransaction(
+        "truncated compact-u16".into(),
+    ))
 }
 
 #[cfg(test)]

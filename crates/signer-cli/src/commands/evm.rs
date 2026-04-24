@@ -6,7 +6,7 @@ use signer_evm::{Sign, SignMessage, Signer};
 use super::{parse_hex, parse_hex32};
 use crate::output::{self, CliResult};
 
-const CHAIN: &str = "ethereum";
+const CHAIN: &str = "evm";
 
 /// EVM signing operations.
 #[derive(Args)]

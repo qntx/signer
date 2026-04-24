@@ -1,7 +1,7 @@
 //! TON signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_ton::{Sign, SignMessage, Signer};
+use signer_ton::{SignMessage, Signer};
 
 use super::parse_hex;
 use crate::output::{self, CliResult};
@@ -31,8 +31,12 @@ enum TonSubcommand {
         #[arg(short, long)]
         tx: String,
     },
-    /// Show public key for a private key.
-    Address {
+    /// Show signer identity (hex public key) for a private key.
+    ///
+    /// TON wallet addresses depend on the deployed contract code and
+    /// workchain ID, so the signer only exposes its identity (public
+    /// key hex). Use `kobe-ton` for full wallet-address derivation.
+    Identity {
         #[arg(short, long)]
         key: String,
     },
@@ -45,7 +49,7 @@ impl TonCommand {
                 let signer = Signer::from_hex(&key)?;
                 let out = SignMessage::sign_message(&signer, message.as_bytes())?;
                 output::sign(CHAIN, "Ed25519")
-                    .address(signer.address())
+                    .identity(signer.identity())
                     .from_output(&out)
                     .public_key_hex(signer.public_key_hex())
                     .message(message)
@@ -53,16 +57,16 @@ impl TonCommand {
             }
             TonSubcommand::SignTx { key, tx } => {
                 let signer = Signer::from_hex(&key)?;
-                let out = Sign::sign_transaction(&signer, &parse_hex(&tx)?)?;
+                let out = signer.sign_transaction(&parse_hex(&tx)?)?;
                 output::sign(CHAIN, "transaction")
-                    .address(signer.address())
+                    .identity(signer.identity())
                     .from_output(&out)
                     .render(json)
             }
-            TonSubcommand::Address { key } => {
+            TonSubcommand::Identity { key } => {
                 let signer = Signer::from_hex(&key)?;
                 output::address(CHAIN, &signer.public_key_bytes())
-                    .address(signer.address())
+                    .identity(signer.identity())
                     .render(json)
             }
         }

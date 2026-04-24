@@ -10,17 +10,17 @@ keywords = ["crypto", "signer", "spark", "bitcoin-l2", "secp256k1"]
 categories = ["cryptography::cryptocurrencies", "no-std"]
 [features]
 default = ["std"]
-std = ["alloc", "signer-primitives/std"]
+std = ["alloc", "signer-primitives/std", "bech32/std"]
 alloc = ["signer-primitives/alloc"]
 getrandom = ["signer-primitives/getrandom"]
 kobe = ["dep:kobe-spark"]
 
 [dependencies]
 signer-primitives = { workspace = true, features = ["secp256k1"] }
+bech32.workspace = true
 hex.workspace = true
-sha2.workspace = true
 ripemd.workspace = true
-bs58.workspace = true
+sha2.workspace = true
 
 kobe-spark = { workspace = true, optional = true }
 

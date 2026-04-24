@@ -3,7 +3,7 @@
 //! Uses the `f1` (protocol-1) address scheme derived from the uncompressed
 //! public key, and signs transactions with `BLAKE2b-256` + ECDSA.
 //!
-//! # Input to [`Sign::sign_transaction`]
+//! # Input to [`Signer::sign_transaction`]
 //!
 //! Per the [Filecoin signatures spec](https://spec.filecoin.io/algorithms/crypto/signatures/),
 //! "to generate a signature for the `Message` type, compute the signature
@@ -27,9 +27,7 @@ use alloc::{format, string::String, vec::Vec};
 
 use blake2::digest::consts::{U4, U20, U32};
 use blake2::{Blake2b, Digest};
-pub use signer_primitives::{
-    self, Sign, SignError, SignExt, SignMessage, SignMessageExt, SignOutput,
-};
+pub use signer_primitives::{self, Sign, SignError, SignMessage, SignOutput};
 use signer_primitives::{Secp256k1Signer, delegate_secp256k1_ctors};
 
 type Blake2b256 = Blake2b<U32>;
@@ -48,6 +46,11 @@ impl Signer {
     /// Filecoin protocol-1 (secp256k1) address (`f1…`).
     ///
     /// Computed as `"f1" + base32_lower(BLAKE2b-160(uncompressed_pubkey) || BLAKE2b-4(0x01 || payload))`.
+    ///
+    /// Only produces `f1` (protocol 1, secp256k1) addresses. For other
+    /// Filecoin address protocols (`f0` ID, `f2` actor, `f3` BLS,
+    /// `f4` delegated / EAM), use `kobe-fil` which covers the full address
+    /// taxonomy.
     #[must_use]
     pub fn address(&self) -> String {
         let uncompressed = self.0.uncompressed_public_key();
@@ -87,6 +90,22 @@ impl Signer {
     pub fn verify_hash(&self, hash: &[u8; 32], signature: &[u8]) -> Result<(), SignError> {
         self.0.verify_prehash_any(hash, signature)
     }
+
+    /// Sign the `CIDv1` byte array of a CBOR-encoded Filecoin `Message`.
+    ///
+    /// Hashes the input with `BLAKE2b-256` and signs the digest, matching
+    /// the Zondax `filecoin-signing-tools` `transaction_sign_raw` convention
+    /// and every on-chain validator.
+    ///
+    /// Returns a [`SignOutput::Ecdsa`] with raw `v` (`0 | 1`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if signing fails.
+    pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
+        let digest: [u8; 32] = Blake2b256::digest(tx_bytes).into();
+        self.0.sign_prehash_recoverable(&digest)
+    }
 }
 
 impl Sign for Signer {
@@ -95,19 +114,15 @@ impl Sign for Signer {
     fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
         self.0.sign_prehash_recoverable(hash)
     }
-
-    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
-        let digest: [u8; 32] = Blake2b256::digest(tx_bytes).into();
-        self.0.sign_prehash_recoverable(&digest)
-    }
 }
 
 impl SignMessage for Signer {
-    /// BLAKE2b-256 of the raw message bytes, signed with secp256k1 ECDSA.
+    /// **Framing**: Filecoin off-chain message — `BLAKE2b-256` of the raw
+    /// message bytes (no prefix), signed with secp256k1 ECDSA.
     ///
-    /// No domain prefix is applied — Filecoin's wallet ecosystem does not
-    /// specify a canonical off-chain message framing; callers who need one
-    /// should hash their own preimage and call [`Sign::sign_hash`].
+    /// Filecoin's wallet ecosystem does not specify a canonical off-chain
+    /// message framing; callers who need one should hash their own preimage
+    /// and call [`Sign::sign_hash`] directly.
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         let digest: [u8; 32] = Blake2b256::digest(message).into();
         self.0.sign_prehash_recoverable(&digest)

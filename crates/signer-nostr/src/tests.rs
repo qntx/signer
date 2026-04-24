@@ -85,11 +85,11 @@ fn nsec_round_trip_preserves_public_identity() {
 fn from_nsec_rejects_wrong_hrp_and_malformed_bech32() {
     assert!(matches!(
         Signer::from_nsec(TV1_NPUB),
-        Err(SignError::Bech32(_))
+        Err(SignError::InvalidKey(_))
     ));
     assert!(matches!(
         Signer::from_nsec("nsec1notvalid"),
-        Err(SignError::Bech32(_))
+        Err(SignError::InvalidKey(_))
     ));
 }
 
@@ -159,6 +159,7 @@ fn verify_rejects_tampered_signature_and_wrong_message() {
 
 #[cfg(feature = "kobe")]
 mod kobe_integration {
+    use kobe_nostr::{DerivedAccount, DerivedPublicKey};
     use zeroize::Zeroizing;
 
     use super::{Signer, TV1_NPUB, TV1_PRIV_HEX, TV1_PUB_HEX};
@@ -166,14 +167,15 @@ mod kobe_integration {
     /// NIP-06 TV1 surfaced through a `kobe_nostr::DerivedAccount` — the
     /// idiomatic integration path for consumers that derive an account
     /// from a mnemonic.
-    fn tv1_derived_account() -> kobe_nostr::DerivedAccount {
+    fn tv1_derived_account() -> DerivedAccount {
         let mut sk = Zeroizing::new([0u8; 32]);
         hex::decode_to_slice(TV1_PRIV_HEX, sk.as_mut_slice()).unwrap();
-        let pk = hex::decode(TV1_PUB_HEX).unwrap();
-        kobe_nostr::DerivedAccount::new(
+        let mut xonly = [0u8; 32];
+        hex::decode_to_slice(TV1_PUB_HEX, &mut xonly).unwrap();
+        DerivedAccount::new(
             String::from("m/44'/1237'/0'/0/0"),
             sk,
-            pk,
+            DerivedPublicKey::Secp256k1XOnly(xonly),
             String::from(TV1_NPUB),
         )
     }

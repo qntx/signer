@@ -27,7 +27,7 @@
 
 use alloc::format;
 
-use crate::{Sign, SignError, SignExt, SignMessage, SignMessageExt, SignOutput};
+use crate::{SignError, SignOutput};
 
 /// Deterministic secp256k1 test key (also reused by every ECDSA chain crate).
 const SECP_KEY_HEX: &str = "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318";
@@ -473,57 +473,6 @@ mod sign_output {
             v: 0x80,
         };
         assert_eq!(out.to_hex(), hex::encode(out.to_bytes()));
-    }
-}
-
-#[cfg(feature = "secp256k1")]
-mod ext_traits {
-    use super::*;
-
-    // Minimal `Sign + SignMessage` impl that produces known outputs so we can
-    // prove the `SignExt` / `SignMessageExt` pass-throughs equal `to_bytes()`
-    // exactly — without leaking into chain-specific semantics.
-    #[derive(Debug, Default)]
-    struct FakeSigner;
-
-    impl Sign for FakeSigner {
-        type Error = SignError;
-
-        fn sign_hash(&self, _hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-            Ok(SignOutput::Ed25519([0xAA; 64]))
-        }
-
-        fn sign_transaction(&self, _tx: &[u8]) -> Result<SignOutput, SignError> {
-            Ok(SignOutput::Ed25519([0xBB; 64]))
-        }
-    }
-
-    impl SignMessage for FakeSigner {
-        fn sign_message(&self, _msg: &[u8]) -> Result<SignOutput, SignError> {
-            Ok(SignOutput::Ed25519([0xCC; 64]))
-        }
-    }
-
-    #[test]
-    fn sign_ext_returns_same_bytes_as_to_bytes() {
-        let s = FakeSigner;
-        assert_eq!(
-            s.sign_hash_bytes(&[0u8; 32]).unwrap(),
-            s.sign_hash(&[0u8; 32]).unwrap().to_bytes(),
-        );
-        assert_eq!(
-            s.sign_transaction_bytes(b"tx").unwrap(),
-            s.sign_transaction(b"tx").unwrap().to_bytes(),
-        );
-    }
-
-    #[test]
-    fn sign_message_ext_returns_same_bytes_as_to_bytes() {
-        let s = FakeSigner;
-        assert_eq!(
-            s.sign_message_bytes(b"m").unwrap(),
-            s.sign_message(b"m").unwrap().to_bytes(),
-        );
     }
 }
 

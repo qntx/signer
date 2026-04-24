@@ -1,13 +1,13 @@
 //! Spark signer Known Answer Tests.
 //!
-//! Focus: Spark-specific wire format (inherits Bitcoin's legacy P2PKH +
-//! BIP-137 compressed message signing). Core ECDSA determinism lives in
-//! `signer_primitives::tests`.
+//! Focus: Spark-specific wire format (bech32m `spark1…` address + inherits
+//! Bitcoin's BIP-137 compressed message signing and double-SHA256 sighash).
+//! Core ECDSA determinism lives in `signer_primitives::tests`.
 //!
 //! What this file pins:
 //!
-//! - **Address**: `Base58Check(0x00 || RIPEMD160(SHA-256(pk)))`, identical
-//!   to Bitcoin's legacy encoding — cross-verified with `@noble/hashes`.
+//! - **Address**: `bech32m(hrp="spark", RIPEMD160(SHA-256(pk)))` —
+//!   cross-verified with `@noble/hashes` + `@scure/base`.
 //! - **Tx sighash**: `ECDSA(double_SHA-256(tx))`.
 //! - **Message signing**: BIP-137 with compressed-P2PKH header (`v = 31 | 32`).
 //! - **Verify round-trip**: `verify_hash` accepts both the 65-byte wire
@@ -23,15 +23,15 @@
 
 use sha2::{Digest, Sha256};
 
-use super::{Sign, SignMessage, Signer};
+use super::{SignMessage, Signer};
 
 const PRIV_KEY_HEX: &str = "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318";
 const TX_HEX: &str = "deadbeef00010203";
 const MESSAGE: &str = "signer kat v3";
 
-/// Spark reuses Bitcoin's legacy P2PKH derivation
-/// (`Base58Check(0x00 || RIPEMD160(SHA-256(compressed_pubkey)))`).
-const ADDRESS: &str = "1FB3WSwtExGLQUmNp4AQF66tAwAQp6igW3";
+/// Spark bech32m address:
+/// `bech32m(hrp="spark", RIPEMD160(SHA-256(compressed_pubkey)))`.
+const ADDRESS: &str = "spark1nduq8yy8h4nr7g9vuuglzklqatmaquq9g2keef";
 
 /// ECDSA over `double_SHA-256(TX_HEX)` — Bitcoin sighash framing.
 const SIGN_TX_HEX: &str = "ea9298254514da415af8f810e618dd08440e24b3e8c9002d46ebd7ebb2bd97fe2a8ddce39abda97c3abddc0017746355be5f32bbf6f236258c3b8cba7e2578a401";
@@ -44,7 +44,7 @@ fn signer_fixture() -> Signer {
 }
 
 #[test]
-fn address_p2pkh_matches_base58check_kat() {
+fn address_bech32m_matches_spark_hrp_kat() {
     assert_eq!(signer_fixture().address(), ADDRESS);
 }
 

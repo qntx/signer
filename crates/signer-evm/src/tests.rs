@@ -244,6 +244,8 @@ fn pubkey_to_eip55(pk: &VerifyingKey) -> String {
 /// through the hex round-trip.
 #[cfg(feature = "kobe")]
 mod kobe_integration {
+    use k256::ecdsa::SigningKey;
+    use kobe_evm::{DerivedAccount, DerivedPublicKey};
     use zeroize::Zeroizing;
 
     use super::Signer;
@@ -252,19 +254,24 @@ mod kobe_integration {
     /// abandon abandon abandon abandon abandon about` at path
     /// `m/44'/60'/0'/0/0`. Address cross-verified with go-ethereum,
     /// ethers.js, and Python `eth_keys`.
-    fn kat_account() -> kobe_evm::DerivedAccount {
+    fn kat_account() -> DerivedAccount {
         let mut sk = Zeroizing::new([0u8; 32]);
         hex::decode_to_slice(
             "1ab42cc412b618bdea3a599e3c9bae199ebf030895b039e9db1e30dafb12b727",
             sk.as_mut_slice(),
         )
         .unwrap();
-        let pk = hex::decode("0237b0bb7a8288d38ed49a524b5dc98cff3eb5ca824c9f9dc0dfdb3d9cd600f299")
+        let signing_key = SigningKey::from_bytes(sk.as_slice().into()).unwrap();
+        let uncompressed: [u8; 65] = signing_key
+            .verifying_key()
+            .to_encoded_point(false)
+            .as_bytes()
+            .try_into()
             .unwrap();
-        kobe_evm::DerivedAccount::new(
+        DerivedAccount::new(
             String::from("m/44'/60'/0'/0/0"),
             sk,
-            pk,
+            DerivedPublicKey::Secp256k1Uncompressed(uncompressed),
             String::from("0x9858EfFD232B4033E47d90003D41EC34EcaEda94"),
         )
     }

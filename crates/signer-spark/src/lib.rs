@@ -1,15 +1,22 @@
 //! Spark (Bitcoin L2) transaction signer built on secp256k1 ECDSA.
 //!
-//! Shares Bitcoin's cryptographic primitives (double-SHA256, P2PKH address
-//! derivation) and [BIP-137](https://github.com/bitcoin/bips/blob/master/bip-0137.mediawiki)
-//! message signing, but is a distinct chain. Address derivation is handled
-//! by `kobe-spark`.
+//! Shares Bitcoin's cryptographic primitives (double-SHA256 sighash and
+//! [BIP-137](https://github.com/bitcoin/bips/blob/master/bip-0137.mediawiki)
+//! message signing) but derives its own `spark1…` bech32m address via the
+//! hash160 of the compressed public key.
+//!
+//! # Address derivation
+//!
+//! `Signer::address` emits the canonical `spark1…` bech32m address:
+//! `bech32m(hrp="spark", RIPEMD160(SHA256(compressed_pubkey)))`. This matches
+//! the address format expected by Spark L2 nodes and produced by
+//! `kobe-spark`.
 //!
 //! # Message signing
 //!
 //! [`SignMessage::sign_message`] signs with the BIP-137 header byte for a
-//! **compressed P2PKH** address (`v = 31 | 32`), matching Bitcoin Core's
-//! `signmessage` on-wire format so the resulting signature round-trips
+//! **compressed P2PKH** address (`v = 31 | 32`), matching the on-wire format
+//! of Bitcoin Core's `signmessage` so the resulting signature round-trips
 //! through any BIP-137 verifier.
 
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -18,15 +25,17 @@ extern crate alloc;
 
 use alloc::{string::String, vec::Vec};
 
+use bech32::{Bech32m, Hrp};
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha256};
-pub use signer_primitives::{
-    self, Sign, SignError, SignExt, SignMessage, SignMessageExt, SignOutput,
-};
+pub use signer_primitives::{self, Sign, SignError, SignMessage, SignOutput};
 use signer_primitives::{Secp256k1Signer, delegate_secp256k1_ctors};
 
 /// BIP-137 header offset for a compressed P2PKH address (`27 + 4`).
 const BIP137_COMPRESSED_P2PKH_OFFSET: u8 = 31;
+
+/// Spark bech32m address HRP.
+const SPARK_HRP: &str = "spark";
 
 /// Spark transaction signer.
 ///
@@ -37,24 +46,24 @@ pub struct Signer(Secp256k1Signer);
 impl Signer {
     delegate_secp256k1_ctors!();
 
-    /// Spark P2PKH address (legacy, starts with `1`).
+    /// Spark bech32m address (`spark1…`).
     ///
-    /// Same derivation as Bitcoin: `Base58Check(0x00 || RIPEMD160(SHA256(compressed_pubkey)))`.
+    /// Derivation: `bech32m(hrp="spark", RIPEMD160(SHA256(compressed_pubkey)))`.
+    ///
+    /// # Panics
+    ///
+    /// Panics only if bech32m encoding of a fixed 20-byte payload fails,
+    /// which is impossible given the hard-coded HRP and payload length.
     #[must_use]
-    #[allow(
-        clippy::indexing_slicing,
-        reason = "SHA-256 output is always 32 bytes, slicing first 4 is safe"
-    )]
     pub fn address(&self) -> String {
         let pubkey = self.0.compressed_public_key();
-        let sha = Sha256::digest(&pubkey);
-        let hash160 = Ripemd160::digest(sha);
-        let mut payload = Vec::with_capacity(25);
-        payload.push(0x00);
-        payload.extend_from_slice(&hash160);
-        let checksum = Sha256::digest(Sha256::digest(&payload));
-        payload.extend_from_slice(&checksum[..4]);
-        bs58::encode(&payload).into_string()
+        let hash160 = Ripemd160::digest(Sha256::digest(&pubkey));
+        let hrp = Hrp::parse_unchecked(SPARK_HRP);
+        #[allow(
+            clippy::expect_used,
+            reason = "HRP and 20-byte hash160 are always valid bech32m inputs"
+        )]
+        bech32::encode::<Bech32m>(hrp, &hash160).expect("valid bech32m")
     }
 
     /// Compressed public key (33 bytes).
@@ -81,6 +90,19 @@ impl Signer {
     pub fn verify_hash(&self, hash: &[u8; 32], signature: &[u8]) -> Result<(), SignError> {
         self.0.verify_prehash_any(hash, signature)
     }
+
+    /// Sign a Spark transaction sighash preimage (Bitcoin-compatible).
+    ///
+    /// Hashes the input with `double_SHA256` and signs the digest. Returns a
+    /// [`SignOutput::Ecdsa`] with raw `v` (`0 | 1`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if signing fails.
+    pub fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
+        let digest: [u8; 32] = Sha256::digest(Sha256::digest(tx_bytes)).into();
+        self.0.sign_prehash_recoverable(&digest)
+    }
 }
 
 impl Sign for Signer {
@@ -89,29 +111,21 @@ impl Sign for Signer {
     fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
         self.0.sign_prehash_recoverable(hash)
     }
-
-    fn sign_transaction(&self, tx_bytes: &[u8]) -> Result<SignOutput, SignError> {
-        let digest: [u8; 32] = Sha256::digest(Sha256::digest(tx_bytes)).into();
-        self.0.sign_prehash_recoverable(&digest)
-    }
 }
 
 impl SignMessage for Signer {
-    /// BIP-137 message signing for a compressed P2PKH address.
+    /// **Framing**: BIP-137 Bitcoin signed message for the **compressed
+    /// P2PKH** address type — `double_SHA256("\x18Bitcoin Signed Message:\n"
+    /// || CompactSize(len) || message)`.
     ///
-    /// Digest: `double_SHA256("\x18Bitcoin Signed Message:\n" || CompactSize(len) || message)`.
     /// Returns a 65-byte [`SignOutput::Ecdsa`] with `v = 31 | 32`, directly
     /// consumable by any BIP-137 verifier.
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         let digest = bitcoin_message_digest(message);
-        let out = self.0.sign_prehash_recoverable(&digest)?;
-        Ok(match out {
-            SignOutput::Ecdsa { signature, v } => SignOutput::Ecdsa {
-                signature,
-                v: BIP137_COMPRESSED_P2PKH_OFFSET.wrapping_add(v),
-            },
-            other => other,
-        })
+        Ok(self
+            .0
+            .sign_prehash_recoverable(&digest)?
+            .with_v_offset(BIP137_COMPRESSED_P2PKH_OFFSET))
     }
 }
 
