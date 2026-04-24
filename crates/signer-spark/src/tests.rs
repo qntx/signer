@@ -1,13 +1,27 @@
 //! Spark signer Known Answer Tests.
 //!
-//! Goldens are cross-verified with `@noble/curves` + `@noble/hashes` +
-//! `@scure/base`. Cross-cutting plumbing is in `signer_primitives::tests`.
+//! Focus: Spark-specific wire format (inherits Bitcoin's legacy P2PKH +
+//! BIP-137 compressed message signing). Core ECDSA determinism lives in
+//! `signer_primitives::tests`.
+//!
+//! What this file pins:
+//!
+//! - **Address**: `Base58Check(0x00 || RIPEMD160(SHA-256(pk)))`, identical
+//!   to Bitcoin's legacy encoding — cross-verified with `@noble/hashes`.
+//! - **Tx sighash**: `ECDSA(double_SHA-256(tx))`.
+//! - **Message signing**: BIP-137 with compressed-P2PKH header (`v = 31 | 32`).
+//! - **Verify round-trip**: `verify_hash` accepts both the 65-byte wire
+//!   signature and the compact 64-byte form against the `double_SHA-256`
+//!   digest.
 
 #![allow(
     clippy::unwrap_used,
     clippy::missing_assert_message,
+    clippy::indexing_slicing,
     reason = "test module: panics are acceptable and assertions self-describe"
 )]
+
+use sha2::{Digest, Sha256};
 
 use super::{Sign, SignMessage, Signer};
 
@@ -53,4 +67,21 @@ fn sign_message_bip137_compressed_p2pkh_matches_noble_kat() {
         v == 31 || v == 32,
         "BIP-137 compressed-P2PKH header must be 31 or 32"
     );
+}
+
+/// Verify round-trip: `verify_hash` accepts the tx signature against the
+/// double-SHA-256 digest (65-byte wire form and 64-byte compact form).
+#[test]
+fn sign_transaction_verify_hash_roundtrip() {
+    let signer = signer_fixture();
+    let tx = hex::decode(TX_HEX).unwrap();
+    let digest: [u8; 32] = Sha256::digest(Sha256::digest(&tx)).into();
+    let out = signer.sign_transaction(&tx).unwrap();
+
+    signer.verify_hash(&digest, &out.to_bytes()).unwrap();
+    signer.verify_hash(&digest, &out.to_bytes()[..64]).unwrap();
+
+    let mut tampered = out.to_bytes();
+    tampered[32] ^= 0x01;
+    assert!(signer.verify_hash(&digest, &tampered).is_err());
 }

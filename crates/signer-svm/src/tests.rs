@@ -1,12 +1,18 @@
 //! Solana signer Known Answer Tests.
 //!
-//! Goldens are produced by an independent `@noble/curves` (ed25519) +
-//! `@scure/base` (base58) run. The KATs pin the Base58 pubkey address,
-//! all three Ed25519 entry points, and the compact-u16 + signature-slot
-//! splicing machinery that makes Solana's wire format work.
+//! Focus: Solana-specific wire format (Base58 address, compact-u16
+//! signature splicing, Phantom keypair format). Core Ed25519
+//! determinism lives in `signer_primitives::tests` — including the
+//! three full RFC 8032 reference vectors.
+//!
+//! Solana's `sign_*` entry points are raw Ed25519 over the input bytes,
+//! matching `@solana/web3.js`' `nacl.sign.detached`. We therefore do not
+//! re-run Ed25519 KATs here: the `verify` round-trip below proves our
+//! wrappers do not mutate the payload before reaching the primitive.
 
 #![allow(
     clippy::unwrap_used,
+    clippy::panic,
     clippy::missing_assert_message,
     clippy::indexing_slicing,
     reason = "test module: panics are acceptable and assertions self-describe"
@@ -17,50 +23,63 @@ use super::{EncodeSignedTransaction, Sign, SignError, SignMessage, SignOutput, S
 /// RFC 8032 Test Vector 1.
 const PRIV_KEY_HEX: &str = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
 const PUBKEY_HEX: &str = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
-const DIGEST_HEX: &str = "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20";
 const TX_HEX: &str = "deadbeef00010203";
 const MESSAGE: &str = "signer kat v3";
 
 /// `base58(public_key_bytes)`.
 const ADDRESS: &str = "FVen3X669xLzsi6N2V91DoiyzHzg1uAgqiT8jZ9nS96Z";
 
-/// Ed25519 over each fixed input.
-const SIGN_HASH_HEX: &str = "8d917876339a83dc45d1796e557c7baf8bff5e88ab000e166136fa8a32e8318c6e0c05d03a29f317ff7114c7b128ea9a80d57142b818dc0f515f950afef5660b";
-const SIGN_MESSAGE_HEX: &str = "9bf92051ec0e310dd98463902e79f9ab406f100c26901526e415d8f1be3f9544cef179c7bb977eda3dc93df8acc5476d57c38d0bbe777165a68d50655c20d707";
-const SIGN_TX_HEX: &str = "3e9d05cb132f2c766fd1a993bff79e168814d7241683a1bdb95fac2b8500805d009eb99a80000fcc14b5097c6f8d9850a03c275c8ebea1867454a0114d2f7a07";
-
 fn signer_fixture() -> Signer {
     Signer::from_hex(PRIV_KEY_HEX).unwrap()
 }
 
-fn digest() -> [u8; 32] {
-    hex::decode(DIGEST_HEX).unwrap().try_into().unwrap()
-}
-
+/// Solana-specific: `base58(public_key_bytes)`. RFC 8032 pubkey
+/// derivation is already covered in `signer_primitives::tests`, so this
+/// only pins the Base58 encoding step.
 #[test]
-fn address_base58_matches_noble_kat() {
+fn address_base58_matches_scure_base_kat() {
     let s = signer_fixture();
     assert_eq!(s.public_key_hex(), PUBKEY_HEX);
     assert_eq!(s.address(), ADDRESS);
 }
 
+/// `sign_message`, `sign_transaction`, and `sign_hash` are all raw
+/// Ed25519 over their byte inputs. Rather than pin three identical KATs
+/// (which would duplicate the RFC 8032 coverage in primitives), we
+/// assert that each path's output round-trips back through `verify`
+/// against the exact bytes we handed in.
 #[test]
-fn sign_hash_matches_noble_ed25519_kat() {
-    let out = signer_fixture().sign_hash(&digest()).unwrap();
-    assert_eq!(out.to_hex(), SIGN_HASH_HEX);
-}
-
-#[test]
-fn sign_message_matches_noble_ed25519_kat() {
-    let out = signer_fixture().sign_message(MESSAGE.as_bytes()).unwrap();
-    assert_eq!(out.to_hex(), SIGN_MESSAGE_HEX);
-}
-
-#[test]
-fn sign_transaction_matches_noble_ed25519_kat() {
+fn every_entry_point_self_verifies() {
+    let s = signer_fixture();
     let tx = hex::decode(TX_HEX).unwrap();
-    let out = signer_fixture().sign_transaction(&tx).unwrap();
-    assert_eq!(out.to_hex(), SIGN_TX_HEX);
+    let digest_bytes: [u8; 32] =
+        hex::decode("0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20")
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+    for (label, payload, sig) in [
+        (
+            "sign_hash",
+            &digest_bytes[..],
+            s.sign_hash(&digest_bytes).unwrap(),
+        ),
+        (
+            "sign_message",
+            MESSAGE.as_bytes(),
+            s.sign_message(MESSAGE.as_bytes()).unwrap(),
+        ),
+        (
+            "sign_transaction",
+            &tx[..],
+            s.sign_transaction(&tx).unwrap(),
+        ),
+    ] {
+        assert_eq!(sig.to_bytes().len(), 64, "{label}: raw Ed25519 is 64 bytes");
+        assert!(sig.v().is_none(), "{label}: no `v` on raw Ed25519");
+        s.verify(payload, &sig.to_bytes())
+            .unwrap_or_else(|e| panic!("{label} must round-trip: {e}"));
+    }
 }
 
 /// The Phantom / Backpack / Solflare 64-byte keypair (secret || public)

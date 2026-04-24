@@ -1,9 +1,23 @@
 //! Bitcoin signer Known Answer Tests.
 //!
-//! Goldens are produced by an independent `@noble/curves` +
-//! `@noble/hashes` + `@scure/base` JS stack. Address, BIP-137 message
-//! digest, and every BIP-137 header-byte variant are asserted
-//! byte-for-byte, so any wire-format drift fails the build immediately.
+//! Focus: Bitcoin-specific wire format. Core ECDSA determinism and key
+//! validation live in `signer_primitives::tests`.
+//!
+//! What this file pins:
+//!
+//! - **Address**: legacy P2PKH `Base58Check(0x00 || RIPEMD160(SHA-256(pk)))`.
+//! - **Tx sighash**: `ECDSA(double_SHA-256(preimage))`.
+//! - **BIP-137 digest formula**: `double_SHA-256("\x18Bitcoin Signed Message:\n"
+//!   || CompactSize(len) || msg)` — pinned against an independently
+//!   computed hash from `@noble/hashes`.
+//! - **All four BIP-137 header variants**: `v` offsets `27 | 31 | 35 | 39`
+//!   across uncompressed-P2PKH, compressed-P2PKH, `SegWit-P2SH`, and
+//!   native-`SegWit`-bech32 address types (spec: `bips.dev/137`).
+//! - **`CompactSize` boundaries**: 252 (single-byte) and 253/65535
+//!   (`0xFD` + `u16`) branches.
+//! - **BIP-137 recovery round-trip**: the wire signature recovers to a
+//!   pubkey whose P2PKH address matches the signer's own address —
+//!   exactly what Bitcoin Core's `verifymessage` RPC does.
 
 #![allow(
     clippy::unwrap_used,
@@ -11,6 +25,10 @@
     clippy::indexing_slicing,
     reason = "test module: panics are acceptable and assertions self-describe"
 )]
+
+use k256::ecdsa::{RecoveryId, Signature as K256Sig, VerifyingKey};
+use ripemd::Ripemd160;
+use sha2::{Digest, Sha256};
 
 use super::{BitcoinMessageAddressType, Sign, SignMessage, Signer};
 
@@ -132,4 +150,54 @@ fn sign_message_compact_size_varint_boundaries() {
         let v = out.v().unwrap();
         assert!(v == 31 || v == 32, "len={len}");
     }
+}
+
+/// Tx sighash verify round-trip: `verify_hash` accepts the wire signature
+/// against `double_SHA-256(preimage)` and rejects tampered bytes.
+#[test]
+fn sign_transaction_verify_hash_roundtrip() {
+    let signer = signer_fixture();
+    let tx = hex::decode(TX_HEX).unwrap();
+    let digest: [u8; 32] = Sha256::digest(Sha256::digest(&tx)).into();
+    let out = signer.sign_transaction(&tx).unwrap();
+
+    signer.verify_hash(&digest, &out.to_bytes()).unwrap();
+    let mut tampered = out.to_bytes();
+    tampered[32] ^= 0x01;
+    assert!(signer.verify_hash(&digest, &tampered).is_err());
+}
+
+/// `verifymessage`-style BIP-137 round-trip: strip the header byte,
+/// recover the pubkey from the compact `r || s` against the Bitcoin
+/// message digest, and derive the compressed-P2PKH address. The result
+/// must equal the signer's own address — which is exactly how Bitcoin
+/// Core and Electrum verify a BIP-137 signature.
+#[test]
+fn sign_message_bip137_recovers_to_same_p2pkh_address() {
+    let signer = signer_fixture();
+    let out = signer.sign_message(MESSAGE.as_bytes()).unwrap();
+    let sig_bytes = out.to_bytes();
+    let header = out.v().unwrap();
+
+    // Strip the BIP-137 compressed-P2PKH offset (31) to recover the raw parity.
+    assert!((31..=34).contains(&header));
+    let parity = header - 31;
+
+    let digest = super::bitcoin_message_digest(MESSAGE.as_bytes());
+    let sig = K256Sig::from_slice(&sig_bytes[..64]).unwrap();
+    let recovery = RecoveryId::from_byte(parity).unwrap();
+    let recovered = VerifyingKey::recover_from_prehash(&digest, &sig, recovery).unwrap();
+
+    // Derive the compressed-P2PKH address from the recovered pubkey.
+    let compressed = recovered.to_encoded_point(true);
+    let sha = Sha256::digest(compressed.as_bytes());
+    let hash160 = Ripemd160::digest(sha);
+    let mut payload = Vec::with_capacity(25);
+    payload.push(0x00);
+    payload.extend_from_slice(&hash160);
+    let checksum = Sha256::digest(Sha256::digest(&payload));
+    payload.extend_from_slice(&checksum[..4]);
+    let recovered_addr = bs58::encode(&payload).into_string();
+
+    assert_eq!(recovered_addr, signer.address());
 }

@@ -1,14 +1,23 @@
 //! Nostr signer Known Answer Tests.
 //!
-//! Two layers of authority pin the test values:
+//! Focus: NIP-specific encodings (bech32 `npub1…` / `nsec1…`), NIP-01
+//! event-id construction, and the `sign_transaction` → SHA-256 →
+//! BIP-340 pipeline. Raw BIP-340 determinism with `aux_rand = [0;32]`
+//! is already pinned against the canonical CSV in
+//! `signer_primitives::tests`.
 //!
-//! - **NIP-06 Test Vectors 1 + 2** for the `nsec1…` / `npub1…` bech32
-//!   encoding and x-only pubkey derivation — these are *protocol* KATs
-//!   published alongside the spec.
-//! - **Cross-implementation goldens** (`@noble/curves` BIP-340 Schnorr
-//!   with `auxRand = [0u8; 32]`) for the three signing entry points.
-//!   Matching them byte-for-byte proves our `k256::schnorr` wrapping
-//!   does not accidentally deviate from the reference.
+//! What this file pins:
+//!
+//! - **NIP-06 TV1 + TV2**: published protocol KATs for `nsec1…` and
+//!   `npub1…` bech32 encoding. These ground our implementation against
+//!   the public specification rather than against our own past output.
+//! - **HRP rejection**: `from_nsec` refuses an `npub1…` payload.
+//! - **`sign_transaction` = `sign_hash(SHA-256(event))`**: the NIP-01
+//!   event-id pipeline has two equivalent entry points; their outputs
+//!   must be byte-identical.
+//! - **Full NIP-01 event signing**: build a real event per the NIP-01
+//!   canonical serialization, sign via `sign_transaction`, and verify.
+//! - **Verify rejection**: wrong message and single-bit mutations fail.
 
 #![allow(
     clippy::unwrap_used,
@@ -16,6 +25,8 @@
     clippy::indexing_slicing,
     reason = "test module: panics are acceptable and assertions self-describe"
 )]
+
+use sha2::{Digest as _, Sha256};
 
 use super::*;
 
@@ -31,25 +42,8 @@ const TV1_NPUB: &str = "npub1zutzeysacnf9rru6zqwmxd54mud0k44tst6l70ja5mhv8jjumyt
 const TV2_PRIV_HEX: &str = "c15d739894c81a2fcfd3a2df85a0d2c0dbc47a280d092799f144d73d7ae78add";
 const TV2_NPUB: &str = "npub16sdj9zv4f8sl85e45vgq9n7nsgt5qphpvmf7vk8r5hhvmdjxx4es8rq74h";
 
-// -- Cross-implementation KATs (BIP-340 with aux_rand = zeros) ------------
-
-const DIGEST_HEX: &str = "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20";
-const TX_HEX: &str = "deadbeef00010203";
-const MESSAGE: &str = "signer kat v3";
-
-/// BIP-340 Schnorr over `DIGEST_HEX`, `aux_rand = [0u8; 32]`.
-const SIGN_HASH_HEX: &str = "38170398b948d77ec62412ad4d8b4e8b098e56a2dd3186be11d86d7ef1371c4e3c6eebc56cd475874ef94771a179b4d46605af2ddc0c983a540de615ad32f677";
-/// BIP-340 Schnorr over the raw `MESSAGE` bytes — no implicit SHA-256.
-const SIGN_MESSAGE_HEX: &str = "161451d4e7edde557075f7f94fecdef168378ab24455a72da9c24a63e4e1de288c28d22e664c0809815bc7898b1181b166a922f29bb0047ac18cc0be72d6d779";
-/// BIP-340 Schnorr over `SHA-256(TX_HEX)` — NIP-01 event-id path.
-const SIGN_TX_HEX: &str = "25493b03c3f359bdb13c637e903852c9c34024414b8d9981abd9fdd7afafa2b24bd018b1d3bf5c206da29af504fc80116fce6472f3c7d268cba288dc009227ce";
-
 fn tv1_signer() -> Signer {
     Signer::from_hex(TV1_PRIV_HEX).unwrap()
-}
-
-fn digest() -> [u8; 32] {
-    hex::decode(DIGEST_HEX).unwrap().try_into().unwrap()
 }
 
 // ============================================================================
@@ -100,45 +94,16 @@ fn from_nsec_rejects_wrong_hrp_and_malformed_bech32() {
 }
 
 // ============================================================================
-// BIP-340 Schnorr cross-implementation KATs
+// NIP-01 event signing pipeline
 // ============================================================================
 
-/// `sign_hash` takes a 32-byte `event.id` and signs it with BIP-340
-/// (`aux_rand` zero). Must match `@noble/curves` byte-for-byte.
-#[test]
-fn sign_hash_matches_noble_bip340_kat() {
-    let out = tv1_signer().sign_hash(&digest()).unwrap();
-    assert_eq!(out.to_hex(), SIGN_HASH_HEX);
-    assert!(out.v().is_none(), "BIP-340 Schnorr has no recovery id");
-    assert_eq!(
-        hex::encode(out.public_key().unwrap()),
-        TV1_PUB_HEX,
-        "output must carry the signer's x-only pubkey",
-    );
-}
-
-/// `sign_message` passes bytes verbatim into BIP-340 — no implicit hash.
-#[test]
-fn sign_message_is_raw_bip340_matches_noble_kat() {
-    let out = tv1_signer().sign_message(MESSAGE.as_bytes()).unwrap();
-    assert_eq!(out.to_hex(), SIGN_MESSAGE_HEX);
-}
-
-/// `sign_transaction` hashes the serialized NIP-01 event with SHA-256
-/// first, then signs the resulting event id with BIP-340.
-#[test]
-fn sign_transaction_sha256_event_id_matches_noble_kat() {
-    let tx = hex::decode(TX_HEX).unwrap();
-    let out = tv1_signer().sign_transaction(&tx).unwrap();
-    assert_eq!(out.to_hex(), SIGN_TX_HEX);
-}
-
-/// Sanity: `sign_transaction(event)` must equal
-/// `sign_hash(sha256(event))` — cheap equivalence check that keeps the
-/// two sister code paths from drifting apart.
+/// `sign_transaction(event)` must equal `sign_hash(sha256(event))`: the
+/// two entry points are supposed to converge on the NIP-01 event-id
+/// pipeline. This test catches any divergence between them without
+/// pinning a signature byte value (which is already covered by the
+/// BIP-340 CSV KATs in primitives).
 #[test]
 fn sign_transaction_equals_sign_hash_of_sha256() {
-    use sha2::{Digest as _, Sha256};
     let s = tv1_signer();
     let event_json =
         br#"[0,"17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917",1700000000,1,[],"hi"]"#;
@@ -146,11 +111,40 @@ fn sign_transaction_equals_sign_hash_of_sha256() {
     let event_id: [u8; 32] = Sha256::digest(event_json).into();
     let via_hash = s.sign_hash(&event_id).unwrap();
     assert_eq!(direct.to_bytes(), via_hash.to_bytes());
+
+    // Verify round-trip through the public `Signer::verify` API.
+    s.verify(&event_id, &direct.to_bytes()).unwrap();
 }
 
-/// Tampered signature / wrong message must fail `verify`. This is
-/// chain-specific because `Signer::verify` is the public NIP-01 entry
-/// point used by clients to validate relayed events.
+/// End-to-end NIP-01 event signing. Serialize
+/// `[0, pubkey, created_at, kind, tags, content]` per NIP-01 (whitespace
+/// stripped), hash to obtain the `event.id`, sign via
+/// `sign_transaction`, and confirm the result verifies against the
+/// computed event id. This is the exact flow a Nostr client follows.
+#[test]
+fn nip01_event_roundtrip_signs_and_verifies() {
+    let s = tv1_signer();
+    let pubkey_hex = s.public_key_hex();
+
+    // Canonical NIP-01 serialization (no whitespace, no trailing NL).
+    let event_body = format!(r#"[0,"{pubkey_hex}",1700000000,1,[],"hello nostr"]"#);
+    let event_id: [u8; 32] = Sha256::digest(event_body.as_bytes()).into();
+
+    let sig = s.sign_transaction(event_body.as_bytes()).unwrap();
+    assert_eq!(sig.to_bytes().len(), 64);
+    assert_eq!(
+        hex::encode(sig.public_key().unwrap()),
+        pubkey_hex,
+        "Schnorr variant must carry the signer's x-only pubkey",
+    );
+
+    // The 64-byte Schnorr signature must verify against the event.id —
+    // this is what every Nostr relay will check upon receiving the event.
+    s.verify(&event_id, &sig.to_bytes()).unwrap();
+}
+
+/// Tampered signature / wrong message must fail `verify`. This is the
+/// public NIP-01 entry point used by clients to validate relayed events.
 #[test]
 fn verify_rejects_tampered_signature_and_wrong_message() {
     let s = tv1_signer();

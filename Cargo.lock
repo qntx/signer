@@ -1315,6 +1315,7 @@ version = "3.0.0"
 dependencies = [
  "bs58",
  "hex",
+ "k256",
  "kobe-btc",
  "ripemd 0.2.0",
  "sha2 0.11.0",
@@ -1363,6 +1364,7 @@ name = "signer-evm"
 version = "3.0.0"
 dependencies = [
  "hex",
+ "k256",
  "kobe-evm",
  "serde_json",
  "sha3 0.11.0",
@@ -1446,7 +1448,6 @@ name = "signer-ton"
 version = "3.0.0"
 dependencies = [
  "ed25519-dalek",
- "hex",
  "kobe-ton",
  "signer-primitives",
 ]
@@ -1457,6 +1458,7 @@ version = "3.0.0"
 dependencies = [
  "bs58",
  "hex",
+ "k256",
  "kobe-tron",
  "sha2 0.11.0",
  "sha3 0.11.0",

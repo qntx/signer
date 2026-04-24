@@ -27,6 +27,10 @@ kobe-tron = { workspace = true, optional = true }
 [dev-dependencies]
 hex.workspace = true
 signer-primitives = { workspace = true, features = ["testing"] }
+# Dev-only: lets the `ecrecover` round-trip test derive the signer's
+# address from a wire signature without leaking `k256` into the
+# production API.
+k256 = { workspace = true, features = ["ecdsa"] }
 
 [lints]
 workspace = true

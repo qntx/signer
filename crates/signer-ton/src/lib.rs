@@ -2,6 +2,26 @@
 //!
 //! TON wallet addresses depend on the deployed contract code and workchain
 //! ID, so [`Signer::address`] returns the hex-encoded public key instead.
+//!
+//! # Off-chain message framing
+//!
+//! TON has no single canonical "personal signed message" envelope.
+//! Different use cases pick different preimages:
+//!
+//! - **TON Connect `ton_proof`**: `Ed25519(SHA-256(0xffff ||
+//!   utf8("ton-connect") || SHA-256(domain_msg)))`.
+//! - **`ton-proof-item-v2/`**: domain-tagged preimage for authenticated
+//!   sessions.
+//! - **Wallet contract messages**: `Ed25519(cell_hash)` where
+//!   `cell_hash` is the BOC hash of the outgoing message.
+//!
+//! Because none of these is universal, [`SignMessage::sign_message`] and
+//! [`Sign::sign_transaction`] on this crate perform **raw Ed25519** over
+//! the input bytes verbatim (no hashing, no prefixing). Callers are
+//! expected to construct the appropriate preimage for their scenario
+//! and hand it to the signer as-is. This is analogous to Nostr's
+//! `sign_message` — the primitive is intentionally exposed at the
+//! lowest level.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 

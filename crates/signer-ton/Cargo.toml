@@ -22,7 +22,7 @@ ed25519-dalek.workspace = true
 kobe-ton = { workspace = true, optional = true }
 
 [dev-dependencies]
-hex.workspace = true
+signer-primitives = { workspace = true, features = ["testing"] }
 
 [lints]
 workspace = true

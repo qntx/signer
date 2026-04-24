@@ -1,9 +1,22 @@
 //! Sui signer Known Answer Tests.
 //!
-//! Goldens are produced by an independent `@noble/curves` (ed25519) +
-//! `@noble/hashes` (blake2b) run. The KATs pin every moving piece of the
-//! Sui intent-based signing contract: address derivation, BCS length
-//! prefix, personal-message intent digest, and transaction intent digest.
+//! Focus: Sui-specific intent framing (BCS + BLAKE2b-256) and wire
+//! signature layout. Raw Ed25519 determinism lives in
+//! `signer_primitives::tests` via the three RFC 8032 reference vectors.
+//!
+//! What this file pins:
+//!
+//! - **Address**: `0x || hex(BLAKE2b-256(flag(0x00) || pubkey))`.
+//! - **BCS ULEB128**: representative 13-byte length encoding and the
+//!   127 → 128 continuation boundary.
+//! - **Intent signing**: `Ed25519(BLAKE2b-256(intent || bcs(value)))`
+//!   for both `PersonalMessage` (`[3,0,0]`) and `TransactionData`
+//!   (`[0,0,0]`) — matches the spec at
+//!   <https://docs.sui.io/guides/developer/transactions/transaction-auth/intent-signing>.
+//! - **Verify round-trip**: the intent digest feeds back through
+//!   `Signer::verify`, proving the output is a real Ed25519 signature
+//!   over the computed 32-byte digest.
+//! - **Wire format**: `flag(0x00) || sig(64) || pk(32)` = 97 bytes.
 
 #![allow(
     clippy::unwrap_used,
@@ -17,7 +30,6 @@ use super::{ED25519_FLAG, Sign, SignMessage, Signer, bcs_serialize_bytes};
 /// RFC 8032 Test Vector 1.
 const PRIV_KEY_HEX: &str = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
 const PUBKEY_HEX: &str = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
-const DIGEST_HEX: &str = "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20";
 const TX_HEX: &str = "deadbeef00010203";
 const MESSAGE: &str = "signer kat v3";
 
@@ -27,9 +39,6 @@ const ADDRESS: &str = "0x304af458e90e97c841685b8cbbc59b909f3e2cf150df590ada4c814
 /// BCS serialization of `MESSAGE` as `Vec<u8>`:
 /// `uleb128(len) || bytes`. For 13-byte input this is `0x0d || bytes`.
 const BCS_MESSAGE_HEX: &str = "0d7369676e6572206b6174207633";
-
-/// Ed25519 over `DIGEST_HEX` (no intent prefix — `sign_hash` is raw).
-const SIGN_HASH_HEX: &str = "8d917876339a83dc45d1796e557c7baf8bff5e88ab000e166136fa8a32e8318c6e0c05d03a29f317ff7114c7b128ea9a80d57142b818dc0f515f950afef5660b";
 
 /// Ed25519 over `BLAKE2b-256([3, 0, 0] || BCS(MESSAGE))` — Sui
 /// `IntentScope::PersonalMessage`.
@@ -41,10 +50,6 @@ const SIGN_TX_HEX: &str = "e69ae7d37cdc0b67dd79da34d2562f7077aeefc1a5084c547d5d2
 
 fn signer_fixture() -> Signer {
     Signer::from_hex(PRIV_KEY_HEX).unwrap()
-}
-
-fn digest() -> [u8; 32] {
-    hex::decode(DIGEST_HEX).unwrap().try_into().unwrap()
 }
 
 /// Pubkey + BLAKE2b-256 address under the Ed25519 flag (`0x00`).
@@ -76,23 +81,18 @@ fn bcs_uleb128_continuation_boundary() {
     assert_eq!(msg_128.len(), 130);
 }
 
+/// Sui personal-message intent signing: BCS-encode the message, prepend
+/// `IntentScope::PersonalMessage = [3, 0, 0]`, BLAKE2b-256, then sign.
+/// The KAT is cross-verified with `@noble/hashes` + `@noble/curves`.
 #[test]
-fn sign_hash_matches_noble_ed25519_kat() {
-    let out = signer_fixture().sign_hash(&digest()).unwrap();
-    assert_eq!(out.to_hex(), SIGN_HASH_HEX);
+fn sign_message_intent_blake2b_matches_noble_kat() {
+    let out = signer_fixture().sign_message(MESSAGE.as_bytes()).unwrap();
+    assert_eq!(out.to_hex(), SIGN_MESSAGE_HEX);
     assert_eq!(
         hex::encode(out.public_key().unwrap()),
         PUBKEY_HEX,
         "Sui attaches the pubkey for its 97-byte wire signature",
     );
-}
-
-/// Sui personal-message intent signing: BCS-encode the message, prepend
-/// `IntentScope::PersonalMessage = [3, 0, 0]`, BLAKE2b-256, then sign.
-#[test]
-fn sign_message_intent_blake2b_matches_noble_kat() {
-    let out = signer_fixture().sign_message(MESSAGE.as_bytes()).unwrap();
-    assert_eq!(out.to_hex(), SIGN_MESSAGE_HEX);
 }
 
 /// Sui transaction intent signing: prepend
@@ -102,6 +102,34 @@ fn sign_transaction_intent_blake2b_matches_noble_kat() {
     let tx = hex::decode(TX_HEX).unwrap();
     let out = signer_fixture().sign_transaction(&tx).unwrap();
     assert_eq!(out.to_hex(), SIGN_TX_HEX);
+}
+
+/// Verify round-trip: recompute the intent digest locally, then prove
+/// that `Signer::verify` accepts the signature over that exact digest.
+/// This catches any drift in the intent prefix bytes or the BLAKE2b-256
+/// parametrisation.
+#[test]
+fn sign_message_intent_digest_verifies_through_primitive() {
+    use blake2::Blake2bVar;
+    use blake2::digest::{Update, VariableOutput};
+
+    let s = signer_fixture();
+    let bcs = bcs_serialize_bytes(MESSAGE.as_bytes());
+
+    let mut hasher = Blake2bVar::new(32).unwrap();
+    hasher.update(&[0x03, 0x00, 0x00]);
+    hasher.update(&bcs);
+    let mut digest = [0u8; 32];
+    hasher.finalize_variable(&mut digest).unwrap();
+
+    let out = s.sign_message(MESSAGE.as_bytes()).unwrap();
+    let sig = out.to_bytes();
+    s.verify(&digest, &sig).unwrap();
+
+    // Tampering the signature must break verification.
+    let mut tampered = sig;
+    tampered[0] ^= 0x01;
+    assert!(s.verify(&digest, &tampered).is_err());
 }
 
 /// Sui's 97-byte on-chain wire signature: `flag(0x00) || sig(64) || pk(32)`.

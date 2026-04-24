@@ -27,6 +27,9 @@ kobe-btc = { workspace = true, optional = true }
 [dev-dependencies]
 hex.workspace = true
 signer-primitives = { workspace = true, features = ["testing"] }
+# Dev-only: `verifymessage`-style BIP-137 recovery round-trip in the
+# test suite. The production surface stays on `Signer::verify_hash`.
+k256 = { workspace = true, features = ["ecdsa"] }
 
 [lints]
 workspace = true

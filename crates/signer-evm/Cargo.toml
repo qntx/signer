@@ -27,6 +27,10 @@ kobe-evm = { workspace = true, optional = true }
 signer-primitives = { workspace = true, features = ["testing"] }
 hex.workspace = true
 zeroize.workspace = true
+# Used to verify round-trips through `ecrecover` in the test suite. The
+# production surface exposes verification via `Signer::verify_hash`, so
+# this is a dev-only dependency that keeps the main crate dep-graph lean.
+k256 = { workspace = true, features = ["ecdsa"] }
 
 [lints]
 workspace = true

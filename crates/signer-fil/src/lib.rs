@@ -2,6 +2,22 @@
 //!
 //! Uses the `f1` (protocol-1) address scheme derived from the uncompressed
 //! public key, and signs transactions with `BLAKE2b-256` + ECDSA.
+//!
+//! # Input to [`Sign::sign_transaction`]
+//!
+//! Per the [Filecoin signatures spec](https://spec.filecoin.io/algorithms/crypto/signatures/),
+//! "to generate a signature for the `Message` type, compute the signature
+//! over the message's CID (taken as a byte array)". Callers are therefore
+//! expected to hand this signer the **CID byte array** of their
+//! CBOR-encoded `Message` (`CIDv1`, codec `DAG-CBOR`, multihash
+//! `BLAKE2b-256`). The signer then computes `BLAKE2b-256(cid_bytes)` as
+//! the ECDSA prehash — matching the Zondax `filecoin-signing-tools`
+//! `transaction_sign_raw` convention and every on-chain validator.
+//!
+//! For off-chain scenarios where a Filecoin-specific CID is not
+//! meaningful, callers may pass any payload they like and interpret the
+//! signature accordingly; the wrapper places no restriction on the
+//! input bytes.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
