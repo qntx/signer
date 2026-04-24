@@ -21,10 +21,3 @@ target
 #.idea/
 
 /3rdparty
-
-# KAT regeneration artefacts — the generator is committed, its outputs
-# are not (they're inlined into each chain crate's tests.rs).
-tests/goldens/node_modules/
-tests/goldens/package-lock.json
-tests/goldens/vectors.json
-tests/goldens/vectors.rs
