@@ -41,23 +41,18 @@ curl -fsSL https://sh.qntx.fun/signer | sh
 irm https://sh.qntx.fun/signer/ps | iex
 ```
 
-Or via Cargo:
-
-```bash
-cargo install signer-cli
-```
-
 ### CLI Usage
 
 ```bash
-signer evm    sign-message -k "0x4c0883a6..." -m "Hello, Ethereum!"   # EIP-191
-signer btc    sign-message -k "4c0883a6..."   -m "Hello, Bitcoin!"    # BIP-137
-signer sui    sign-tx      -k "9d61b19d..."   -t "0000..."            # BLAKE2b intent
-signer cosmos sign-tx      -k "4c0883a6..."   -t "<SignDoc hex>"      # ADR-036 input
-signer xrpl   sign-tx      -k "4c0883a6..."   -t "<tx fields hex>"    # STX\0 + SHA-512/2 + DER
-signer nostr  sign-hash    -k "nsec10allq0g..." -x "5e6ea04f..."      # NIP-19 accepted
-signer evm    address      -k "0x4c0883a6..."                         # EIP-55 checksummed
-signer --json evm sign-message -k "0x4c0883a6..." -m "test"           # agent-friendly
+signer evm    sign-message -k "0x4c0883a6.."    -m "Hello, Ethereum!"   # EIP-191
+signer btc    sign-message -k "4c0883a6..."     -m "Hello, Bitcoin!"    # BIP-137
+signer sui    sign-tx      -k "9d61b19d..."     -t "0000..."            # BLAKE2b intent
+signer cosmos sign-tx      -k "4c0883a6..."     -t "<SignDoc hex>"      # ADR-036 input
+signer xrpl   sign-tx      -k "4c0883a6..."     -t "<tx fields hex>"    # STX\0 + SHA-512/2 + DER
+signer nostr  sign-hash    -k "nsec10allq0g..." -x "5e6ea04f..."        # NIP-19 accepted
+signer evm    address      -k "0x4c0883a6..."                           # EIP-55 checksummed
+
+signer --json evm sign-message -k "0x4c0883a6..." -m "test"             # agent-friendly
 ```
 
 ### Library Usage
