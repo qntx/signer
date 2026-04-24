@@ -19,27 +19,34 @@ pub(crate) struct SparkCommand {
 enum SparkSubcommand {
     /// Sign a raw 32-byte hash.
     SignHash {
+        /// Private key in hex (with or without 0x prefix).
         #[arg(short, long)]
         key: String,
+        /// 32-byte hash in hex (with or without 0x prefix).
         #[arg(short = 'x', long)]
         hash: String,
     },
     /// Sign a message (double-SHA256 then sign).
     SignMessage {
+        /// Private key in hex (with or without 0x prefix).
         #[arg(short, long)]
         key: String,
+        /// Message to sign.
         #[arg(short, long)]
         message: String,
     },
     /// Sign transaction bytes (double-SHA256 then sign).
     SignTx {
+        /// Private key in hex (with or without 0x prefix).
         #[arg(short, long)]
         key: String,
+        /// Hex-encoded transaction bytes.
         #[arg(short, long)]
         tx: String,
     },
     /// Show public key for a private key.
     Address {
+        /// Private key in hex (with or without 0x prefix).
         #[arg(short, long)]
         key: String,
     },

@@ -19,8 +19,10 @@ pub(crate) struct CosmosCommand {
 enum CosmosSubcommand {
     /// Sign a raw 32-byte hash.
     SignHash {
+        /// Private key in hex (with or without 0x prefix).
         #[arg(short, long)]
         key: String,
+        /// 32-byte hash in hex (with or without 0x prefix).
         #[arg(short = 'x', long)]
         hash: String,
     },
@@ -31,13 +33,16 @@ enum CosmosSubcommand {
     /// externally (or with `kobe cosmos adr036-doc`) and feed the canonical
     /// bytes into this subcommand.
     SignTx {
+        /// Private key in hex (with or without 0x prefix).
         #[arg(short, long)]
         key: String,
+        /// Hex-encoded `SignDoc` bytes.
         #[arg(short, long)]
         tx: String,
     },
     /// Show compressed public key for a private key.
     Address {
+        /// Private key in hex (with or without 0x prefix).
         #[arg(short, long)]
         key: String,
     },

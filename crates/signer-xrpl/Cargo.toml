@@ -8,6 +8,7 @@ readme = "../../README.md"
 description = "XRP Ledger transaction signer — secp256k1 ECDSA + SHA-512-half + DER."
 keywords = ["crypto", "signer", "xrpl", "ripple", "secp256k1"]
 categories = ["cryptography::cryptocurrencies", "no-std"]
+
 [features]
 default = ["std"]
 std = ["alloc", "signer-primitives/std"]

@@ -7,7 +7,7 @@ repository.workspace = true
 readme = "../../README.md"
 description = "Unified signing trait and types for multi-chain transaction signers."
 keywords = ["crypto", "signer", "trait", "multi-chain"]
-categories = ["cryptography::cryptocurrencies"]
+categories = ["cryptography::cryptocurrencies", "no-std"]
 
 [features]
 default = ["std"]

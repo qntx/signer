@@ -76,8 +76,15 @@ impl Signer {
 
     /// Sign arbitrary bytes with raw Ed25519 (no hashing or prefixing).
     ///
-    /// Returns the native [`Signature`]. For the unified
-    /// [`SignOutput::Ed25519`] wire form, use [`SignMessage::sign_message`].
+    /// Returns the native [`Signature`] from `ed25519-dalek`. Solana has
+    /// no on-chain signing framing beyond raw Ed25519, so this method,
+    /// [`Self::sign_transaction`], and [`SignMessage::sign_message`]
+    /// produce byte-identical signatures for identical input bytes —
+    /// they differ only in return type:
+    ///
+    /// - [`sign_raw`](Self::sign_raw) → native `ed25519_dalek::Signature`
+    /// - [`sign_transaction`](Self::sign_transaction) → [`SignOutput::Ed25519`]
+    /// - [`SignMessage::sign_message`] → [`SignOutput::Ed25519`]
     #[must_use]
     pub fn sign_raw(&self, message: &[u8]) -> Signature {
         self.0.sign_raw(message)
@@ -108,13 +115,15 @@ impl Signer {
     ///
     /// Strips the compact-u16 header and signature slot placeholders.
     ///
-    /// Also available via the [`ExtractSignableBytes`] trait.
+    /// The signer state itself is not consulted — the [`&self`](Self)
+    /// receiver is kept for symmetry with the [`ExtractSignableBytes`]
+    /// trait method and to enable ergonomic method-call syntax.
     ///
     /// # Errors
     ///
     /// Returns an error if the transaction is empty or malformed.
     #[allow(clippy::indexing_slicing, reason = "bounds are checked before slicing")]
-    pub fn extract_signable_bytes(tx_bytes: &[u8]) -> Result<&[u8], SignError> {
+    pub fn extract_signable_bytes<'a>(&self, tx_bytes: &'a [u8]) -> Result<&'a [u8], SignError> {
         if tx_bytes.is_empty() {
             return Err(SignError::InvalidTransaction("empty transaction".into()));
         }
@@ -136,14 +145,18 @@ impl Signer {
     /// structurally identical). Mirrors the [`EncodeSignedTransaction`]
     /// trait method for callers that already hold a [`SignOutput`].
     ///
-    /// For direct splicing from the native `ed25519_dalek::Signature`
-    /// representation, use [`Signer::splice_signature`].
+    /// The signer state itself is not consulted — the [`&self`](Self)
+    /// receiver is kept for symmetry with the [`EncodeSignedTransaction`]
+    /// trait method and to enable ergonomic method-call syntax. For direct
+    /// splicing from the native `ed25519_dalek::Signature` representation,
+    /// use [`Signer::splice_signature`].
     ///
     /// # Errors
     ///
     /// Returns an error if the transaction is empty, has no signature slots,
     /// or if `signature` is not an Ed25519 variant.
     pub fn encode_signed_transaction(
+        &self,
         tx_bytes: &[u8],
         signature: &SignOutput,
     ) -> Result<Vec<u8>, SignError> {
@@ -213,8 +226,11 @@ impl Sign for Signer {
 
 impl SignMessage for Signer {
     /// **Framing**: raw Ed25519 over the message bytes — no prefix, no
-    /// hashing. Solana has no canonical off-chain message envelope; this
-    /// matches `nacl.sign.detached` in `@solana/web3.js`.
+    /// hashing. Matches `nacl.sign.detached` from `@solana/web3.js`, the
+    /// de-facto ecosystem standard for Solana off-chain message signing.
+    /// There is no on-chain message-signing protocol on Solana itself;
+    /// wallets (Phantom, Backpack, Solflare) and dapps converge on the
+    /// `nacl.sign.detached` wire shape as the portable default.
     fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         Ok(self.0.sign_output(message))
     }
@@ -222,7 +238,7 @@ impl SignMessage for Signer {
 
 impl ExtractSignableBytes for Signer {
     fn extract_signable_bytes<'a>(&self, tx_bytes: &'a [u8]) -> Result<&'a [u8], SignError> {
-        Self::extract_signable_bytes(tx_bytes)
+        Self::extract_signable_bytes(self, tx_bytes)
     }
 }
 
@@ -232,7 +248,7 @@ impl EncodeSignedTransaction for Signer {
         tx_bytes: &[u8],
         signature: &SignOutput,
     ) -> Result<Vec<u8>, SignError> {
-        Self::encode_signed_transaction(tx_bytes, signature)
+        Self::encode_signed_transaction(self, tx_bytes, signature)
     }
 }
 

@@ -8,6 +8,7 @@ readme = "../../README.md"
 description = "TRON transaction signer — secp256k1 ECDSA + Keccak-256."
 keywords = ["crypto", "signer", "tron", "secp256k1", "keccak"]
 categories = ["cryptography::cryptocurrencies", "no-std"]
+
 [features]
 default = ["std"]
 std = ["alloc", "signer-primitives/std"]

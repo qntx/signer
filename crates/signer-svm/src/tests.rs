@@ -112,14 +112,15 @@ fn from_keypair_base58_rejects_invalid_inputs() {
 /// signable payload verbatim.
 #[test]
 fn extract_signable_bytes_strips_compact_u16_header_and_signature_slots() {
+    let signer = signer_fixture();
     let mut tx = vec![1u8]; // compact-u16 `num_sigs = 1`
     tx.extend_from_slice(&[0u8; 64]);
     tx.extend_from_slice(b"message_body");
-    let body = Signer::extract_signable_bytes(&tx).unwrap();
+    let body = signer.extract_signable_bytes(&tx).unwrap();
     assert_eq!(body, b"message_body");
 
     assert!(matches!(
-        Signer::extract_signable_bytes(&[]),
+        signer.extract_signable_bytes(&[]),
         Err(SignError::InvalidTransaction(_))
     ));
 }
@@ -140,8 +141,9 @@ fn encode_signed_transaction_matches_splice_signature() {
     assert_eq!(&spliced_low[1..65], &raw_sig);
     assert_eq!(&spliced_low[65..], msg_body);
 
-    let spliced_high =
-        Signer::encode_signed_transaction(&tx, &SignOutput::Ed25519(raw_sig)).unwrap();
+    let spliced_high = s
+        .encode_signed_transaction(&tx, &SignOutput::Ed25519(raw_sig))
+        .unwrap();
     assert_eq!(spliced_low, spliced_high);
 }
 

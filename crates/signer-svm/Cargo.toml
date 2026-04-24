@@ -8,6 +8,7 @@ readme = "../../README.md"
 description = "Solana transaction signer — Ed25519 signing, compact-u16 tx encoding."
 keywords = ["crypto", "signer", "solana", "ed25519", "wallet"]
 categories = ["cryptography::cryptocurrencies", "no-std"]
+
 [features]
 default = ["std"]
 std = ["alloc", "signer-primitives/std", "zeroize/std"]

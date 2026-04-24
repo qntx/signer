@@ -27,7 +27,7 @@ use alloc::{format, string::String, vec::Vec};
 
 use blake2::digest::consts::{U4, U20, U32};
 use blake2::{Blake2b, Digest};
-pub use signer_primitives::{self, Sign, SignError, SignMessage, SignOutput};
+pub use signer_primitives::{self, Sign, SignError, SignOutput};
 use signer_primitives::{Secp256k1Signer, delegate_secp256k1_ctors};
 
 type Blake2b256 = Blake2b<U32>;
@@ -113,19 +113,6 @@ impl Sign for Signer {
 
     fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
         self.0.sign_prehash_recoverable(hash)
-    }
-}
-
-impl SignMessage for Signer {
-    /// **Framing**: Filecoin off-chain message — `BLAKE2b-256` of the raw
-    /// message bytes (no prefix), signed with secp256k1 ECDSA.
-    ///
-    /// Filecoin's wallet ecosystem does not specify a canonical off-chain
-    /// message framing; callers who need one should hash their own preimage
-    /// and call [`Sign::sign_hash`] directly.
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        let digest: [u8; 32] = Blake2b256::digest(message).into();
-        self.0.sign_prehash_recoverable(&digest)
     }
 }
 

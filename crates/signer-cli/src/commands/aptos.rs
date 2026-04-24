@@ -1,7 +1,7 @@
 //! Aptos signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_aptos::{SignMessage, Signer};
+use signer_aptos::Signer;
 
 use super::parse_hex;
 use crate::output::{self, CliResult};
@@ -17,22 +17,23 @@ pub(crate) struct AptosCommand {
 
 #[derive(Subcommand)]
 enum AptosSubcommand {
-    /// Sign a message with Ed25519.
-    Sign {
-        #[arg(short, long)]
-        key: String,
-        #[arg(short, long)]
-        message: String,
-    },
-    /// Sign a BCS-serialized `RawTransaction` (with APTOS domain prefix).
+    /// Sign a BCS-serialized `RawTransaction` (with `APTOS::RawTransaction`
+    /// SHA3-256 domain prefix).
+    ///
+    /// Aptos has no canonical off-chain personal-message envelope; the
+    /// on-chain signing message is the only convention. For raw Ed25519
+    /// over arbitrary bytes, call `Signer::sign_raw` from library code.
     SignTx {
+        /// Private key in hex (with or without 0x prefix).
         #[arg(short, long)]
         key: String,
+        /// Hex-encoded BCS `RawTransaction` bytes.
         #[arg(short, long)]
         tx: String,
     },
     /// Show Aptos address for a private key.
     Address {
+        /// Private key in hex (with or without 0x prefix).
         #[arg(short, long)]
         key: String,
     },
@@ -41,23 +42,12 @@ enum AptosSubcommand {
 impl AptosCommand {
     pub(crate) fn execute(self, json: bool) -> CliResult {
         match self.command {
-            AptosSubcommand::Sign { key, message } => {
-                let signer = Signer::from_hex(&key)?;
-                let out = SignMessage::sign_message(&signer, message.as_bytes())?;
-                output::sign(CHAIN, "Ed25519")
-                    .address(signer.address())
-                    .from_output(&out)
-                    .public_key_hex(signer.public_key_hex())
-                    .message(message)
-                    .render(json)
-            }
             AptosSubcommand::SignTx { key, tx } => {
                 let signer = Signer::from_hex(&key)?;
                 let out = signer.sign_transaction(&parse_hex(&tx)?)?;
                 output::sign(CHAIN, "transaction")
                     .address(signer.address())
                     .from_output(&out)
-                    .public_key_hex(signer.public_key_hex())
                     .render(json)
             }
             AptosSubcommand::Address { key } => {

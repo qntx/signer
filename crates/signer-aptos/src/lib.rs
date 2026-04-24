@@ -14,7 +14,7 @@ use alloc::{format, string::String, vec::Vec};
 
 pub use ed25519_dalek::Signature;
 use sha3::Digest as _;
-pub use signer_primitives::{self, Sign, SignError, SignMessage, SignOutput};
+pub use signer_primitives::{self, Sign, SignError, SignOutput};
 use signer_primitives::{Ed25519Signer, delegate_ed25519_ctors};
 
 /// Ed25519 single-key authentication scheme byte used by Aptos.
@@ -56,9 +56,10 @@ impl Signer {
 
     /// Sign arbitrary bytes with raw Ed25519 (no domain prefix).
     ///
-    /// Returns the native [`Signature`]. For the unified
-    /// [`SignOutput::Ed25519WithPubkey`] wire form, use
-    /// [`SignMessage::sign_message`].
+    /// Returns the native [`Signature`]. Aptos has no canonical off-chain
+    /// message envelope, so this is the only way to sign arbitrary bytes
+    /// outside of an on-chain [`Signer::sign_transaction`] call (which
+    /// adds the `APTOS::RawTransaction` domain prefix).
     #[must_use]
     pub fn sign_raw(&self, message: &[u8]) -> Signature {
         self.0.sign_raw(message)
@@ -102,15 +103,6 @@ impl Sign for Signer {
     /// only as a low-level off-chain primitive.
     fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
         Ok(self.0.sign_output_with_pubkey(hash))
-    }
-}
-
-impl SignMessage for Signer {
-    /// **Framing**: raw Ed25519 over the message bytes — no Aptos domain
-    /// prefix. Aptos has no canonical off-chain message envelope; callers
-    /// should construct chain-specific preimages themselves if needed.
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        Ok(self.0.sign_output_with_pubkey(message))
     }
 }
 

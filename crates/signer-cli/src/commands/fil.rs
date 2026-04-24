@@ -1,7 +1,7 @@
 //! Filecoin signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_fil::{Sign, SignMessage, Signer};
+use signer_fil::{Sign, Signer};
 
 use super::{parse_hex, parse_hex32};
 use crate::output::{self, CliResult};
@@ -19,27 +19,29 @@ pub(crate) struct FilCommand {
 enum FilSubcommand {
     /// Sign a raw 32-byte hash.
     SignHash {
+        /// Private key in hex (with or without 0x prefix).
         #[arg(short, long)]
         key: String,
+        /// 32-byte hash in hex (with or without 0x prefix).
         #[arg(short = 'x', long)]
         hash: String,
     },
-    /// Sign a message (Blake2b-256 then sign).
-    SignMessage {
-        #[arg(short, long)]
-        key: String,
-        #[arg(short, long)]
-        message: String,
-    },
-    /// Sign transaction bytes (Blake2b-256 then sign).
+    /// Sign a CID byte array (or arbitrary preimage), Blake2b-256 then sign.
+    ///
+    /// Filecoin has no separate personal-message scheme; feed any preimage
+    /// you wish to sign here and the wrapper will hash it with Blake2b-256
+    /// before the ECDSA step.
     SignTx {
+        /// Private key in hex (with or without 0x prefix).
         #[arg(short, long)]
         key: String,
+        /// Hex-encoded CID / preimage bytes.
         #[arg(short, long)]
         tx: String,
     },
     /// Show public key for a private key.
     Address {
+        /// Private key in hex (with or without 0x prefix).
         #[arg(short, long)]
         key: String,
     },
@@ -55,15 +57,6 @@ impl FilCommand {
                     .address(signer.address())
                     .from_output(&out)
                     .message(hash)
-                    .render(json)
-            }
-            FilSubcommand::SignMessage { key, message } => {
-                let signer = Signer::from_hex(&key)?;
-                let out = signer.sign_message(message.as_bytes())?;
-                output::sign(CHAIN, "message (Blake2b-256)")
-                    .address(signer.address())
-                    .from_output(&out)
-                    .message(message)
                     .render(json)
             }
             FilSubcommand::SignTx { key, tx } => {

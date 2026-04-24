@@ -227,7 +227,15 @@ fn encode_compact_size(buf: &mut Vec<u8>, n: usize) {
 }
 
 /// Compute `double_SHA256("\x18Bitcoin Signed Message:\n" || CompactSize(len) || message)`.
-pub(crate) fn bitcoin_message_digest(message: &[u8]) -> [u8; 32] {
+///
+/// This is the BIP-137 signed-message digest reused verbatim by any
+/// Bitcoin-descended chain whose off-chain message scheme delegates to
+/// Bitcoin Core's `signmessage` — currently this crate and `signer-spark`.
+/// Exposing the digest function (instead of duplicating it in every
+/// consumer) keeps the `CompactSize` encoding and prefix bytes defined in
+/// a single location.
+#[must_use]
+pub fn bitcoin_message_digest(message: &[u8]) -> [u8; 32] {
     const PREFIX: &[u8] = b"\x18Bitcoin Signed Message:\n";
     let mut data = Vec::with_capacity(PREFIX.len() + 9 + message.len());
     data.extend_from_slice(PREFIX);

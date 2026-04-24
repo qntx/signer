@@ -32,7 +32,6 @@ colored.workspace = true
 hex = { workspace = true, features = ["std"] }
 serde.workspace = true
 serde_json = { workspace = true, features = ["std"] }
-sha2.workspace = true
 
 [lints]
 workspace = true

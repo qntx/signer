@@ -106,13 +106,15 @@ impl Signer {
     ///
     /// `signature` must be a [`SignOutput::Ecdsa`] produced by
     /// [`sign_transaction`](Self::sign_transaction) (with raw `v = 0 | 1`).
-    ///
-    /// Also available via the [`EncodeSignedTransaction`] trait.
+    /// The signer state itself is not consulted — the [`&self`](Self)
+    /// receiver is kept for symmetry with the [`EncodeSignedTransaction`]
+    /// trait method and to enable ergonomic method-call syntax.
     ///
     /// # Errors
     ///
     /// Returns an error if the unsigned tx or signature variant is malformed.
     pub fn encode_signed_transaction(
+        &self,
         unsigned_tx: &[u8],
         signature: &SignOutput,
     ) -> Result<Vec<u8>, SignError> {
@@ -159,7 +161,7 @@ impl EncodeSignedTransaction for Signer {
         unsigned_tx: &[u8],
         signature: &SignOutput,
     ) -> Result<Vec<u8>, SignError> {
-        Self::encode_signed_transaction(unsigned_tx, signature)
+        Self::encode_signed_transaction(self, unsigned_tx, signature)
     }
 }
 

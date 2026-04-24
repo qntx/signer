@@ -22,7 +22,7 @@
     reason = "test module: panics are acceptable and assertions self-describe"
 )]
 
-use super::{Sign, SignMessage, Signer};
+use super::{Sign, Signer};
 
 /// RFC 8032 Test Vector 1 — shared by SVM / Sui / Aptos as well.
 const PRIV_KEY_HEX: &str = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
@@ -55,7 +55,6 @@ fn every_entry_point_is_raw_ed25519_and_self_verifies() {
 
     let cases: &[(&str, &[u8])] = &[
         ("sign_hash", &[1u8; 32]),
-        ("sign_message", b"signer kat v3"),
         ("sign_transaction", b"\xde\xad\xbe\xef\x00\x01\x02\x03"),
     ];
 
@@ -66,7 +65,6 @@ fn every_entry_point_is_raw_ed25519_and_self_verifies() {
                 digest.copy_from_slice(payload);
                 s.sign_hash(&digest).unwrap()
             }
-            "sign_message" => s.sign_message(payload).unwrap(),
             "sign_transaction" => s.sign_transaction(payload).unwrap(),
             _ => unreachable!(),
         };

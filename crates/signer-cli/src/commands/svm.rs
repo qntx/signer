@@ -17,8 +17,8 @@ pub(crate) struct SvmCommand {
 
 #[derive(Subcommand)]
 enum SvmSubcommand {
-    /// Sign a message with Ed25519.
-    Sign {
+    /// Sign a message with Ed25519 (matches `nacl.sign.detached`).
+    SignMessage {
         /// Private key in hex or base58 keypair format.
         #[arg(short, long)]
         key: String,
@@ -55,7 +55,7 @@ fn load_signer(key: &str) -> Result<Signer, Box<dyn std::error::Error>> {
 impl SvmCommand {
     pub(crate) fn execute(self, json: bool) -> CliResult {
         match self.command {
-            SvmSubcommand::Sign { key, message, hex } => {
+            SvmSubcommand::SignMessage { key, message, hex } => {
                 let signer = load_signer(&key)?;
                 let msg_bytes = if hex {
                     parse_hex(&message)?
@@ -63,7 +63,7 @@ impl SvmCommand {
                     message.as_bytes().to_vec()
                 };
                 let out = signer.sign_message(&msg_bytes)?;
-                output::sign(CHAIN, "Ed25519")
+                output::sign(CHAIN, "Ed25519 (nacl.sign.detached)")
                     .address(signer.address())
                     .from_output(&out)
                     .public_key_bytes(&signer.public_key_bytes())

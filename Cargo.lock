@@ -1319,7 +1319,6 @@ dependencies = [
  "hex",
  "serde",
  "serde_json",
- "sha2 0.11.0",
  "signer-aptos",
  "signer-btc",
  "signer-cosmos",
@@ -1403,6 +1402,7 @@ dependencies = [
  "kobe-spark",
  "ripemd 0.2.0",
  "sha2 0.11.0",
+ "signer-btc",
  "signer-primitives",
 ]
 

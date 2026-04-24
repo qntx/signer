@@ -8,6 +8,7 @@ readme = "../../README.md"
 description = "Filecoin transaction signer — secp256k1 ECDSA + Blake2b."
 keywords = ["crypto", "signer", "filecoin", "blake2b", "secp256k1"]
 categories = ["cryptography::cryptocurrencies", "no-std"]
+
 [features]
 default = ["std"]
 std = ["alloc", "signer-primitives/std"]

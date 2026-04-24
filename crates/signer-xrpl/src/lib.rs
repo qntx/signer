@@ -123,11 +123,6 @@ impl Sign for Signer {
     }
 }
 
-// XRPL intentionally does **not** implement `SignMessage`: the ledger has no
-// canonical off-chain message-signing standard (no EIP-191 equivalent), so a
-// runtime `Err` would be a type-system lie. Users who need a custom scheme
-// hash their own preimage and call `Sign::sign_hash`.
-
 #[cfg(feature = "kobe")]
 impl Signer {
     /// Create from a [`kobe_xrpl::DerivedAccount`].

@@ -68,7 +68,7 @@ The `--json` flag is **global** and must appear **before** the chain subcommand.
 
 ### Subcommands per chain
 
-#### secp256k1 ECDSA chains with message signing (evm, btc, tron, spark, fil)
+#### secp256k1 ECDSA chains with message signing (evm, btc, tron, spark)
 
 | Subcommand     | Description                                     |
 | -------------- | ----------------------------------------------- |
@@ -77,24 +77,32 @@ The `--json` flag is **global** and must appear **before** the chain subcommand.
 | `sign-tx`      | Sign transaction bytes (chain-specific hashing) |
 | `address`      | Show address and/or public key                  |
 
-#### secp256k1 ECDSA chains without message signing (cosmos, xrpl)
+#### secp256k1 ECDSA chains without message signing (cosmos, xrpl, fil)
 
 | Subcommand  | Description                                                                  |
 | ----------- | ---------------------------------------------------------------------------- |
 | `sign-hash` | Sign a raw 32-byte hash                                                      |
-| `sign-tx`   | Sign transaction bytes (Cosmos: `SignDoc` / ADR-036; XRPL: `STX\0` + SHA-512-half) |
+| `sign-tx`   | Sign transaction bytes (Cosmos: `SignDoc` / ADR-036; XRPL: `STX\0` + SHA-512-half; Filecoin: Blake2b-256 of CID bytes) |
 | `address`   | Show address and/or public key                                               |
 
-Cosmos has no single-argument `sign-message`: for off-chain signing build the ADR-036 `StdSignDoc` externally (or via `kobe cosmos`) and feed its canonical bytes into `sign-tx`. XRPL has no canonical message standard.
+Cosmos has no single-argument `sign-message`: for off-chain signing build the ADR-036 `StdSignDoc` externally (or via `kobe cosmos`) and feed its canonical bytes into `sign-tx`. XRPL has no canonical message standard. Filecoin has no separate personal-message scheme either — `sign-tx` doubles as the message-signing entry point (it Blake2b-256 hashes whatever you feed it).
 
-#### Ed25519 chains (svm, sui, ton, aptos)
+#### Ed25519 chains with message signing (svm, sui)
 
-| Subcommand     | Description                      |
-| -------------- | -------------------------------- |
-| `sign`         | Sign a message (SVM, TON, Aptos) |
-| `sign-message` | Sign a message with intent (SUI) |
-| `sign-tx`      | Sign transaction bytes           |
-| `address`      | Show address and/or public key   |
+| Subcommand     | Description                                                 |
+| -------------- | ----------------------------------------------------------- |
+| `sign-message` | Sign a message (SVM: `nacl.sign.detached`; SUI: BCS+intent) |
+| `sign-tx`      | Sign transaction bytes                                      |
+| `address`      | Show address and/or public key                              |
+
+#### Ed25519 chains without message signing (ton, aptos)
+
+| Subcommand  | Description                                                                  |
+| ----------- | ---------------------------------------------------------------------------- |
+| `sign-tx`   | Sign transaction bytes (TON: raw Ed25519; Aptos: SHA3-256 domain prefix + Ed25519) |
+| `address` (Aptos) / `identity` (TON) | Show address or hex public-key identity                   |
+
+TON has no canonical personal-message envelope (TON Connect / `ton_proof` / wallet cell-hash all differ), and Aptos has no off-chain equivalent of its `APTOS::RawTransaction` prefix. Both chains expose only `sign-tx`; library users who genuinely need raw Ed25519 over arbitrary bytes call `Signer::sign_raw` from Rust code.
 
 #### BIP-340 Schnorr chains (nostr)
 
@@ -111,33 +119,35 @@ Cosmos has no single-argument `sign-message`: for off-chain signing build the AD
 | ------------ | ----- | ------------------ | ---------------------------------------------------------------------- |
 | `--json`     |       | Global             | JSON output (must come before chain subcommand)                        |
 | `--key`      | `-k`  | All                | Private key in hex (0x-prefixed or plain); Nostr also accepts `nsec1…` |
-| `--message`  | `-m`  | sign, sign-message | Message to sign                                                        |
+| `--message`  | `-m`  | sign-message       | Message to sign                                                        |
 | `--hash`     | `-x`  | sign-hash          | 32-byte hash in hex (Nostr also accepts `--event-id`)                  |
 | `--event-id` | `-x`  | nostr sign-hash    | Alias for `--hash` — the 32-byte NIP-01 event id                       |
 | `--tx`       | `-t`  | sign-tx            | Hex-encoded transaction bytes (Nostr: serialized NIP-01 event)         |
 
 ### Solana-specific flags
 
-| Flag    | Scope  | Description                        |
-| ------- | ------ | ---------------------------------- |
-| `--hex` | `sign` | Treat message as hex-encoded bytes |
+| Flag    | Scope          | Description                        |
+| ------- | -------------- | ---------------------------------- |
+| `--hex` | `sign-message` | Treat message as hex-encoded bytes |
 
 ## Chain-Specific Hashing
 
-| Chain      | `sign-message` hash                                                              | `sign-tx` hash                   |
-| ---------- | -------------------------------------------------------------------------------- | -------------------------------- |
-| Ethereum   | Keccak-256 (EIP-191 prefix, `v = 27 | 28`)                                       | Keccak-256 (`v = 0 | 1`)         |
-| Bitcoin    | double-SHA256 (Bitcoin Signed Message prefix, BIP-137 compressed P2PKH `v = 31 | 32`) | double-SHA256 (`v = 0 | 1`) |
-| Solana     | Ed25519 direct                                                                   | Ed25519 direct                   |
-| Cosmos     | _Not supported — use `sign-tx` with an ADR-036 `StdSignDoc`_                     | SHA-256 (`v = 0 | 1`)            |
-| Tron       | Keccak-256 (TRON Signed Message prefix, `v = 27 | 28`)                           | SHA-256 (`v = 0 | 1`)            |
-| Sui        | BLAKE2b-256 (BCS + intent)                                                       | BLAKE2b-256 (intent)             |
-| TON        | Ed25519 direct                                                                   | Ed25519 direct                   |
-| Filecoin   | BLAKE2b-256 (raw, `v = 0 | 1`)                                                   | BLAKE2b-256 (`v = 0 | 1`)        |
-| Spark      | double-SHA256 (Bitcoin Signed Message prefix, BIP-137 compressed P2PKH `v = 31 | 32`) | double-SHA256 (`v = 0 | 1`) |
-| XRP Ledger | Not supported (no canonical message standard)                                    | SHA-512-half + DER               |
-| Aptos      | Ed25519 direct                                                                   | SHA3-256 domain prefix + Ed25519 |
-| Nostr      | BIP-340 Schnorr (raw, no implicit hashing)                                       | SHA-256 then BIP-340 Schnorr     |
+The `v` fragments below are wrapped in inline code to survive markdown table rendering — the literal pipe character inside `v = X | Y` would otherwise be parsed as a column separator.
+
+| Chain      | `sign-message` hash                                                                            | `sign-tx` hash                       |
+| ---------- | ---------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Ethereum   | Keccak-256 (EIP-191 prefix, `v = 27 \| 28`)                                                    | Keccak-256 (`v = 0 \| 1`)            |
+| Bitcoin    | double-SHA256 (Bitcoin Signed Message prefix, BIP-137 compressed P2PKH `v = 31 \| 32`)         | double-SHA256 (`v = 0 \| 1`)         |
+| Solana     | Ed25519 direct                                                                                 | Ed25519 direct                       |
+| Cosmos     | _Not supported — use `sign-tx` with an ADR-036 `StdSignDoc`_                                   | SHA-256 (`v = 0 \| 1`)               |
+| Tron       | Keccak-256 (TRON Signed Message prefix, `v = 27 \| 28`)                                        | SHA-256 (`v = 0 \| 1`)               |
+| Sui        | BLAKE2b-256 (BCS + intent)                                                                     | BLAKE2b-256 (intent)                 |
+| TON        | _Not supported — use `sign-tx` (raw Ed25519 over the preimage you supply)_                     | Ed25519 direct                       |
+| Filecoin   | _Not supported — use `sign-tx` (Blake2b-256 over the preimage you supply)_                     | BLAKE2b-256 (`v = 0 \| 1`)           |
+| Spark      | double-SHA256 (Bitcoin Signed Message prefix, BIP-137 compressed P2PKH `v = 31 \| 32`)         | double-SHA256 (`v = 0 \| 1`)         |
+| XRP Ledger | _Not supported (no canonical message standard)_                                                | SHA-512-half + DER                   |
+| Aptos      | _Not supported — use `sign-tx` (applies the `APTOS::RawTransaction` SHA3-256 domain prefix)_   | SHA3-256 domain prefix + Ed25519     |
+| Nostr      | BIP-340 Schnorr (raw, no implicit hashing)                                                     | SHA-256 then BIP-340 Schnorr         |
 
 ## Usage Examples
 
@@ -182,11 +192,11 @@ signer --json btc sign-message -k "4c0883a6..." -m "test"
 ### Solana
 
 ```bash
-# Sign a message
-signer svm sign -k "9d61b19d..." -m "Hello, Solana!"
+# Sign a message (matches `nacl.sign.detached` from @solana/web3.js)
+signer svm sign-message -k "9d61b19d..." -m "Hello, Solana!"
 
 # Sign hex-encoded bytes
-signer svm sign -k "9d61b19d..." -m "0a0b0c..." --hex
+signer svm sign-message -k "9d61b19d..." -m "0a0b0c..." --hex
 
 # Sign transaction bytes
 signer svm sign-tx -k "9d61b19d..." -t "01000103..."
@@ -195,13 +205,23 @@ signer svm sign-tx -k "9d61b19d..." -t "01000103..."
 signer svm address -k "9d61b19d..."
 ```
 
-### Tron / Spark / Filecoin
+### Tron / Spark
 
 ```bash
-# Tron / Spark / Filecoin follow the same `sign-message` / `sign-tx` pattern
+# Tron and Spark support `sign-message` (Keccak-256 / double-SHA256 framed).
 signer tron sign-message -k "4c0883a6..." -m "Hello"
+signer spark sign-message -k "4c0883a6..." -m "Hello"
 signer spark sign-tx -k "4c0883a6..." -t "deadbeef..."
+```
+
+### Filecoin (no `sign-message`, use `sign-tx`)
+
+```bash
+# Filecoin has no personal-message scheme; `sign-tx` Blake2b-256 hashes
+# whatever you feed it and signs the digest.
 signer fil sign-hash -k "4c0883a6..." -x "abcdef..."
+signer fil sign-tx   -k "4c0883a6..." -t "<hex of CID bytes or any preimage>"
+signer fil address   -k "4c0883a6..."
 ```
 
 ### Cosmos (no `sign-message`, ADR-036 via `sign-tx`)
@@ -236,29 +256,23 @@ signer sui sign-tx -k "9d61b19d..." -t "0000..."
 signer sui address -k "9d61b19d..."
 ```
 
-### TON
+### TON (no `sign-message`, use `sign-tx` for any raw-Ed25519 preimage)
 
 ```bash
-# Sign a message
-signer ton sign -k "9d61b19d..." -m "Hello, TON!"
-
-# Sign transaction bytes
-signer ton sign-tx -k "9d61b19d..." -t "b5ee9c72..."
-
-# Show public key
-signer ton address -k "9d61b19d..."
+# TON has no canonical personal-message envelope; hand any preimage to
+# sign-tx and it will apply raw Ed25519.
+signer ton sign-tx  -k "9d61b19d..." -t "b5ee9c72..."
+signer ton identity -k "9d61b19d..."
 ```
 
-### Aptos
+### Aptos (no `sign-message`, use `sign-tx` for BCS `RawTransaction`)
 
 ```bash
-# Sign a message (raw Ed25519)
-signer aptos sign -k "9d61b19d..." -m "Hello, Aptos!"
-
-# Sign BCS-serialized RawTransaction (with APTOS:: domain prefix)
+# Aptos applies the SHA3-256("APTOS::RawTransaction") domain prefix inside
+# sign-tx. There is no off-chain personal-message equivalent on the CLI —
+# library callers who need raw Ed25519 over arbitrary bytes use
+# `Signer::sign_raw` directly.
 signer aptos sign-tx -k "9d61b19d..." -t "0000..."
-
-# Show Aptos address (SHA3-256 derived)
 signer aptos address -k "9d61b19d..."
 ```
 

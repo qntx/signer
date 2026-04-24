@@ -8,6 +8,7 @@ readme = "../../README.md"
 description = "Cosmos transaction signer — secp256k1 ECDSA + SHA-256."
 keywords = ["crypto", "signer", "cosmos", "secp256k1", "wallet"]
 categories = ["cryptography::cryptocurrencies", "no-std"]
+
 [features]
 default = ["std"]
 std = ["alloc", "signer-primitives/std"]

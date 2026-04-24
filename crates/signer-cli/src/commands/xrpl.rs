@@ -19,20 +19,25 @@ pub(crate) struct XrplCommand {
 enum XrplSubcommand {
     /// Sign a raw 32-byte hash (DER-encoded output).
     SignHash {
+        /// Private key in hex (with or without 0x prefix).
         #[arg(short, long)]
         key: String,
+        /// 32-byte hash in hex (with or without 0x prefix).
         #[arg(short = 'x', long)]
         hash: String,
     },
     /// Sign transaction bytes (STX\0 prefix + SHA-512-half, then sign).
     SignTx {
+        /// Private key in hex (with or without 0x prefix).
         #[arg(short, long)]
         key: String,
+        /// Hex-encoded unsigned transaction bytes (without `STX\0`).
         #[arg(short, long)]
         tx: String,
     },
     /// Show compressed public key for a private key.
     Address {
+        /// Private key in hex (with or without 0x prefix).
         #[arg(short, long)]
         key: String,
     },

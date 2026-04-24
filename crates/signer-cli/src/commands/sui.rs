@@ -19,20 +19,25 @@ pub(crate) struct SuiCommand {
 enum SuiSubcommand {
     /// Sign a message (BCS + `BLAKE2b` intent).
     SignMessage {
+        /// Private key in hex (with or without 0x prefix).
         #[arg(short, long)]
         key: String,
+        /// Message to sign.
         #[arg(short, long)]
         message: String,
     },
     /// Sign transaction bytes (`BLAKE2b` intent digest).
     SignTx {
+        /// Private key in hex (with or without 0x prefix).
         #[arg(short, long)]
         key: String,
+        /// Hex-encoded BCS transaction bytes.
         #[arg(short, long)]
         tx: String,
     },
     /// Show Sui address and public key for a private key.
     Address {
+        /// Private key in hex (with or without 0x prefix).
         #[arg(short, long)]
         key: String,
     },
@@ -43,7 +48,7 @@ impl SuiCommand {
         match self.command {
             SuiSubcommand::SignMessage { key, message } => {
                 let signer = Signer::from_hex(&key)?;
-                let out = SignMessage::sign_message(&signer, message.as_bytes())?;
+                let out = signer.sign_message(message.as_bytes())?;
                 output::sign(CHAIN, "personal message (BCS + intent)")
                     .address(signer.address())
                     .from_output(&out)

@@ -199,7 +199,7 @@ fn encode_signed_transaction_matches_rlp_envelope_and_recovers() {
     unsigned.extend_from_slice(&super::rlp::encode_list(&items));
 
     let out = signer.sign_transaction(&unsigned).unwrap();
-    let signed = Signer::encode_signed_transaction(&unsigned, &out).unwrap();
+    let signed = signer.encode_signed_transaction(&unsigned, &out).unwrap();
     assert_eq!(signed[0], 0x02, "envelope must keep the type byte");
 
     // Recover the address from the raw-`v` signature and the Keccak-256 of

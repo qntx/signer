@@ -90,6 +90,13 @@ pub enum SignOutput {
     /// | `signer_btc::Signer::sign_message` (BIP-137, compressed P2PKH)        | `31` or `32`              |
     /// | `signer_btc::Signer::sign_message_with` (BIP-137, caller-selected)    | `27..=42` per BIP-137     |
     /// | `signer_spark::Signer::sign_message` (same BIP-137 encoding as BTC)   | `31` or `32`              |
+    ///
+    /// The encodings collide across chains: `27|28` means both EIP-191
+    /// (EVM) **and** TRON's message prefix, and `31|32` means BIP-137
+    /// compressed on both BTC and Spark. Consumers therefore cannot
+    /// identify the producing chain from the `v` byte alone — the
+    /// verifier must already know which chain / scheme the signature
+    /// was produced against.
     Ecdsa {
         /// 64-byte compact `r || s`.
         signature: [u8; 64],
@@ -288,21 +295,19 @@ pub trait Sign: Send + Sync {
 /// message-signing convention.
 ///
 /// Implemented only by chains with a well-defined standard for signing
-/// arbitrary messages. Chains without one (XRPL has no canonical scheme;
-/// Cosmos defers to ADR-036 which requires a pre-built `SignDoc` and is
-/// therefore best served through each chain's inherent `sign_transaction`)
-/// simply do not implement this trait, making the capability visible in the
-/// type system rather than hidden behind a runtime `Err`.
+/// arbitrary messages. Chains without one (XRPL, Cosmos, Filecoin, TON,
+/// Aptos) deliberately do **not** implement this trait, making the
+/// capability visible in the type system rather than hidden behind a
+/// runtime `Err`. Those chains expose only the inherent signing entry
+/// points (`sign_transaction` and, for Ed25519 chains, `sign_raw`).
 ///
 /// | Chain            | Transform                                                          | `v` on `Ecdsa`    |
 /// |------------------|--------------------------------------------------------------------|-------------------|
 /// | EVM              | Keccak-256 of `\x19Ethereum Signed Message:\n{len}` + message      | `27` or `28`      |
 /// | Bitcoin / Spark  | double-SHA256 of `\x18Bitcoin Signed Message:\n` + CompactSize+msg | `31` or `32`      |
 /// | Tron             | Keccak-256 of `\x19TRON Signed Message:\n{len}` + message          | `27` or `28`      |
-/// | Filecoin         | BLAKE2b-256 of the raw message                                     | `0` or `1`        |
-/// | Solana / TON     | Raw Ed25519 over the message (no prefix)                           | — (Ed25519)       |
-/// | Sui              | BLAKE2b-256 of `PersonalMessage` intent + BCS-encoded message        | — (Ed25519)       |
-/// | Aptos            | Raw Ed25519 over the message (no domain prefix)                    | — (Ed25519)       |
+/// | Solana           | Raw Ed25519 over the message (matches `nacl.sign.detached`)        | — (Ed25519)       |
+/// | Sui              | BLAKE2b-256 of `PersonalMessage` intent + BCS-encoded message      | — (Ed25519)       |
 /// | Nostr            | Raw BIP-340 Schnorr over the message (no prefix)                   | — (Schnorr)       |
 ///
 /// # Example

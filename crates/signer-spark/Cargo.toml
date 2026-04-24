@@ -8,15 +8,17 @@ readme = "../../README.md"
 description = "Spark (Bitcoin L2) transaction signer — secp256k1 ECDSA."
 keywords = ["crypto", "signer", "spark", "bitcoin-l2", "secp256k1"]
 categories = ["cryptography::cryptocurrencies", "no-std"]
+
 [features]
 default = ["std"]
-std = ["alloc", "signer-primitives/std", "bech32/std"]
-alloc = ["signer-primitives/alloc"]
-getrandom = ["signer-primitives/getrandom"]
+std = ["alloc", "signer-primitives/std", "bech32/std", "signer-btc/std"]
+alloc = ["signer-primitives/alloc", "signer-btc/alloc"]
+getrandom = ["signer-primitives/getrandom", "signer-btc/getrandom"]
 kobe = ["dep:kobe-spark"]
 
 [dependencies]
 signer-primitives = { workspace = true, features = ["secp256k1"] }
+signer-btc = { workspace = true, default-features = false, features = ["alloc"] }
 bech32.workspace = true
 hex.workspace = true
 ripemd.workspace = true

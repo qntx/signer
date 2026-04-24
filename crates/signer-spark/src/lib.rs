@@ -28,6 +28,7 @@ use alloc::{string::String, vec::Vec};
 use bech32::{Bech32m, Hrp};
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha256};
+use signer_btc::bitcoin_message_digest;
 pub use signer_primitives::{self, Sign, SignError, SignMessage, SignOutput};
 use signer_primitives::{Secp256k1Signer, delegate_secp256k1_ctors};
 
@@ -138,35 +139,6 @@ impl Signer {
     /// Returns an error if the private key is invalid.
     pub fn from_derived(account: &kobe_spark::DerivedAccount) -> Result<Self, SignError> {
         Self::from_bytes(account.private_key_bytes())
-    }
-}
-
-/// Compute `double_SHA256("\x18Bitcoin Signed Message:\n" || CompactSize(len) || message)`.
-fn bitcoin_message_digest(message: &[u8]) -> [u8; 32] {
-    const PREFIX: &[u8] = b"\x18Bitcoin Signed Message:\n";
-    let mut data = Vec::with_capacity(PREFIX.len() + 9 + message.len());
-    data.extend_from_slice(PREFIX);
-    encode_compact_size(&mut data, message.len());
-    data.extend_from_slice(message);
-    Sha256::digest(Sha256::digest(&data)).into()
-}
-
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "values are range-checked before each cast"
-)]
-fn encode_compact_size(buf: &mut Vec<u8>, n: usize) {
-    if n < 253 {
-        buf.push(n as u8);
-    } else if n <= 0xFFFF {
-        buf.push(0xFD);
-        buf.extend_from_slice(&(n as u16).to_le_bytes());
-    } else if n <= 0xFFFF_FFFF {
-        buf.push(0xFE);
-        buf.extend_from_slice(&(n as u32).to_le_bytes());
-    } else {
-        buf.push(0xFF);
-        buf.extend_from_slice(&(n as u64).to_le_bytes());
     }
 }
 

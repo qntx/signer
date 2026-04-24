@@ -16,8 +16,11 @@
 //!   which is a common point of confusion.
 //! - **Sign round-trip**: the signing message and signature feed back
 //!   through the primitive verify path.
-//! - **Capability**: `sign_message` is raw Ed25519, matching the
-//!   decision that Aptos has no built-in personal-message standard.
+//! - **Capability absence**: Aptos deliberately does **not** implement
+//!   [`signer_primitives::SignMessage`] — there is no canonical off-chain
+//!   message envelope on Aptos. The fact that this module compiles without
+//!   `use …::SignMessage` and without a trait impl on `Signer` is the test.
+//!   Callers that need raw Ed25519 over arbitrary bytes use [`Signer::sign_raw`].
 
 #![allow(
     clippy::unwrap_used,
@@ -26,7 +29,7 @@
     reason = "test module: panics are acceptable and assertions self-describe"
 )]
 
-use super::{SignMessage, Signer};
+use super::Signer;
 
 /// RFC 8032 Test Vector 1.
 const PRIV_KEY_HEX: &str = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
@@ -103,15 +106,17 @@ fn sign_transaction_signing_message_verifies_through_primitive() {
     assert!(s.verify(&wrong, &out.to_bytes()).is_err());
 }
 
-/// Aptos `sign_message` is raw Ed25519 (no domain prefix), matching the
-/// `sign_raw` API and leaving personal-message framing to higher-level
-/// protocols like wallet adapters. Verify round-trip proves the wrapper
-/// does not reframe the message before hitting the primitive.
+/// Aptos does **not** implement [`signer_primitives::SignMessage`]; raw
+/// Ed25519 over arbitrary bytes is instead accessed through [`Signer::sign_raw`],
+/// which returns the native `ed25519_dalek::Signature`. This test pins the
+/// contract: `sign_raw` hashes nothing, adds no prefix, and produces a
+/// 64-byte signature that verifies against the original bytes.
 #[test]
-fn sign_message_is_raw_ed25519_and_verifies() {
+fn sign_raw_is_plain_ed25519_over_input_bytes() {
     let s = signer_fixture();
-    let out = s.sign_message(MESSAGE.as_bytes()).unwrap();
-    assert_eq!(out.to_bytes().len(), 64);
-    s.verify(MESSAGE.as_bytes(), &out.to_bytes()).unwrap();
-    assert!(s.verify(b"different", &out.to_bytes()).is_err());
+    let sig = s.sign_raw(MESSAGE.as_bytes());
+    let sig_bytes = sig.to_bytes();
+    assert_eq!(sig_bytes.len(), 64);
+    s.verify(MESSAGE.as_bytes(), &sig_bytes).unwrap();
+    assert!(s.verify(b"different", &sig_bytes).is_err());
 }

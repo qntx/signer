@@ -1,7 +1,6 @@
 //! Nostr signing CLI commands (BIP-340 Schnorr, NIP-01/NIP-19).
 
 use clap::{Args, Subcommand};
-use sha2::{Digest as _, Sha256};
 use signer_nostr::{Sign, SignError, SignMessage, Signer};
 
 use super::parse_hex;
@@ -81,12 +80,11 @@ impl NostrCommand {
             NostrSubcommand::SignTx { key, tx } => {
                 let signer = load_signer(&key)?;
                 let serialized = parse_hex(&tx)?;
-                let event_id: [u8; 32] = Sha256::digest(&serialized).into();
-                let out = signer.sign_hash(&event_id)?;
+                let out = signer.sign_transaction(&serialized)?;
                 output::sign(CHAIN, "NIP-01 serialized event")
                     .address(signer.address())
                     .from_output(&out)
-                    .message(hex::encode(event_id))
+                    .message(hex::encode(&serialized))
                     .render(json)
             }
             NostrSubcommand::Address { key } => {

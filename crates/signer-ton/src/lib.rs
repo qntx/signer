@@ -17,13 +17,12 @@
 //! - **Wallet contract messages**: `Ed25519(cell_hash)` where
 //!   `cell_hash` is the BOC hash of the outgoing message.
 //!
-//! Because none of these is universal, [`SignMessage::sign_message`] and
-//! [`Signer::sign_transaction`] on this crate perform **raw Ed25519** over
-//! the input bytes verbatim (no hashing, no prefixing). Callers are
-//! expected to construct the appropriate preimage for their scenario
-//! and hand it to the signer as-is. This is analogous to Nostr's
-//! `sign_message` — the primitive is intentionally exposed at the
-//! lowest level.
+//! Because none of these is universal, this crate deliberately does **not**
+//! implement [`SignMessage`](signer_primitives::SignMessage). Callers
+//! construct the appropriate preimage for their scenario and hand it to
+//! [`Signer::sign_transaction`] (raw Ed25519 over the bytes) or to
+//! [`Signer::sign_raw`] when they want the native `ed25519_dalek::Signature`
+//! type instead of a [`SignOutput`].
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -32,7 +31,7 @@ extern crate alloc;
 use alloc::{string::String, vec::Vec};
 
 pub use ed25519_dalek::Signature;
-pub use signer_primitives::{self, Sign, SignError, SignMessage, SignOutput};
+pub use signer_primitives::{self, Sign, SignError, SignOutput};
 use signer_primitives::{Ed25519Signer, delegate_ed25519_ctors};
 
 /// TON transaction signer.
@@ -72,7 +71,7 @@ impl Signer {
     /// Sign arbitrary bytes with raw Ed25519 (no hashing or prefixing).
     ///
     /// Returns the native [`Signature`]. For the unified
-    /// [`SignOutput::Ed25519`] wire form, use [`SignMessage::sign_message`].
+    /// [`SignOutput::Ed25519`] wire form, use [`Signer::sign_transaction`].
     #[must_use]
     pub fn sign_raw(&self, message: &[u8]) -> Signature {
         self.0.sign_raw(message)
@@ -108,17 +107,6 @@ impl Sign for Signer {
 
     fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
         Ok(self.0.sign_output(hash))
-    }
-}
-
-impl SignMessage for Signer {
-    /// **Framing**: raw Ed25519 over the message bytes — no prefix, no
-    /// hashing. TON has no single canonical personal-message envelope (TON
-    /// Connect `ton_proof` and wallet-contract messages all pick different
-    /// preimages), so the primitive is intentionally exposed at the lowest
-    /// level.
-    fn sign_message(&self, message: &[u8]) -> Result<SignOutput, SignError> {
-        Ok(self.0.sign_output(message))
     }
 }
 

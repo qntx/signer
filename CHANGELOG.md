@@ -2,6 +2,79 @@
 
 All notable changes to this workspace are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+Consistency, redundancy, and API-symmetry pass on top of v2.0. Every item was motivated by a point in the internal design audit — see the audit report for the full rationale.
+
+### Changed
+
+- **`SignMessage` is now only implemented by chains with a genuine off-chain message-signing convention** (EVM, Bitcoin, Spark, Tron, Solana, Sui, Nostr). TON, Aptos, and Filecoin — which had no canonical scheme — joined Cosmos and XRPL in deliberately *not* implementing the trait, making the capability gap visible in the type system instead of hiding it behind a "raw bytes" pseudo-convention.
+- **`Signer::encode_signed_transaction` now takes `&self`** on every chain (EVM, SVM). Previously it was an inherent associated function while the `EncodeSignedTransaction` trait required `&self`; the two signatures are now identical and callers always use method-call syntax `signer.encode_signed_transaction(tx, sig)`.
+- **`signer-svm::Signer::extract_signable_bytes` now takes `&self`** for the same reason. The inherent method and the `ExtractSignableBytes` trait method now share a signature; callers use method-call syntax `signer.extract_signable_bytes(tx)` uniformly. The signer state is not consulted — the receiver is purely for trait symmetry.
+- **`signer-spark` depends on `signer-btc`** and reuses `signer_btc::bitcoin_message_digest` instead of duplicating the BIP-137 digest implementation. `bitcoin_message_digest` is now a `pub` function in `signer-btc`.
+- **CLI subcommand surface aligned with the library.** Aptos, TON, and Filecoin no longer advertise `sign` / `sign-message`; `sign-tx` is their only signing entry point. Ed25519 chains (Sui, Nostr) use method-call syntax uniformly in the CLI implementation.
+- **`signer svm sign` is renamed to `signer svm sign-message`** so every chain with a `SignMessage` impl exposes the same CLI verb (`sign-message`). The Solana binding still signs the message bytes raw with Ed25519 (matching `nacl.sign.detached` from `@solana/web3.js`); only the subcommand name changed.
+- **Nostr CLI `sign-tx` routes through `Signer::sign_transaction`** instead of re-hashing with SHA-256 in the CLI layer.
+- **Every CLI subcommand field is now documented** (`--key`, `--message`, `--hash`, `--tx`). `signer <chain> <subcommand> --help` now renders a consistent description for each flag across all 12 chains.
+- **Umbrella `signer` crate re-export ordering fixed.** `primitives` and trait re-exports first, then chain re-exports in alphabetical order, then the `prelude` module at the end — previously the `prelude` module was wedged between `nostr` and `spark`.
+- **`delegate_{secp256k1,ed25519,schnorr}_ctors!` macros simplified.** The two-arg `$err:ty` branch (used by the v1 SVM / Nostr wrapper errors) has been removed. v2.0 folded those wrappers into `SignError`, leaving the branch dead; every call site already used the zero-arg form.
+- **Cargo metadata hygiene.** `signer-primitives` and `signer-nostr` now declare the `"no-std"` category (matching the 11 chain crates that already did). All 12 chain-crate `Cargo.toml` files now have the standard blank line separator between `[package]` and `[features]`.
+- **`SKILL.md` table rendering fix.** The `Chain-Specific Hashing` table now escapes the `|` inside `v = X | Y` fragments so Markdown renderers do not treat the pipes as column separators.
+
+### Documentation
+
+- **`signer-svm::Signer::sign_raw` docstring** now states the equivalence of the three raw-Ed25519 entry points (`sign_raw`, `sign_transaction`, `SignMessage::sign_message`) — they differ only in return type, the wire signature is byte-identical for identical inputs.
+- **`signer-svm` `SignMessage` impl docstring** no longer contradicts itself: the old text called Solana's scheme "no canonical off-chain envelope" in the same sentence as "matches `nacl.sign.detached`". It now accurately frames `nacl.sign.detached` as the de-facto ecosystem convention that every Solana wallet accepts.
+- **`SignOutput::Ecdsa` doc** explicitly calls out the cross-chain `v`-byte collisions (`27 | 28` = EVM and Tron, `31 | 32` = BTC and Spark) so consumers do not assume the byte identifies the producing chain.
+- **`signer-xrpl`** drops a stale `//` comment that duplicated — and risked drifting from — the module-level docstring's explanation of why `SignMessage` is absent.
+- **`signer-cli` `aptos sign-tx`** no longer re-attaches the public key after `from_output(&out)`: Aptos's `sign_transaction` returns `SignOutput::Ed25519WithPubkey`, so the builder already carries the key. Purely cosmetic — JSON output is byte-identical to v2.1-pre.
+
+### Removed
+
+- **`impl SignMessage for signer_aptos::Signer`** — Aptos has no canonical off-chain message envelope; use `Signer::sign_raw` for raw-Ed25519-over-bytes or `Signer::sign_transaction` for the on-chain `APTOS::RawTransaction`-prefixed flow.
+- **`impl SignMessage for signer_ton::Signer`** — TON has no single personal-message convention (TON Connect, `ton_proof`, wallet cell-hash all differ); feed your own preimage to `Signer::sign_transaction` (raw Ed25519) or `Signer::sign_raw`.
+- **`impl SignMessage for signer_fil::Signer`** — Filecoin has no off-chain scheme distinct from on-chain signing; the old `sign_message` was a byte-for-byte alias for `sign_transaction`.
+- **`signer aptos sign` / `signer ton sign`** CLI subcommands (library `SignMessage` impl removed).
+- **`signer fil sign-message`** CLI subcommand (byte-equivalent to `sign-tx`).
+
+### Migration
+
+```rust
+// 2.0 — SignMessage on TON / Aptos / Filecoin returned raw-bytes Ed25519 /
+//       Blake2b-256 ECDSA.
+use signer_aptos::{SignMessage, Signer};
+let sig = signer.sign_message(bytes)?; // SignOutput::Ed25519WithPubkey
+
+// 2.1 — SignMessage is gone on these chains. Pick the explicit entry point:
+use signer_aptos::Signer;
+let native_sig = signer.sign_raw(bytes);               // ed25519_dalek::Signature
+let on_chain   = signer.sign_transaction(bcs_raw_tx)?; // SignOutput::Ed25519WithPubkey
+```
+
+```rust
+// 2.0 — Signer::encode_signed_transaction was an associated function.
+let signed = signer_evm::Signer::encode_signed_transaction(&unsigned, &sig)?;
+
+// 2.1 — It is a method; call through the signer instance.
+let signed = signer.encode_signed_transaction(&unsigned, &sig)?;
+```
+
+```rust
+// 2.0 — signer-svm's inherent extract_signable_bytes was static.
+let body = signer_svm::Signer::extract_signable_bytes(&tx_bytes)?;
+
+// 2.1 — It is a method for trait symmetry with `ExtractSignableBytes`.
+let body = signer.extract_signable_bytes(&tx_bytes)?;
+```
+
+```sh
+# 2.0 — SVM had its own subcommand name for message signing.
+signer svm sign --key <hex> --message "hello"
+
+# 2.1 — aligned with every other chain that implements SignMessage.
+signer svm sign-message --key <hex> --message "hello"
+```
+
 ## [2.0.0]
 
 First major release since `1.0.0`. A workspace-wide rearchitecture that reframes the [`Sign`] trait as a **primitive-level** surface (only `sign_hash` is required), promotes every chain's transaction signing to an **inherent method** documented in its own right, collapses `SignError` to a single type across the workspace, fixes several address-derivation bugs, upgrades to `kobe 2.0`, and synchronises `signer-cli` with the library's new semantics.

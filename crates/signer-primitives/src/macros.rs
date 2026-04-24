@@ -9,21 +9,14 @@
 //! of the macros below instead of repeating the identical bodies thirteen
 //! times.
 //!
-//! # Custom error types
-//!
-//! Every macro has two forms:
-//!
-//! - `delegate_X_ctors!()` — returns [`crate::SignError`] directly.
-//! - `delegate_X_ctors!(MyError)` — returns a chain-specific wrapper that
-//!   must implement `From<signer_primitives::SignError>` (e.g. the
-//!   `Core(#[from])` pattern used by `signer-svm` and `signer-nostr`).
+//! All constructors return [`crate::SignError`] directly: the v2.0
+//! workspace unification folded every chain-specific error wrapper into a
+//! single type, so there is no need for a per-crate error parameter.
 
-/// Emit `from_bytes`, `from_hex`, and `random` for a tuple newtype that wraps
-/// [`Secp256k1Signer`](crate::Secp256k1Signer).
+/// Emit `from_bytes`, `from_hex`, `try_random`, and `random` for a tuple
+/// newtype that wraps [`Secp256k1Signer`](crate::Secp256k1Signer).
 ///
-/// Produces methods returning `Result<Self, signer_primitives::SignError>`.
-/// For chains that carry a wrapper error type, pass the wrapper as an
-/// argument: `delegate_secp256k1_ctors!(crate::SignError)`.
+/// Every constructor returns `Result<Self, signer_primitives::SignError>`.
 ///
 /// # Example
 ///
@@ -37,16 +30,13 @@
 #[macro_export]
 macro_rules! delegate_secp256k1_ctors {
     () => {
-        $crate::delegate_secp256k1_ctors!($crate::SignError);
-    };
-    ($err:ty) => {
         /// Create from a raw 32-byte private key.
         ///
         /// # Errors
         ///
         /// Returns an error if the bytes are not a valid secp256k1 scalar
         /// (zero or ≥ curve order).
-        pub fn from_bytes(bytes: &[u8; 32]) -> ::core::result::Result<Self, $err> {
+        pub fn from_bytes(bytes: &[u8; 32]) -> ::core::result::Result<Self, $crate::SignError> {
             Ok(Self($crate::Secp256k1Signer::from_bytes(bytes)?))
         }
 
@@ -55,7 +45,7 @@ macro_rules! delegate_secp256k1_ctors {
         /// # Errors
         ///
         /// Returns an error if the hex is invalid or the key is out of range.
-        pub fn from_hex(hex_str: &str) -> ::core::result::Result<Self, $err> {
+        pub fn from_hex(hex_str: &str) -> ::core::result::Result<Self, $crate::SignError> {
             Ok(Self($crate::Secp256k1Signer::from_hex(hex_str)?))
         }
 
@@ -66,7 +56,7 @@ macro_rules! delegate_secp256k1_ctors {
         /// Returns an error if the OS RNG is unavailable or the sampled
         /// scalar is out of range (probability ≈ 2⁻¹²⁸).
         #[cfg(feature = "getrandom")]
-        pub fn try_random() -> ::core::result::Result<Self, $err> {
+        pub fn try_random() -> ::core::result::Result<Self, $crate::SignError> {
             Ok(Self($crate::Secp256k1Signer::try_random()?))
         }
 
@@ -87,16 +77,13 @@ macro_rules! delegate_secp256k1_ctors {
     };
 }
 
-/// Emit `from_bytes`, `from_hex`, and `random` for a tuple newtype that wraps
-/// [`Ed25519Signer`](crate::Ed25519Signer).
+/// Emit `from_bytes`, `from_hex`, `try_random`, and `random` for a tuple
+/// newtype that wraps [`Ed25519Signer`](crate::Ed25519Signer).
 ///
-/// See [`delegate_secp256k1_ctors!`] for the two-arg form.
+/// Every constructor returns `Result<Self, signer_primitives::SignError>`.
 #[macro_export]
 macro_rules! delegate_ed25519_ctors {
     () => {
-        $crate::delegate_ed25519_ctors!($crate::SignError);
-    };
-    ($err:ty) => {
         /// Create from raw 32-byte secret key bytes.
         ///
         /// Every 32-byte input is a valid Ed25519 secret key, so this
@@ -106,7 +93,7 @@ macro_rules! delegate_ed25519_ctors {
         /// # Errors
         ///
         /// Reserved for future compatibility.
-        pub fn from_bytes(bytes: &[u8; 32]) -> ::core::result::Result<Self, $err> {
+        pub fn from_bytes(bytes: &[u8; 32]) -> ::core::result::Result<Self, $crate::SignError> {
             Ok(Self($crate::Ed25519Signer::from_bytes(bytes)?))
         }
 
@@ -115,7 +102,7 @@ macro_rules! delegate_ed25519_ctors {
         /// # Errors
         ///
         /// Returns an error if the hex is malformed or not exactly 32 bytes.
-        pub fn from_hex(hex_str: &str) -> ::core::result::Result<Self, $err> {
+        pub fn from_hex(hex_str: &str) -> ::core::result::Result<Self, $crate::SignError> {
             Ok(Self($crate::Ed25519Signer::from_hex(hex_str)?))
         }
 
@@ -125,7 +112,7 @@ macro_rules! delegate_ed25519_ctors {
         ///
         /// Returns an error if the OS RNG is unavailable.
         #[cfg(feature = "getrandom")]
-        pub fn try_random() -> ::core::result::Result<Self, $err> {
+        pub fn try_random() -> ::core::result::Result<Self, $crate::SignError> {
             Ok(Self($crate::Ed25519Signer::try_random()?))
         }
 
@@ -144,23 +131,20 @@ macro_rules! delegate_ed25519_ctors {
     };
 }
 
-/// Emit `from_bytes`, `from_hex`, and `random` for a tuple newtype that wraps
-/// [`SchnorrSigner`](crate::SchnorrSigner).
+/// Emit `from_bytes`, `from_hex`, `try_random`, and `random` for a tuple
+/// newtype that wraps [`SchnorrSigner`](crate::SchnorrSigner).
 ///
-/// See [`delegate_secp256k1_ctors!`] for the two-arg form.
+/// Every constructor returns `Result<Self, signer_primitives::SignError>`.
 #[macro_export]
 macro_rules! delegate_schnorr_ctors {
     () => {
-        $crate::delegate_schnorr_ctors!($crate::SignError);
-    };
-    ($err:ty) => {
         /// Create from a raw 32-byte private key.
         ///
         /// # Errors
         ///
         /// Returns an error if the bytes are not a valid secp256k1 scalar
         /// (zero or ≥ curve order).
-        pub fn from_bytes(bytes: &[u8; 32]) -> ::core::result::Result<Self, $err> {
+        pub fn from_bytes(bytes: &[u8; 32]) -> ::core::result::Result<Self, $crate::SignError> {
             Ok(Self($crate::SchnorrSigner::from_bytes(bytes)?))
         }
 
@@ -169,7 +153,7 @@ macro_rules! delegate_schnorr_ctors {
         /// # Errors
         ///
         /// Returns an error if the hex is invalid or the key is out of range.
-        pub fn from_hex(hex_str: &str) -> ::core::result::Result<Self, $err> {
+        pub fn from_hex(hex_str: &str) -> ::core::result::Result<Self, $crate::SignError> {
             Ok(Self($crate::SchnorrSigner::from_hex(hex_str)?))
         }
 
@@ -180,7 +164,7 @@ macro_rules! delegate_schnorr_ctors {
         /// Returns an error if the OS RNG is unavailable or the sampled
         /// scalar is out of range (probability ≈ 2⁻¹²⁸).
         #[cfg(feature = "getrandom")]
-        pub fn try_random() -> ::core::result::Result<Self, $err> {
+        pub fn try_random() -> ::core::result::Result<Self, $crate::SignError> {
             Ok(Self($crate::SchnorrSigner::try_random()?))
         }
 

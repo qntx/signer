@@ -1,7 +1,7 @@
 //! TON signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_ton::{SignMessage, Signer};
+use signer_ton::Signer;
 
 use super::parse_hex;
 use crate::output::{self, CliResult};
@@ -17,17 +17,18 @@ pub(crate) struct TonCommand {
 
 #[derive(Subcommand)]
 enum TonSubcommand {
-    /// Sign a message with Ed25519.
-    Sign {
-        #[arg(short, long)]
-        key: String,
-        #[arg(short, long)]
-        message: String,
-    },
-    /// Sign transaction bytes with Ed25519.
+    /// Sign arbitrary preimage bytes with raw Ed25519.
+    ///
+    /// TON has no canonical personal-message envelope (TON Connect
+    /// `ton_proof`, `ton-proof-item-v2/`, and wallet cell-hash all pick
+    /// different preimages), so the signer simply applies raw Ed25519 to
+    /// the bytes the caller supplies. Use this subcommand for both tx
+    /// preimages (e.g. `cell_hash`) and hand-framed off-chain messages.
     SignTx {
+        /// Private key in hex (with or without 0x prefix).
         #[arg(short, long)]
         key: String,
+        /// Hex-encoded preimage bytes (`cell_hash`, `ton_proof`, …).
         #[arg(short, long)]
         tx: String,
     },
@@ -37,6 +38,7 @@ enum TonSubcommand {
     /// workchain ID, so the signer only exposes its identity (public
     /// key hex). Use `kobe-ton` for full wallet-address derivation.
     Identity {
+        /// Private key in hex (with or without 0x prefix).
         #[arg(short, long)]
         key: String,
     },
@@ -45,22 +47,13 @@ enum TonSubcommand {
 impl TonCommand {
     pub(crate) fn execute(self, json: bool) -> CliResult {
         match self.command {
-            TonSubcommand::Sign { key, message } => {
-                let signer = Signer::from_hex(&key)?;
-                let out = SignMessage::sign_message(&signer, message.as_bytes())?;
-                output::sign(CHAIN, "Ed25519")
-                    .identity(signer.identity())
-                    .from_output(&out)
-                    .public_key_hex(signer.public_key_hex())
-                    .message(message)
-                    .render(json)
-            }
             TonSubcommand::SignTx { key, tx } => {
                 let signer = Signer::from_hex(&key)?;
                 let out = signer.sign_transaction(&parse_hex(&tx)?)?;
-                output::sign(CHAIN, "transaction")
+                output::sign(CHAIN, "raw Ed25519")
                     .identity(signer.identity())
                     .from_output(&out)
+                    .public_key_hex(signer.public_key_hex())
                     .render(json)
             }
             TonSubcommand::Identity { key } => {
