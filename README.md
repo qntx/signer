@@ -1,5 +1,3 @@
-<!-- markdownlint-disable MD033 MD041 MD036 -->
-
 # Signer
 
 [![Crates.io][crates-badge]][crates-url]
@@ -19,9 +17,9 @@
 [rust-badge]: https://img.shields.io/badge/rust-edition%202024-orange.svg
 [rust-url]: https://doc.rust-lang.org/edition-guide/
 
-**Modular, `no_std`-compatible Rust toolkit for multi-chain transaction signing — 12 chains, zero hand-written cryptography, cross-implementation KATs.**
+**`no_std`-compatible Rust toolkit for multi-chain transaction signing — twelve networks, zero hand-written cryptography, byte-for-byte cross-implementation KATs.**
 
-Signer provides thin, secure wrappers around battle-tested cryptographic libraries ([k256](https://docs.rs/k256) for secp256k1 ECDSA and BIP-340 Schnorr, [ed25519-dalek](https://docs.rs/ed25519-dalek) for Ed25519) and exposes a capability-driven trait surface across Bitcoin, Ethereum, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, Aptos, and Nostr. Every library crate compiles under `no_std + alloc`, zeroizes sensitive material on drop, and is asserted byte-for-byte against an independent `@noble/curves` + `@noble/hashes` JavaScript reference.
+Signer composes thin wrappers around [`k256`](https://docs.rs/k256) (secp256k1 ECDSA and BIP-340 Schnorr) and [`ed25519-dalek`](https://docs.rs/ed25519-dalek) into a capability-driven trait surface for Aptos, Bitcoin, Ethereum, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, and Nostr. Every library crate builds under `no_std + alloc`; private keys wrap in `ZeroizeOnDrop`, `Debug` prints `[REDACTED]`, and every chain-specific output is pinned against the relevant RFC / BIP / EIP vectors plus an independent [`@noble/curves`](https://github.com/paulmillr/noble-curves) reference.
 
 <p align="center">
   <img src="demo.gif" alt="Signer CLI Demo"/>
@@ -33,7 +31,7 @@ Signer provides thin, secure wrappers around battle-tested cryptographic librari
 
 **Shell** (macOS / Linux):
 
-```sh
+```bash
 curl -fsSL https://sh.qntx.fun/signer | sh
 ```
 
@@ -52,55 +50,17 @@ cargo install signer-cli
 ### CLI Usage
 
 ```bash
-# Ethereum — EIP-191 personal_sign (v = 27 | 28)
-signer evm sign-message -k "0x4c0883a6..." -m "Hello, Ethereum!"
-
-# Bitcoin — BIP-137 message signing (compressed-P2PKH header, v = 31 | 32)
-signer btc sign-message -k "4c0883a6..." -m "Hello, Bitcoin!"
-
-# Solana — Ed25519 raw
-signer svm sign -k "9d61b19d..." -m "Hello, Solana!"
-
-# Sui — BLAKE2b intent signing
-signer sui sign-tx -k "9d61b19d..." -t "0000..."
-
-# Cosmos — ADR-036 canonical SignDoc bytes (no `sign-message` subcommand:
-# build the StdSignDoc externally, e.g. with `kobe cosmos`, then feed it here)
-signer cosmos sign-tx -k "4c0883a6..." -t "<hex of canonical SignDoc>"
-
-# XRP Ledger — STX\0 prefix + SHA-512/2 + DER
-signer xrpl sign-tx -k "4c0883a6..." -t "<hex of unsigned tx fields>"
-
-# Nostr — BIP-340 Schnorr, accepts hex or NIP-19 nsec
-signer nostr sign-hash -k "nsec10allq0g..." -x "5e6ea04f..."
-signer nostr address  -k "7f7ff03d..."   # prints npub1… and x-only pubkey
-
-# Show address / public key
-signer evm address -k "0x4c0883a6..."
-
-# JSON output (for scripts / agents)
-signer --json evm sign-message -k "0x4c0883a6..." -m "test"
+signer evm    sign-message -k "0x4c0883a6..." -m "Hello, Ethereum!"   # EIP-191
+signer btc    sign-message -k "4c0883a6..."   -m "Hello, Bitcoin!"    # BIP-137
+signer sui    sign-tx      -k "9d61b19d..."   -t "0000..."            # BLAKE2b intent
+signer cosmos sign-tx      -k "4c0883a6..."   -t "<SignDoc hex>"      # ADR-036 input
+signer xrpl   sign-tx      -k "4c0883a6..."   -t "<tx fields hex>"    # STX\0 + SHA-512/2 + DER
+signer nostr  sign-hash    -k "nsec10allq0g..." -x "5e6ea04f..."      # NIP-19 accepted
+signer evm    address      -k "0x4c0883a6..."                         # EIP-55 checksummed
+signer --json evm sign-message -k "0x4c0883a6..." -m "test"           # agent-friendly
 ```
 
 ### Library Usage
-
-The signing surface is split across two traits so capability gaps are
-visible at the type level:
-
-- [`Sign`](https://docs.rs/signer-primitives/latest/signer_primitives/trait.Sign.html)
-  — mandatory, exposes `sign_hash(&[u8; 32])` and `sign_transaction(&[u8])`
-  on every chain.
-- [`SignMessage`](https://docs.rs/signer-primitives/latest/signer_primitives/trait.SignMessage.html)
-  — opt-in. Implemented by chains with a standardised off-chain message
-  scheme (EVM, BTC, Spark, Tron, Filecoin, SVM, Sui, TON, Aptos, Nostr);
-  deliberately **not** implemented by XRPL (no canonical spec) or Cosmos
-  (defers to ADR-036, which needs a pre-built `StdSignDoc`).
-
-`SignOutput` is a discriminated enum whose variants (`Ecdsa`, `EcdsaDer`,
-`Ed25519`, `Ed25519WithPubkey`, `Schnorr`) carry each chain's native wire
-format — callers pattern-match instead of juggling `Option` metadata.
-Address derivation, `verify_hash`, and `public_key_{bytes,hex}` are
-inherent methods on every chain's `Signer`.
 
 ```rust
 use signer_evm::{Sign as _, SignMessage as _, Signer};
@@ -109,52 +69,47 @@ let signer = Signer::from_hex(
     "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318",
 )?;
 
-let digest = [0x42u8; 32];
-let raw    = signer.sign_hash(&digest)?;       // v = 0 | 1 (raw parity)
-let eip191 = signer.sign_message(b"hello")?;   // v = 27 | 28 (EIP-191 header)
+let raw = signer.sign_hash(&[0x42u8; 32])?;  // v = 0 | 1  (raw parity, feeds RLP)
+let msg = signer.sign_message(b"hello")?;    // v = 27 | 28 (EIP-191 wire)
 
 println!("Address:   {}", signer.address());
-println!("Signature: {}", eip191.to_hex());    // 65-byte r || s || v hex
-if let Some(v) = eip191.v() { println!("v: {v}"); }
+println!("Signature: {}", msg.to_hex());
 ```
 
-```rust
-// BIP-137 Bitcoin message signing — default is compressed-P2PKH (v = 31 | 32);
-// other address types select their own header via `sign_message_with`.
-use signer_btc::{BitcoinMessageAddressType, SignMessage as _, Signer};
+`SignOutput` is a discriminated enum (`Ecdsa { signature, v }` / `EcdsaDer(Vec<u8>)` / `Ed25519([u8; 64])` / `Ed25519WithPubkey { signature, public_key }` / `Schnorr { signature, xonly_public_key }`) — callers pattern-match on the variant that matches their chain's wire format instead of juggling `Option` metadata.
 
-let signer = Signer::from_hex("4c0883a6...")?;
-let default = signer.sign_message(b"Hello, Bitcoin!")?;                // v = 31 | 32
-let bech32  = signer.sign_message_with(
-    BitcoinMessageAddressType::SegwitBech32,
-    b"Hello, Bitcoin!",
-)?;                                                                     // v = 39 | 40
-```
+Chains without a canonical off-chain scheme deliberately do not implement `SignMessage`; callers build the domain-specific preimage themselves and pass it through `Sign::sign_transaction`:
 
 ```rust
-use signer_svm::{SignMessage as _, Signer};
-
-let signer = Signer::try_random()?;                     // fallible: surfaces entropy failure
-let out    = signer.sign_message(b"hello solana")?;     // SignOutput::Ed25519([u8; 64])
-signer.verify(b"hello solana", &out.to_bytes())?;       // inherent verify
-
-println!("Address: {}", signer.address());
-```
-
-```rust
-// Cosmos does NOT implement SignMessage: off-chain message signing goes
-// through ADR-036, which requires a pre-built StdSignDoc.
+// Cosmos: build the ADR-036 `StdSignDoc` externally (e.g. via `kobe cosmos`)
+// and hand its canonical bytes to `sign_transaction`.
 use signer_cosmos::{Sign as _, Signer};
 
 let signer    = Signer::from_hex("4c0883a6...")?;
-let sign_doc  = build_adr036_sign_doc("cosmos1…", b"hello");   // user / kobe builds this
+let sign_doc  = build_adr036_sign_doc("cosmos1...", b"hello");
 let signature = signer.sign_transaction(sign_doc.as_bytes())?;
+```
+
+Bitcoin message signing picks the BIP-137 header byte for the target address type; the default matches Bitcoin Core's `signmessage`:
+
+```rust
+use signer_btc::{BitcoinMessageAddressType, SignMessage as _, Signer};
+
+let signer = Signer::from_hex("4c0883a6...")?;
+
+// Default: compressed-P2PKH header (v = 31 | 32), Bitcoin Core compatible.
+let compressed = signer.sign_message(b"Hi")?;
+
+// Explicit: native SegWit (bech32) header, v = 39 | 40.
+let bech32 = signer.sign_message_with(
+    BitcoinMessageAddressType::SegwitBech32,
+    b"Hi",
+)?;
 ```
 
 ### Kobe HD Wallet Integration
 
-Enable the `kobe` feature to construct signers from
-[kobe](https://github.com/qntx/kobe) 1.x derived keys:
+Enable the `kobe` feature to construct signers from [kobe](https://github.com/qntx/kobe) 1.x derived keys:
 
 ```rust
 use kobe::Wallet;
@@ -167,51 +122,52 @@ let signer  = Signer::from_derived(&account)?;
 println!("Address: {}", signer.address());
 ```
 
-For chains with newtype-wrapped accounts (Bitcoin / Solana), pass the
-chain-specific account directly:
+## Supported Chains
 
-```rust
-// Bitcoin: kobe_btc::BtcAccount wraps DerivedAccount + WIF / address type
-let account = kobe_btc::Deriver::new(&wallet, kobe_btc::Network::Mainnet)?.derive(0)?;
-let signer  = signer_btc::Signer::from_derived(&account)?;
-```
+| Chain      | Crate           | Curve           | Sighash                     | Off-chain message                    |
+| ---------- | --------------- | --------------- | --------------------------- | ------------------------------------ |
+| Bitcoin    | `signer-btc`    | secp256k1       | double-SHA-256              | BIP-137 (four header variants)       |
+| Ethereum   | `signer-evm`    | secp256k1       | Keccak-256                  | EIP-191, EIP-712                     |
+| Cosmos     | `signer-cosmos` | secp256k1       | SHA-256                     | ADR-036 `StdSignDoc` (external)      |
+| Tron       | `signer-tron`   | secp256k1       | SHA-256 (`raw_data` txID)   | TRON prefix, wire `v = 27/28`        |
+| Filecoin   | `signer-fil`    | secp256k1       | BLAKE2b-256 over CID bytes  | BLAKE2b-256                          |
+| Spark      | `signer-spark`  | secp256k1       | double-SHA-256              | BIP-137 (compressed P2PKH)           |
+| XRP Ledger | `signer-xrpl`   | secp256k1       | `STX\0` + SHA-512-half, DER | none (no canonical spec)             |
+| Solana     | `signer-svm`    | Ed25519         | raw                         | raw Ed25519                          |
+| Sui        | `signer-sui`    | Ed25519         | BLAKE2b-256 intent + BCS    | `PersonalMessage` intent             |
+| TON        | `signer-ton`    | Ed25519         | raw                         | raw (caller builds the preimage)     |
+| Aptos      | `signer-aptos`  | Ed25519         | SHA3-256 domain + BCS       | raw Ed25519                          |
+| Nostr      | `signer-nostr`  | Schnorr BIP-340 | SHA-256 (NIP-01 event id)   | raw BIP-340 (caller frames it)       |
 
 ## Design
 
-- **12 chains** — Ethereum, Bitcoin, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, Aptos, Nostr.
-- **Zero hand-rolled crypto** — secp256k1 ECDSA and BIP-340 Schnorr via [k256](https://docs.rs/k256), Ed25519 via [ed25519-dalek](https://docs.rs/ed25519-dalek). Hashing is outsourced to `sha2` / `sha3` / `blake2` / `ripemd`; address encoding to [`bech32`](https://docs.rs/bech32) / `bs58`.
-- **Capability-split traits** — mandatory `Sign` (`sign_hash` + `sign_transaction`) plus three opt-in capabilities (`SignMessage`, `EncodeSignedTransaction`, `ExtractSignableBytes`) so chains without a canonical off-chain scheme surface the gap at compile time instead of a runtime `Err`.
-- **Type-safe digests** — `sign_hash` takes `&[u8; 32]`; ragged byte slices are rejected at compile time. `Secp256k1Signer::verify_prehash` is strict 64-byte compact; `verify_prehash_recoverable` is strict 65-byte; `verify_prehash_any` does length dispatch for chain-level wrappers.
-- **Discriminated `SignOutput`** — `Ecdsa { signature, v }` / `EcdsaDer(Vec<u8>)` / `Ed25519([u8; 64])` / `Ed25519WithPubkey { signature, public_key }` / `Schnorr { signature, xonly_public_key }`. The `v` byte is fully documented per producer (raw parity `0 | 1`, EIP-191 `27 | 28`, BIP-137 `27..=42`).
-- **BIP-137 compliance** — Bitcoin and Spark `sign_message` emit the compressed-P2PKH header byte (`v = 31 | 32`) directly consumable by Bitcoin Core `verifymessage`, Electrum, and every BIP-137 verifier. `BitcoinMessageAddressType` + `sign_message_with` unlock the SegWit-P2SH and bech32 header variants when needed.
-- **Standard error contract** — `Sign::Error: core::error::Error + From<SignError> + Send + Sync + 'static`, so signers interoperate with `?`, `Box<dyn Error>`, and `thiserror` out of the box.
-- **Fallible entropy** — every primitive and chain `Signer` exposes `try_random() -> Result<Self, SignError>`; the panicking `random()` is a thin wrapper for std environments.
-- **`no_std` + `alloc`** — Every library crate compiles on `thumbv7m-none-eabi` under CI; embedded / WASM ready.
-- **Security hardened** — `ZeroizeOnDrop`, `Debug` output redacted to `[REDACTED]`, `Clone` intentionally removed, `Send + Sync` required.
-- **Kobe integration** — Optional HD wallet bridging via the `kobe` feature flag ([kobe](https://github.com/qntx/kobe) 1.x derived accounts).
-- **Cross-implementation KATs** — Every chain crate's test suite asserts its Rust output byte-for-byte against an independent `@noble/curves` + `@noble/hashes` + `@scure/base` JavaScript reference (generator at [`tests/goldens/`](tests/goldens/README.md)). Tests are real protocol-equivalence checks, not self-confirming dumps.
-- **Strict linting** — Clippy `pedantic` + `nursery` + `correctness` (deny), `rust_2018_idioms` deny, `rust_2024_compatibility` warn, zero warnings on nightly.
+- **12 chains** — Aptos, Bitcoin, Ethereum, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, Nostr
+- **Zero hand-rolled crypto** — `k256` for secp256k1 ECDSA and BIP-340 Schnorr, `ed25519-dalek` for Ed25519; hashing via `sha2` / `sha3` / `blake2` / `ripemd`; encoding via `bech32` / `bs58`
+- **Capability-split traits** — mandatory `Sign` (`sign_hash` + `sign_transaction`) plus opt-in `SignMessage`, `ExtractSignableBytes`, `EncodeSignedTransaction`; capability gaps surface at compile time, not a runtime `Err`
+- **Type-safe digests** — `sign_hash` takes `&[u8; 32]`; `verify_prehash*` dispatches strictly on wire length (64-byte compact, 65-byte recoverable, DER)
+- **Discriminated `SignOutput`** — `Ecdsa { signature, v }` / `EcdsaDer(Vec<u8>)` / `Ed25519([u8; 64])` / `Ed25519WithPubkey` / `Schnorr`, with `v` byte semantics fully documented per producer (raw parity, EIP-191, BIP-137 four ranges)
+- **Cross-implementation KATs** — RFC 6979 deterministic ECDSA, RFC 8032 Test Vectors 1–3, BIP-340 `test-vectors.csv` indices 0–3/5/6, EIP-712 "Mail" example (`be609aee…30957bd2`), BIP-137 four-variant header, plus `ecrecover` / `verifymessage` / intent-digest round-trips — no self-confirming dumps
+- **Standard error contract** — `Sign::Error: core::error::Error + From<SignError> + Send + Sync + 'static`, interoperating with `?`, `Box<dyn Error>`, and `thiserror` out of the box
+- **Fallible entropy** — every signer exposes `try_random() -> Result<Self, SignError>`; the panicking `random()` is a thin wrapper for std environments
+- **`no_std` + `alloc`** — every library crate compiles on `thumbv7m-none-eabi` under CI; embedded / WASM ready
+- **Security hardened** — `ZeroizeOnDrop`, `Debug` redacted to `[REDACTED]`, `Clone` intentionally removed, `Send + Sync` required
+- **Kobe integration** — optional HD wallet bridging via the `kobe` feature flag ([kobe](https://github.com/qntx/kobe) 1.x derived accounts)
+- **Strict linting** — Clippy `pedantic` + `nursery` + `correctness` (deny), `rust_2018_idioms` deny, zero warnings on nightly
 
 ## Crates
 
 See **[`crates/README.md`](crates/README.md)** for the full crate table, dependency graph, and feature flag reference.
 
-## Testing
-
-- `cargo test --workspace --all-features` runs the full suite — every chain crate is a Known Answer Test suite asserting byte-for-byte equality with [`@noble/curves`](https://github.com/paulmillr/noble-curves) / [`@noble/hashes`](https://github.com/paulmillr/noble-hashes) / [`@scure/base`](https://github.com/paulmillr/scure-base).
-- Cross-cutting sanity (constructor validation, curve-order rejection, `verify_prehash*` dispatch, `SignOutput` wire layout, `Debug [REDACTED]`) lives once in `signer-primitives::tests`; per-chain suites pin only the chain-specific spec (domain separator, address encoding, BIP-137 header, intent prefix, …).
-- KAT generator: [`tests/goldens/generate.mjs`](tests/goldens/README.md). Outputs are `.gitignored`; the hex constants are inlined into each `tests.rs`.
-
 ## Security
 
 This library has **not** been independently audited. Use at your own risk.
 
-- Private keys wrapped in [`ZeroizeOnDrop`](https://docs.rs/zeroize) — zeroed from memory on drop.
-- `Debug` impl outputs `[REDACTED]` — no key material leaks to logs.
-- `Clone` intentionally removed — prevents uncontrolled key copies.
-- Random generation uses OS-provided CSPRNG via [`getrandom`](https://docs.rs/getrandom); prefer `try_random()` on embedded / WASM targets where entropy can legitimately fail.
-- `Sign` + `SignMessage` require `Send + Sync` — safe for concurrent use and async executors.
-- No key material is logged or persisted by the workspace.
+- Private keys wrapped in [`zeroize`](https://docs.rs/zeroize) — wiped from memory on drop
+- `Debug` impl prints `[REDACTED]` — no key material reaches logs
+- `Clone` intentionally removed — prevents uncontrolled key duplication
+- Random generation uses OS-provided CSPRNG via [`getrandom`](https://docs.rs/getrandom); prefer `try_random()` on embedded / WASM targets where entropy can legitimately fail
+- `Sign` and `SignMessage` require `Send + Sync` — safe to share across async executors
+- No key material is logged or persisted by the workspace
 
 ## License
 
