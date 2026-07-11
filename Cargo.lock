@@ -110,6 +110,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32637268377fc7b10a8c6d51de3e7fba1ce5dd371a96e342b34e6078db558e7f"
 
 [[package]]
+name = "bech32"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "efbd3e1070bbdf4cd88a75264e18e8a26f7cb5c6949eadf0ceb85fb159cf08f8"
+
+[[package]]
 name = "bip32"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -144,7 +150,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39581299241111285f3268ba75ddf372746fd041620918b145c1af9d75e91b6c"
 dependencies = [
  "base58ck",
- "bech32",
+ "bech32 0.11.1",
  "bitcoin-io",
  "bitcoin-units",
  "bitcoin_hashes",
@@ -735,7 +741,7 @@ version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f33f4b47ccf25be5036e35474930b2af4e56ca992f362131bda2c8a7f605a739"
 dependencies = [
- "bech32",
+ "bech32 0.11.1",
  "kobe-primitives",
  "ripemd 0.2.0",
  "sha2 0.11.0",
@@ -767,7 +773,7 @@ version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "44bcc54d609ff9de52dd4a79f4ff21fe3be34bcde56a68a98d6723747e26ef36"
 dependencies = [
- "bech32",
+ "bech32 0.11.1",
  "kobe-primitives",
  "zeroize",
 ]
@@ -795,7 +801,7 @@ version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57aac0d9e507c7db77cab73a60b40bfe7c9b1997fbc46e28abdb6722147386b8"
 dependencies = [
- "bech32",
+ "bech32 0.11.1",
  "kobe-primitives",
 ]
 
@@ -1292,7 +1298,7 @@ dependencies = [
 name = "signer-cosmos"
 version = "2.0.1"
 dependencies = [
- "bech32",
+ "bech32 0.12.0",
  "hex",
  "kobe-cosmos",
  "ripemd 0.2.0",
@@ -1327,7 +1333,7 @@ dependencies = [
 name = "signer-nostr"
 version = "2.0.1"
 dependencies = [
- "bech32",
+ "bech32 0.12.0",
  "hex",
  "kobe-nostr",
  "sha2 0.11.0",
@@ -1351,7 +1357,7 @@ dependencies = [
 name = "signer-spark"
 version = "2.0.1"
 dependencies = [
- "bech32",
+ "bech32 0.12.0",
  "hex",
  "kobe-spark",
  "ripemd 0.2.0",
