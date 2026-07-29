@@ -1,0 +1,70 @@
+# Justfile for Rust project using Cargo
+
+all: fmt clippy-fix check-no-std
+
+# Build the project with all features enabled in release mode
+build:
+    cargo build --workspace --release --all-features
+
+# Check the project for compilation errors without producing binaries
+check:
+    cargo check --workspace --all-features
+
+# Verify no_std compilation
+check-no-std:
+    cargo check -p signer-primitives --no-default-features
+    cargo check -p signer-btc --no-default-features --features alloc
+    cargo check -p signer-evm --no-default-features --features alloc
+    cargo check -p signer-svm --no-default-features --features alloc
+    cargo check -p signer-cosmos --no-default-features --features alloc
+    cargo check -p signer-tron --no-default-features --features alloc
+    cargo check -p signer-spark --no-default-features --features alloc
+    cargo check -p signer-fil --no-default-features --features alloc
+    cargo check -p signer-ton --no-default-features --features alloc
+    cargo check -p signer-sui --no-default-features --features alloc
+    cargo check -p signer-xrpl --no-default-features --features alloc
+    cargo check -p signer-aptos --no-default-features --features alloc
+    cargo check -p signer-nostr --no-default-features --features alloc
+    cargo check -p signer --no-default-features --features alloc
+
+# Update dependencies to their latest compatible versions
+update:
+    cargo update
+
+# Run the project with all features enabled in release mode
+run:
+    cargo run --release --all-features
+
+# Run all tests with all features enabled
+test:
+    cargo test --workspace --all-features
+
+# Run benchmarks with all features enabled
+bench:
+    cargo bench --all-features
+
+# Run Clippy linter with nightly toolchain (check only, for CI)
+# Uses workspace lints from Cargo.toml
+clippy:
+    cargo +nightly clippy --workspace \
+        --all-targets \
+        --all-features \
+        -- -D warnings
+
+# Run Clippy linter with auto-fix (for development)
+clippy-fix:
+    cargo +nightly clippy --workspace \
+        --fix \
+        --all-targets \
+        --all-features \
+        --allow-dirty \
+        --allow-staged \
+        -- -D warnings
+
+# Format the code using rustfmt with nightly toolchain
+fmt:
+    cargo +nightly fmt
+
+# Generate documentation for all crates and open it in the browser
+doc:
+    cargo +nightly doc --all-features --no-deps --open
