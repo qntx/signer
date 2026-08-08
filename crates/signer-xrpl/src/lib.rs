@@ -26,6 +26,9 @@
 
 extern crate alloc;
 
+#[cfg(feature = "kobe")]
+use kobe_xrpl as _;
+
 use alloc::{string::String, vec::Vec};
 
 use ripemd::Ripemd160;
@@ -124,16 +127,9 @@ impl Sign for Signer {
 }
 
 #[cfg(feature = "kobe")]
-impl Signer {
-    /// Create from a [`kobe_xrpl::DerivedAccount`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the private key is invalid.
-    pub fn from_derived(account: &kobe_xrpl::DerivedAccount) -> Result<Self, SignError> {
-        Self::from_bytes(account.private_key_bytes())
-    }
-}
+pub use signer_primitives::FromDerived;
+
+signer_primitives::impl_from_secret_key!();
 
 /// XRPL base58 alphabet.
 const XRPL_ALPHABET: bs58::Alphabet = *bs58::Alphabet::RIPPLE;

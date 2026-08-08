@@ -26,7 +26,7 @@
     reason = "test module: panics are acceptable and assertions self-describe"
 )]
 
-use sha2::{Digest as _, Sha256};
+use sha2::Sha256;
 
 use super::*;
 
@@ -182,6 +182,7 @@ mod kobe_integration {
 
     #[test]
     fn from_derived_matches_nip06_tv1_kat() {
+        use signer_primitives::FromDerived;
         let acct = tv1_derived_account();
         let via_derived = Signer::from_derived(&acct).unwrap();
         let via_hex = Signer::from_hex(acct.private_key_hex().as_str()).unwrap();

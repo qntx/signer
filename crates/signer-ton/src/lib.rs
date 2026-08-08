@@ -28,6 +28,9 @@
 
 extern crate alloc;
 
+#[cfg(feature = "kobe")]
+use kobe_ton as _;
+
 use alloc::{string::String, vec::Vec};
 
 pub use ed25519_dalek::Signature;
@@ -111,16 +114,9 @@ impl Sign for Signer {
 }
 
 #[cfg(feature = "kobe")]
-impl Signer {
-    /// Create from a [`kobe_ton::DerivedAccount`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the private key is invalid.
-    pub fn from_derived(account: &kobe_ton::DerivedAccount) -> Result<Self, SignError> {
-        Self::from_bytes(account.private_key_bytes())
-    }
-}
+pub use signer_primitives::FromDerived;
+
+signer_primitives::impl_from_secret_key!();
 
 #[cfg(test)]
 mod tests;

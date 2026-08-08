@@ -19,6 +19,9 @@
 
 extern crate alloc;
 
+#[cfg(feature = "kobe")]
+use kobe_evm as _;
+
 use alloc::{format, string::String, vec::Vec};
 
 mod eip712;
@@ -166,16 +169,9 @@ impl EncodeSignedTransaction for Signer {
 }
 
 #[cfg(feature = "kobe")]
-impl Signer {
-    /// Create a signer from a [`kobe_evm::DerivedAccount`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the private key is invalid.
-    pub fn from_derived(account: &kobe_evm::DerivedAccount) -> Result<Self, SignError> {
-        Self::from_bytes(account.private_key_bytes())
-    }
-}
+pub use signer_primitives::FromDerived;
+
+signer_primitives::impl_from_secret_key!();
 
 fn eip55_checksum(addr_hex: &str) -> String {
     let lower = addr_hex.to_lowercase();

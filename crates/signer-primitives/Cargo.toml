@@ -11,12 +11,14 @@ categories = ["cryptography::cryptocurrencies", "no-std"]
 
 [features]
 default = ["std"]
-std = ["alloc", "zeroize?/std"]
+std = ["alloc", "zeroize?/std", "kobe-primitives?/std"]
 alloc = ["zeroize?/alloc"]
 getrandom = ["dep:getrandom"]
 secp256k1 = ["alloc", "dep:k256", "dep:zeroize"]
 schnorr = ["alloc", "dep:k256", "dep:zeroize", "k256/schnorr"]
 ed25519 = ["alloc", "dep:ed25519-dalek"]
+# Bridge to kobe 3.x HD accounts (`FromDerived`).
+kobe = ["alloc", "dep:kobe-primitives", "dep:zeroize", "kobe-primitives/alloc"]
 testing = ["secp256k1", "schnorr"]
 
 [dependencies]
@@ -26,6 +28,7 @@ k256 = { workspace = true, optional = true }
 ed25519-dalek = { workspace = true, optional = true }
 zeroize = { workspace = true, optional = true }
 getrandom = { workspace = true, optional = true }
+kobe-primitives = { workspace = true, optional = true, default-features = false }
 
 [lints]
 workspace = true

@@ -4,6 +4,25 @@ All notable changes to this workspace are documented in this file. The format is
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-08-08
+
+### Breaking
+
+- Workspace version **3.0.0**; MSRV **1.85**.
+- Kobe bridge targets **kobe 3.2+** (was 2.x).
+- `Signer::from_derived` moved to trait [`FromDerived`] (import `use signer_primitives::FromDerived` or chain re-export).
+- New [`FromSecretKey`] / [`parse_secret_hex`] shared secret loading.
+- Secp256k1 primitive stores `Zeroizing` secret bytes alongside `SigningKey`.
+- Added **Casper** (`signer-casper`, dual-curve digest/message signing).
+- CLI `--key` accepts `-` (stdin) and `@path` (file) in addition to hex.
+- Umbrella default features: `std` + `mainstream` (`btc`,`evm`,`svm`).
+
+### Added
+
+- `signer-casper` with `KeyAlgo::{Secp256k1,Ed25519}`, tagged public-key hex, deploy-hash helpers.
+- CI `cargo-deny` job; no_std check for casper.
+
+
 Consistency, redundancy, and API-symmetry pass on top of v2.0. Every item was motivated by a point in the internal design audit — see the audit report for the full rationale.
 
 ### Changed

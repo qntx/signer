@@ -10,6 +10,9 @@
 
 extern crate alloc;
 
+#[cfg(feature = "kobe")]
+use kobe_aptos as _;
+
 use alloc::{format, string::String, vec::Vec};
 
 pub use ed25519_dalek::Signature;
@@ -107,16 +110,9 @@ impl Sign for Signer {
 }
 
 #[cfg(feature = "kobe")]
-impl Signer {
-    /// Create a signer from a [`kobe_aptos::DerivedAccount`].
-    ///
-    /// # Errors
-    ///
-    /// Returns [`SignError::InvalidKey`] if the derived bytes are malformed.
-    pub fn from_derived(account: &kobe_aptos::DerivedAccount) -> Result<Self, SignError> {
-        Self::from_bytes(account.private_key_bytes())
-    }
-}
+pub use signer_primitives::FromDerived;
+
+signer_primitives::impl_from_secret_key!();
 
 /// Compute SHA3-256.
 fn sha3_256(data: &[u8]) -> [u8; 32] {

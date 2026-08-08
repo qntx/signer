@@ -30,6 +30,9 @@
 
 extern crate alloc;
 
+#[cfg(feature = "kobe")]
+use kobe_nostr as _;
+
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -165,20 +168,9 @@ impl SignMessage for Signer {
 }
 
 #[cfg(feature = "kobe")]
-impl Signer {
-    /// Create from a [`kobe_nostr::DerivedAccount`].
-    ///
-    /// Uses the raw 32-byte private key directly (no hex or bech32
-    /// round-trip).
-    ///
-    /// # Errors
-    ///
-    /// Returns [`SignError::InvalidKey`] if the derived bytes are not a
-    /// valid secp256k1 scalar.
-    pub fn from_derived(account: &kobe_nostr::DerivedAccount) -> Result<Self, SignError> {
-        Self::from_bytes(account.private_key_bytes())
-    }
-}
+pub use signer_primitives::FromDerived;
+
+signer_primitives::impl_from_secret_key!();
 
 fn encode_bech32(hrp: &str, data: &[u8]) -> String {
     let hrp = Hrp::parse_unchecked(hrp);

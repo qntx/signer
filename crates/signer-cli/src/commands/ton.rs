@@ -4,6 +4,7 @@ use clap::{Args, Subcommand};
 use signer_ton::Signer;
 
 use super::parse_hex;
+use super::key::load_secret_key;
 use crate::output::{self, CliResult};
 
 const CHAIN: &str = "ton";
@@ -25,7 +26,7 @@ enum TonSubcommand {
     /// the bytes the caller supplies. Use this subcommand for both tx
     /// preimages (e.g. `cell_hash`) and hand-framed off-chain messages.
     SignTx {
-        /// Private key in hex (with or without 0x prefix).
+        /// Private key: hex, `-` for stdin, or `@path` (optional 0x).
         #[arg(short, long)]
         key: String,
         /// Hex-encoded preimage bytes (`cell_hash`, `ton_proof`, …).
@@ -38,7 +39,7 @@ enum TonSubcommand {
     /// workchain ID, so the signer only exposes its identity (public
     /// key hex). Use `kobe-ton` for full wallet-address derivation.
     Identity {
-        /// Private key in hex (with or without 0x prefix).
+        /// Private key: hex, `-` for stdin, or `@path` (optional 0x).
         #[arg(short, long)]
         key: String,
     },
@@ -48,7 +49,7 @@ impl TonCommand {
     pub(crate) fn execute(self, json: bool) -> CliResult {
         match self.command {
             TonSubcommand::SignTx { key, tx } => {
-                let signer = Signer::from_hex(&key)?;
+                let signer = Signer::from_bytes(&load_secret_key(&key)?)?;
                 let out = signer.sign_transaction(&parse_hex(&tx)?)?;
                 output::sign(CHAIN, "raw Ed25519")
                     .identity(signer.identity())
@@ -57,7 +58,7 @@ impl TonCommand {
                     .render(json)
             }
             TonSubcommand::Identity { key } => {
-                let signer = Signer::from_hex(&key)?;
+                let signer = Signer::from_bytes(&load_secret_key(&key)?)?;
                 output::address(CHAIN, &signer.public_key_bytes())
                     .identity(signer.identity())
                     .render(json)

@@ -77,6 +77,21 @@ macro_rules! delegate_secp256k1_ctors {
     };
 }
 
+/// Implement [`FromSecretKey`](crate::FromSecretKey) for a chain `Signer`
+/// newtype that already exposes `from_bytes`.
+#[macro_export]
+macro_rules! impl_from_secret_key {
+    () => {
+        impl $crate::FromSecretKey for Signer {
+            fn from_secret_bytes(
+                bytes: &[u8; 32],
+            ) -> ::core::result::Result<Self, $crate::SignError> {
+                Self::from_bytes(bytes)
+            }
+        }
+    };
+}
+
 /// Emit `from_bytes`, `from_hex`, `try_random`, and `random` for a tuple
 /// newtype that wraps [`Ed25519Signer`](crate::Ed25519Signer).
 ///

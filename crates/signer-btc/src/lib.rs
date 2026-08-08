@@ -31,6 +31,9 @@
 
 extern crate alloc;
 
+#[cfg(feature = "kobe")]
+use kobe_btc as _;
+
 use alloc::{string::String, vec::Vec};
 
 use ripemd::Ripemd160;
@@ -196,16 +199,9 @@ impl SignMessage for Signer {
 }
 
 #[cfg(feature = "kobe")]
-impl Signer {
-    /// Create from a [`kobe_btc::BtcAccount`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the private key is invalid.
-    pub fn from_derived(account: &kobe_btc::BtcAccount) -> Result<Self, SignError> {
-        Self::from_bytes(account.private_key_bytes())
-    }
-}
+pub use signer_primitives::FromDerived;
+
+signer_primitives::impl_from_secret_key!();
 
 #[allow(
     clippy::cast_possible_truncation,

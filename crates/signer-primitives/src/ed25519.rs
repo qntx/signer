@@ -17,6 +17,7 @@ use alloc::{format, vec::Vec};
 
 use ed25519_dalek::{Signature, Signer as _, SigningKey, Verifier as _, VerifyingKey};
 
+use crate::secret::{FromSecretKey, parse_secret_hex};
 use crate::{SignError, SignOutput};
 
 /// Shared Ed25519 signer.
@@ -55,6 +56,12 @@ impl core::fmt::Debug for Ed25519Signer {
     }
 }
 
+impl FromSecretKey for Ed25519Signer {
+    fn from_secret_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
+        Self::from_bytes(bytes)
+    }
+}
+
 impl Ed25519Signer {
     /// Create from raw 32-byte secret key bytes.
     ///
@@ -80,11 +87,7 @@ impl Ed25519Signer {
     /// Returns [`SignError::InvalidKey`] if the hex is malformed or not
     /// exactly 32 bytes.
     pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
-        let stripped = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-        let decoded = hex::decode(stripped).map_err(|e| SignError::InvalidKey(e.to_string()))?;
-        let bytes: [u8; 32] = decoded.try_into().map_err(|v: Vec<u8>| {
-            SignError::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
-        })?;
+        let bytes = parse_secret_hex(hex_str)?;
         Self::from_bytes(&bytes)
     }
 

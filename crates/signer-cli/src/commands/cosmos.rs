@@ -3,6 +3,7 @@
 use clap::{Args, Subcommand};
 use signer_cosmos::{Sign, Signer};
 
+use super::key::load_secret_key;
 use super::{parse_hex, parse_hex32};
 use crate::output::{self, CliResult};
 
@@ -19,7 +20,7 @@ pub(crate) struct CosmosCommand {
 enum CosmosSubcommand {
     /// Sign a raw 32-byte hash.
     SignHash {
-        /// Private key in hex (with or without 0x prefix).
+        /// Private key: hex, `-` for stdin, or `@path` (optional 0x).
         #[arg(short, long)]
         key: String,
         /// 32-byte hash in hex (with or without 0x prefix).
@@ -33,7 +34,7 @@ enum CosmosSubcommand {
     /// externally (or with `kobe cosmos adr036-doc`) and feed the canonical
     /// bytes into this subcommand.
     SignTx {
-        /// Private key in hex (with or without 0x prefix).
+        /// Private key: hex, `-` for stdin, or `@path` (optional 0x).
         #[arg(short, long)]
         key: String,
         /// Hex-encoded `SignDoc` bytes.
@@ -42,7 +43,7 @@ enum CosmosSubcommand {
     },
     /// Show compressed public key for a private key.
     Address {
-        /// Private key in hex (with or without 0x prefix).
+        /// Private key: hex, `-` for stdin, or `@path` (optional 0x).
         #[arg(short, long)]
         key: String,
     },
@@ -52,7 +53,7 @@ impl CosmosCommand {
     pub(crate) fn execute(self, json: bool) -> CliResult {
         match self.command {
             CosmosSubcommand::SignHash { key, hash } => {
-                let signer = Signer::from_hex(&key)?;
+                let signer = Signer::from_bytes(&load_secret_key(&key)?)?;
                 let out = signer.sign_hash(&parse_hex32(&hash)?)?;
                 output::sign(CHAIN, "raw hash")
                     .address(signer.address())
@@ -61,7 +62,7 @@ impl CosmosCommand {
                     .render(json)
             }
             CosmosSubcommand::SignTx { key, tx } => {
-                let signer = Signer::from_hex(&key)?;
+                let signer = Signer::from_bytes(&load_secret_key(&key)?)?;
                 let out = signer.sign_transaction(&parse_hex(&tx)?)?;
                 output::sign(CHAIN, "transaction")
                     .address(signer.address())
@@ -69,7 +70,7 @@ impl CosmosCommand {
                     .render(json)
             }
             CosmosSubcommand::Address { key } => {
-                let signer = Signer::from_hex(&key)?;
+                let signer = Signer::from_bytes(&load_secret_key(&key)?)?;
                 output::address(CHAIN, &signer.public_key_bytes())
                     .address(signer.address())
                     .render(json)

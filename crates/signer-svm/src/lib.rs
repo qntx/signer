@@ -8,6 +8,9 @@
 
 extern crate alloc;
 
+#[cfg(feature = "kobe")]
+use kobe_svm as _;
+
 use alloc::{format, string::String, vec::Vec};
 
 pub use ed25519_dalek::Signature;
@@ -253,16 +256,9 @@ impl EncodeSignedTransaction for Signer {
 }
 
 #[cfg(feature = "kobe")]
-impl Signer {
-    /// Create from a [`kobe_svm::SvmAccount`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the private key is invalid.
-    pub fn from_derived(account: &kobe_svm::SvmAccount) -> Result<Self, SignError> {
-        Self::from_bytes(account.private_key_bytes())
-    }
-}
+pub use signer_primitives::FromDerived;
+
+signer_primitives::impl_from_secret_key!();
 
 fn decode_compact_u16(data: &[u8]) -> Result<(usize, usize), SignError> {
     let mut value: usize = 0;

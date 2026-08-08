@@ -23,6 +23,9 @@
 
 extern crate alloc;
 
+#[cfg(feature = "kobe")]
+use kobe_fil as _;
+
 use alloc::{format, string::String, vec::Vec};
 
 use blake2::digest::consts::{U4, U20, U32};
@@ -117,16 +120,9 @@ impl Sign for Signer {
 }
 
 #[cfg(feature = "kobe")]
-impl Signer {
-    /// Create from a [`kobe_fil::DerivedAccount`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the private key is invalid.
-    pub fn from_derived(account: &kobe_fil::DerivedAccount) -> Result<Self, SignError> {
-        Self::from_bytes(account.private_key_bytes())
-    }
-}
+pub use signer_primitives::FromDerived;
+
+signer_primitives::impl_from_secret_key!();
 
 /// RFC 4648 base32 lowercase encoding without padding.
 #[allow(

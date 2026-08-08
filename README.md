@@ -17,7 +17,7 @@
 [rust-badge]: https://img.shields.io/badge/rust-edition%202024-orange.svg
 [rust-url]: https://doc.rust-lang.org/edition-guide/
 
-**`no_std`-compatible Rust toolkit for multi-chain transaction signing — twelve networks, zero hand-written cryptography, cross-implementation KATs.**
+**`no_std`-compatible Rust toolkit for multi-chain transaction signing — thirteen networks, zero hand-written cryptography, cross-implementation KATs.**
 
 Signer composes thin wrappers around [`k256`](https://docs.rs/k256) (secp256k1 ECDSA and BIP-340 Schnorr) and [`ed25519-dalek`](https://docs.rs/ed25519-dalek) into a capability-driven trait surface for Aptos, Bitcoin, Ethereum, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, and Nostr. Every library crate builds under `no_std + alloc`; private keys wrap in `ZeroizeOnDrop`, `Debug` prints `[REDACTED]`, and every chain-specific output is pinned against the relevant RFC / BIP / EIP vectors plus an independent [`@noble/curves`](https://github.com/paulmillr/noble-curves) reference.
 
@@ -52,6 +52,7 @@ signer sui    sign-tx      -k "9d61b19d..."     -t "0000..."            # BLAKE2
 signer cosmos sign-tx      -k "4c0883a6..."     -t "<SignDoc hex>"      # ADR-036 input
 signer xrpl   sign-tx      -k "4c0883a6..."     -t "<tx fields hex>"    # STX\0 + SHA-512/2 + DER
 signer nostr  sign-hash    -k "nsec10allq0g..." -x "5e6ea04f..."        # NIP-19 accepted
+echo "$KEY" | signer casper sign-hash -k - -x "<32-byte deploy hash>"  # Casper
 signer evm    address      -k "0x4c0883a6..."                           # EIP-55 checksummed
 
 signer --json evm sign-message -k "0x4c0883a6..." -m "test"             # agent-friendly
@@ -135,10 +136,11 @@ println!("Address: {}", signer.address());
 | Sui        | `signer-sui`    | Ed25519         | BLAKE2b-256 intent + BCS    | `PersonalMessage` intent             |
 | Aptos      | `signer-aptos`  | Ed25519         | SHA3-256 domain + BCS       | raw Ed25519                          |
 | Nostr      | `signer-nostr`  | Schnorr BIP-340 | SHA-256 (NIP-01 event id)   | raw BIP-340 (caller frames it)       |
+| Casper     | `signer-casper` | secp / Ed25519  | deploy digest (`BLAKE2b`)   | raw bytes / digest (dual-curve)      |
 
 ## Design
 
-- **12 chains** — Aptos, Bitcoin, Ethereum, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, Nostr
+- **13 chains** — Aptos, Bitcoin, Ethereum, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, Nostr
 - **Zero hand-written cryptography** — `k256` for secp256k1 ECDSA and BIP-340 Schnorr, `ed25519-dalek` for Ed25519; hashing via `sha2` / `sha3` / `blake2` / `ripemd`; encoding via `bech32` / `bs58`
 - **Capability-split traits** — mandatory `Sign::sign_hash` as the primitive-level interface (32 bytes in, `SignOutput` out) plus opt-in `SignMessage`, `ExtractSignableBytes`, `EncodeSignedTransaction`; each chain's protocol-level `sign_transaction` is an inherent method on its `Signer` (transaction-bytes semantics differ irreconcilably across chains, so a trait would be a false abstraction). Capability gaps surface at compile time, not a runtime `Err`.
 - **Type-safe digests** — `sign_hash` takes `&[u8; 32]`; `verify_prehash*` dispatches strictly on wire length (64-byte compact, 65-byte recoverable, DER)

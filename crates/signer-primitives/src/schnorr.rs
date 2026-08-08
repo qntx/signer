@@ -8,11 +8,12 @@
 
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
-use alloc::{format, string::String, vec::Vec};
+use alloc::{format, string::String};
 
 use k256::schnorr::{Signature, SigningKey, VerifyingKey};
 use zeroize::{ZeroizeOnDrop, Zeroizing};
 
+use crate::secret::{FromSecretKey, parse_secret_hex};
 use crate::{SignError, SignOutput};
 
 /// Shared BIP-340 Taproot Schnorr signer over secp256k1.
@@ -71,6 +72,12 @@ impl core::fmt::Debug for SchnorrSigner {
 
 impl ZeroizeOnDrop for SchnorrSigner {}
 
+impl FromSecretKey for SchnorrSigner {
+    fn from_secret_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
+        Self::from_bytes(bytes)
+    }
+}
+
 impl SchnorrSigner {
     /// Create from a raw 32-byte private key.
     ///
@@ -94,11 +101,7 @@ impl SchnorrSigner {
     /// Returns [`SignError::InvalidKey`] if the hex is malformed, not 32
     /// bytes long, or not a valid secp256k1 scalar.
     pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
-        let stripped = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-        let decoded = hex::decode(stripped).map_err(|e| SignError::InvalidKey(e.to_string()))?;
-        let bytes: [u8; 32] = decoded.try_into().map_err(|v: Vec<u8>| {
-            SignError::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
-        })?;
+        let bytes = parse_secret_hex(hex_str)?;
         Self::from_bytes(&bytes)
     }
 

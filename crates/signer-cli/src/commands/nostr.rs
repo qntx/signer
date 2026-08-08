@@ -1,9 +1,10 @@
 //! Nostr signing CLI commands (BIP-340 Schnorr, NIP-01/NIP-19).
 
 use clap::{Args, Subcommand};
-use signer_nostr::{Sign, SignError, SignMessage, Signer};
+use signer_nostr::{Sign, SignMessage, Signer};
 
 use super::parse_hex;
+use super::key::load_secret_key;
 use crate::output::{self, CliResult};
 
 const CHAIN: &str = "nostr";
@@ -98,10 +99,10 @@ impl NostrCommand {
 }
 
 /// Accept either a hex-encoded private key or an `nsec1…` bech32 string.
-fn load_signer(key: &str) -> Result<Signer, SignError> {
+fn load_signer(key: &str) -> Result<Signer, Box<dyn std::error::Error>> {
     if key.starts_with("nsec1") {
-        Signer::from_nsec(key)
+        Ok(Signer::from_nsec(key)?)
     } else {
-        Signer::from_hex(key)
+        Ok(Signer::from_bytes(&load_secret_key(key)?)?)
     }
 }

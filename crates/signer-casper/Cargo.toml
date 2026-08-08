@@ -1,12 +1,12 @@
 [package]
-name = "signer-fil"
+name = "signer-casper"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 readme = "../../README.md"
-description = "Filecoin transaction signer — secp256k1 ECDSA + Blake2b."
-keywords = ["crypto", "signer", "filecoin", "blake2b", "secp256k1"]
+description = "Casper Network signer — dual-curve ECDSA / Ed25519 over deploy digests."
+keywords = ["crypto", "signer", "casper", "cspr", "no_std"]
 categories = ["cryptography::cryptocurrencies", "no-std"]
 
 [features]
@@ -14,18 +14,17 @@ default = ["std"]
 std = ["alloc", "signer-primitives/std"]
 alloc = ["signer-primitives/alloc"]
 getrandom = ["signer-primitives/getrandom"]
-kobe = ["dep:kobe-fil", "signer-primitives/kobe"]
+kobe = ["dep:kobe-casper", "signer-primitives/kobe"]
 
 [dependencies]
-signer-primitives = { workspace = true, features = ["secp256k1"] }
+signer-primitives = { workspace = true, features = ["secp256k1", "ed25519"] }
 hex.workspace = true
-blake2.workspace = true
 
-kobe-fil = { workspace = true, optional = true }
+kobe-casper = { workspace = true, optional = true }
 
 [dev-dependencies]
+signer-primitives = { workspace = true, features = ["testing", "secp256k1", "ed25519"] }
 hex.workspace = true
-signer-primitives = { workspace = true, features = ["testing"] }
 
 [lints]
 workspace = true

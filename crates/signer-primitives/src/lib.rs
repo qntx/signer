@@ -54,6 +54,7 @@ mod error;
 pub mod macros;
 #[cfg(feature = "schnorr")]
 mod schnorr;
+mod secret;
 #[cfg(feature = "secp256k1")]
 mod secp256k1;
 #[cfg(feature = "testing")]
@@ -67,6 +68,11 @@ pub use ed25519::Ed25519Signer;
 pub use error::SignError;
 #[cfg(feature = "schnorr")]
 pub use schnorr::SchnorrSigner;
+pub use secret::{FromSecretKey, parse_secret_hex};
+#[cfg(feature = "kobe")]
+pub use secret::FromDerived;
+#[cfg(feature = "kobe")]
+use kobe_primitives as _;
 #[cfg(feature = "secp256k1")]
 pub use secp256k1::Secp256k1Signer;
 

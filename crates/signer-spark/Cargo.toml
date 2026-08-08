@@ -14,7 +14,7 @@ default = ["std"]
 std = ["alloc", "signer-primitives/std", "bech32/std", "signer-btc/std"]
 alloc = ["signer-primitives/alloc", "signer-btc/alloc"]
 getrandom = ["signer-primitives/getrandom", "signer-btc/getrandom"]
-kobe = ["dep:kobe-spark"]
+kobe = ["dep:kobe-spark", "signer-primitives/kobe"]
 
 [dependencies]
 signer-primitives = { workspace = true, features = ["secp256k1"] }

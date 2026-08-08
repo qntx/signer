@@ -246,6 +246,7 @@ fn pubkey_to_eip55(pk: &VerifyingKey) -> String {
 mod kobe_integration {
     use k256::ecdsa::SigningKey;
     use kobe_evm::{DerivedAccount, DerivedPublicKey};
+    use signer_primitives::FromDerived;
     use zeroize::Zeroizing;
 
     use super::Signer;
@@ -280,7 +281,7 @@ mod kobe_integration {
     fn from_derived_matches_bip39_abandon_about_kat() {
         let acct = kat_account();
         let via_bytes = Signer::from_derived(&acct).unwrap();
-        let via_hex = Signer::from_hex(&acct.private_key_hex()).unwrap();
+        let via_hex = Signer::from_hex(acct.private_key_hex().as_str()).unwrap();
         assert_eq!(via_bytes.address(), via_hex.address());
         assert_eq!(
             via_bytes.address(),

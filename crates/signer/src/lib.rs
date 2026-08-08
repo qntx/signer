@@ -25,6 +25,8 @@
 pub use signer_aptos as aptos;
 #[cfg(feature = "btc")]
 pub use signer_btc as btc;
+#[cfg(feature = "casper")]
+pub use signer_casper as casper;
 #[cfg(feature = "cosmos")]
 pub use signer_cosmos as cosmos;
 #[cfg(feature = "evm")]
@@ -35,8 +37,11 @@ pub use signer_fil as fil;
 pub use signer_nostr as nostr;
 pub use signer_primitives as primitives;
 pub use signer_primitives::{
-    EncodeSignedTransaction, ExtractSignableBytes, Sign, SignError, SignMessage, SignOutput,
+    EncodeSignedTransaction, ExtractSignableBytes, FromSecretKey, Sign, SignError, SignMessage,
+    SignOutput,
 };
+#[cfg(feature = "kobe")]
+pub use signer_primitives::FromDerived;
 #[cfg(feature = "spark")]
 pub use signer_spark as spark;
 #[cfg(feature = "sui")]

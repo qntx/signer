@@ -31,6 +31,9 @@
 
 extern crate alloc;
 
+#[cfg(feature = "kobe")]
+use kobe_cosmos as _;
+
 use alloc::{format, string::String, vec::Vec};
 
 use bech32::{Bech32, Hrp};
@@ -150,16 +153,9 @@ impl Sign for Signer {
 }
 
 #[cfg(feature = "kobe")]
-impl Signer {
-    /// Create from a [`kobe_cosmos::DerivedAccount`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the private key is invalid.
-    pub fn from_derived(account: &kobe_cosmos::DerivedAccount) -> Result<Self, SignError> {
-        Self::from_bytes(account.private_key_bytes())
-    }
-}
+pub use signer_primitives::FromDerived;
+
+signer_primitives::impl_from_secret_key!();
 
 #[cfg(test)]
 mod tests;

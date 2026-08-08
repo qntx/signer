@@ -14,7 +14,7 @@ default = ["std"]
 std = ["alloc", "signer-primitives/std"]
 alloc = ["signer-primitives/alloc"]
 getrandom = ["signer-primitives/getrandom"]
-kobe = ["dep:kobe-aptos"]
+kobe = ["dep:kobe-aptos", "signer-primitives/kobe"]
 
 [dependencies]
 signer-primitives = { workspace = true, features = ["ed25519"] }

@@ -10,6 +10,9 @@
 
 extern crate alloc;
 
+#[cfg(feature = "kobe")]
+use kobe_sui as _;
+
 use alloc::{format, string::String, vec::Vec};
 
 use blake2::Blake2bVar;
@@ -134,16 +137,9 @@ impl SignMessage for Signer {
 }
 
 #[cfg(feature = "kobe")]
-impl Signer {
-    /// Create from a [`kobe_sui::DerivedAccount`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the private key is invalid.
-    pub fn from_derived(account: &kobe_sui::DerivedAccount) -> Result<Self, SignError> {
-        Self::from_bytes(account.private_key_bytes())
-    }
-}
+pub use signer_primitives::FromDerived;
+
+signer_primitives::impl_from_secret_key!();
 
 /// BLAKE2b-256 hash.
 #[allow(
