@@ -1,26 +1,27 @@
 [package]
-name = "signer-sui"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-repository.workspace = true
-readme = "../../README.md"
-description = "Sui transaction signer — Ed25519 + intent-based signing."
-keywords = ["crypto", "signer", "sui", "ed25519", "blake2b"]
-categories = ["cryptography::cryptocurrencies", "no-std"]
+name                   = "signer-sui"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+readme                 = "../../README.md"
+description            = "Sui transaction signer — Ed25519 + intent-based signing."
+keywords               = ["crypto", "signer", "sui", "ed25519", "blake2b"]
+categories             = ["cryptography::cryptocurrencies", "no-std"]
 
 [features]
-default = ["std"]
-std = ["alloc", "signer-primitives/std"]
-alloc = ["signer-primitives/alloc"]
+default   = ["std"]
+std       = ["alloc", "signer-primitives/std"]
+alloc     = ["signer-primitives/alloc"]
 getrandom = ["signer-primitives/getrandom"]
-kobe = ["dep:kobe-sui", "signer-primitives/kobe"]
+kobe      = ["dep:kobe-sui", "signer-primitives/kobe"]
 
 [dependencies]
-signer-primitives = { workspace = true, features = ["ed25519"] }
+signer-primitives       = { workspace = true, features = ["ed25519"] }
 ed25519-dalek.workspace = true
-blake2.workspace = true
-hex.workspace = true
+blake2.workspace        = true
+hex.workspace           = true
 
 kobe-sui = { workspace = true, optional = true }
 

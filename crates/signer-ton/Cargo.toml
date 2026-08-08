@@ -1,23 +1,24 @@
 [package]
-name = "signer-ton"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-repository.workspace = true
-readme = "../../README.md"
-description = "TON transaction signer — Ed25519 signing."
-keywords = ["crypto", "signer", "ton", "ed25519", "wallet"]
-categories = ["cryptography::cryptocurrencies", "no-std"]
+name                   = "signer-ton"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+readme                 = "../../README.md"
+description            = "TON transaction signer — Ed25519 signing."
+keywords               = ["crypto", "signer", "ton", "ed25519", "wallet"]
+categories             = ["cryptography::cryptocurrencies", "no-std"]
 
 [features]
-default = ["std"]
-std = ["alloc", "signer-primitives/std"]
-alloc = ["signer-primitives/alloc"]
+default   = ["std"]
+std       = ["alloc", "signer-primitives/std"]
+alloc     = ["signer-primitives/alloc"]
 getrandom = ["signer-primitives/getrandom"]
-kobe = ["dep:kobe-ton", "signer-primitives/kobe"]
+kobe      = ["dep:kobe-ton", "signer-primitives/kobe"]
 
 [dependencies]
-signer-primitives = { workspace = true, features = ["ed25519"] }
+signer-primitives       = { workspace = true, features = ["ed25519"] }
 ed25519-dalek.workspace = true
 
 kobe-ton = { workspace = true, optional = true }

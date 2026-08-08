@@ -1,21 +1,24 @@
 # Makefile for Rust project using Cargo
+# Kept in sync with Justfile (same targets / same check suite).
 
-.PHONY: all build check check-no-std run test bench clippy clippy-fix fmt doc update
+.PHONY: all default list build check check-no-std update run test bench clippy clippy-fix fmt fmt-check doc deny clean
 
-all: fmt clippy-fix check-no-std
+# Default: run the standard local check suite (includes tests; mirrors CI).
+default: all
+all: fmt clippy-fix check-no-std deny test
 
-# Build the project with all features enabled in release mode
+list:
+	@echo "Targets: all build check check-no-std update run test bench clippy clippy-fix fmt fmt-check doc deny clean"
+
 build:
 	cargo build --workspace --release --all-features
 
-# Check the project for compilation errors without producing binaries
 check:
 	cargo check --workspace --all-features
 
-# Verify no_std compilation (all crates use #![cfg_attr(not(feature = "std"), no_std)])
-# CI uses thumbv7m-none-eabi for strict bare-metal verification
 check-no-std:
 	cargo check -p signer-primitives --no-default-features
+	cargo check -p signer-primitives --no-default-features --features alloc
 	cargo check -p signer-btc --no-default-features --features alloc
 	cargo check -p signer-evm --no-default-features --features alloc
 	cargo check -p signer-svm --no-default-features --features alloc
@@ -28,46 +31,39 @@ check-no-std:
 	cargo check -p signer-xrpl --no-default-features --features alloc
 	cargo check -p signer-aptos --no-default-features --features alloc
 	cargo check -p signer-nostr --no-default-features --features alloc
+	cargo check -p signer-casper --no-default-features --features alloc
 	cargo check -p signer --no-default-features --features alloc
+	cargo check -p signer --no-default-features --features "alloc,all-chains"
 
-# Update dependencies to their latest compatible versions
 update:
 	cargo update
 
-# Run the project with all features enabled in release mode
 run:
 	cargo run --release --all-features
 
-# Run all tests with all features enabled
 test:
 	cargo test --workspace --all-features
 
-# Run benchmarks with all features enabled
 bench:
 	cargo bench --all-features
 
-# Run Clippy linter with nightly toolchain (check only, for CI)
-# Uses workspace lints from Cargo.toml
 clippy:
-	cargo +nightly clippy --workspace \
-		--all-targets \
-		--all-features \
-		-- -D warnings
+	cargo +nightly clippy --workspace --all-targets --all-features -- -D warnings
 
-# Run Clippy linter with auto-fix (for development)
 clippy-fix:
-	cargo +nightly clippy --workspace \
-		--fix \
-		--all-targets \
-		--all-features \
-		--allow-dirty \
-		--allow-staged \
-		-- -D warnings
+	cargo +nightly clippy --workspace --fix --all-targets --all-features --allow-dirty --allow-staged -- -D warnings
 
-# Format the code using rustfmt with nightly toolchain
 fmt:
-	cargo +nightly fmt
+	cargo +nightly fmt --all
 
-# Generate documentation for all crates and open it in the browser
+fmt-check:
+	cargo +nightly fmt --all -- --check
+
 doc:
-	cargo +nightly doc --all-features --no-deps --open
+	cargo doc --workspace --all-features --open
+
+deny:
+	cargo deny check --all-features
+
+clean:
+	cargo clean

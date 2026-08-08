@@ -1,13 +1,14 @@
 [package]
-name = "signer-cli"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-repository.workspace = true
-readme = "../../README.md"
-description = "Multi-chain transaction signing CLI tool."
-keywords = ["crypto", "signer", "bitcoin", "ethereum", "cli"]
-categories = ["command-line-utilities", "cryptography"]
+name                   = "signer-cli"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+readme                 = "../../README.md"
+description            = "Multi-chain transaction signing CLI tool."
+keywords               = ["crypto", "signer", "bitcoin", "ethereum", "cli"]
+categories             = ["command-line-utilities", "cryptography"]
 
 [[bin]]
 name = "signer"
@@ -15,24 +16,24 @@ path = "src/main.rs"
 
 [dependencies]
 signer-primitives = { workspace = true, features = ["std"] }
-signer-btc = { workspace = true, features = ["std", "getrandom"] }
-signer-evm = { workspace = true, features = ["std", "getrandom"] }
-signer-svm = { workspace = true, features = ["std", "getrandom"] }
-signer-cosmos = { workspace = true, features = ["std", "getrandom"] }
-signer-tron = { workspace = true, features = ["std", "getrandom"] }
-signer-spark = { workspace = true, features = ["std", "getrandom"] }
-signer-fil = { workspace = true, features = ["std", "getrandom"] }
-signer-ton = { workspace = true, features = ["std", "getrandom"] }
-signer-sui = { workspace = true, features = ["std", "getrandom"] }
-signer-xrpl = { workspace = true, features = ["std", "getrandom"] }
-signer-aptos = { workspace = true, features = ["std", "getrandom"] }
-signer-nostr = { workspace = true, features = ["std", "getrandom"] }
-signer-casper = { workspace = true, features = ["std", "getrandom"] }
-clap.workspace = true
+signer-btc        = { workspace = true, features = ["std", "getrandom"] }
+signer-evm        = { workspace = true, features = ["std", "getrandom"] }
+signer-svm        = { workspace = true, features = ["std", "getrandom"] }
+signer-cosmos     = { workspace = true, features = ["std", "getrandom"] }
+signer-tron       = { workspace = true, features = ["std", "getrandom"] }
+signer-spark      = { workspace = true, features = ["std", "getrandom"] }
+signer-fil        = { workspace = true, features = ["std", "getrandom"] }
+signer-ton        = { workspace = true, features = ["std", "getrandom"] }
+signer-sui        = { workspace = true, features = ["std", "getrandom"] }
+signer-xrpl       = { workspace = true, features = ["std", "getrandom"] }
+signer-aptos      = { workspace = true, features = ["std", "getrandom"] }
+signer-nostr      = { workspace = true, features = ["std", "getrandom"] }
+signer-casper     = { workspace = true, features = ["std", "getrandom"] }
+clap.workspace    = true
 colored.workspace = true
-hex = { workspace = true, features = ["std"] }
-serde.workspace = true
-serde_json = { workspace = true, features = ["std"] }
+hex               = { workspace = true, features = ["std"] }
+serde.workspace   = true
+serde_json        = { workspace = true, features = ["std"] }
 
 [lints]
 workspace = true

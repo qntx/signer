@@ -1,79 +1,57 @@
 [package]
-name = "signer"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-repository.workspace = true
-readme = "../../README.md"
-description = "Multi-chain transaction signer — umbrella crate re-exporting chain-specific signers."
-keywords = ["crypto", "signer", "wallet", "multichain", "no_std"]
-categories = ["cryptography::cryptocurrencies", "no-std"]
-
-[dependencies]
-signer-primitives.workspace = true
-signer-btc = { workspace = true, optional = true }
-signer-evm = { workspace = true, optional = true }
-signer-svm = { workspace = true, optional = true }
-signer-cosmos = { workspace = true, optional = true }
-signer-tron = { workspace = true, optional = true }
-signer-spark = { workspace = true, optional = true }
-signer-fil = { workspace = true, optional = true }
-signer-ton = { workspace = true, optional = true }
-signer-sui = { workspace = true, optional = true }
-signer-xrpl = { workspace = true, optional = true }
-signer-aptos = { workspace = true, optional = true }
-signer-nostr = { workspace = true, optional = true }
-signer-casper = { workspace = true, optional = true }
+name                   = "signer"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+readme                 = "../../README.md"
+description            = "Multi-chain transaction signer — umbrella crate re-exporting chain-specific signers."
+keywords               = ["crypto", "signer", "wallet", "multichain", "no_std"]
+categories             = ["cryptography::cryptocurrencies", "no-std"]
 
 [features]
-default = ["std", "mainstream"]
+# Minimal default: only `std` + mainstream chains. Opt into more via presets.
+default    = ["std", "mainstream"]
+std        = ["alloc", "signer-primitives/std", "signer-aptos?/std", "signer-btc?/std", "signer-evm?/std", "signer-svm?/std", "signer-cosmos?/std", "signer-tron?/std", "signer-spark?/std", "signer-fil?/std", "signer-ton?/std", "signer-sui?/std", "signer-nostr?/std", "signer-xrpl?/std", "signer-casper?/std"]
+alloc      = ["signer-primitives/alloc", "signer-aptos?/alloc", "signer-btc?/alloc", "signer-evm?/alloc", "signer-svm?/alloc", "signer-cosmos?/alloc", "signer-tron?/alloc", "signer-spark?/alloc", "signer-fil?/alloc", "signer-ton?/alloc", "signer-sui?/alloc", "signer-nostr?/alloc", "signer-xrpl?/alloc", "signer-casper?/alloc"]
+getrandom  = ["signer-btc?/getrandom", "signer-evm?/getrandom", "signer-svm?/getrandom", "signer-cosmos?/getrandom", "signer-tron?/getrandom", "signer-spark?/getrandom", "signer-fil?/getrandom", "signer-ton?/getrandom", "signer-sui?/getrandom", "signer-xrpl?/getrandom", "signer-aptos?/getrandom", "signer-nostr?/getrandom", "signer-casper?/getrandom"]
+
+btc        = ["dep:signer-btc"]
+evm        = ["dep:signer-evm"]
+svm        = ["dep:signer-svm"]
+cosmos     = ["dep:signer-cosmos"]
+tron       = ["dep:signer-tron"]
+spark      = ["dep:signer-spark"]
+fil        = ["dep:signer-fil"]
+ton        = ["dep:signer-ton"]
+sui        = ["dep:signer-sui"]
+xrpl       = ["dep:signer-xrpl"]
+aptos      = ["dep:signer-aptos"]
+nostr      = ["dep:signer-nostr"]
+casper     = ["dep:signer-casper"]
+
+# Preset: the three most requested chains.
 mainstream = ["btc", "evm", "svm"]
-std = ["alloc", "signer-primitives/std",
-    "signer-btc?/std", "signer-evm?/std", "signer-svm?/std",
-    "signer-cosmos?/std", "signer-tron?/std", "signer-spark?/std",
-    "signer-fil?/std", "signer-ton?/std", "signer-sui?/std",
-    "signer-xrpl?/std",
-    "signer-aptos?/std",
-    "signer-nostr?/std", "signer-casper?/std",
-]
-alloc = ["signer-primitives/alloc",
-    "signer-btc?/alloc", "signer-evm?/alloc", "signer-svm?/alloc",
-    "signer-cosmos?/alloc", "signer-tron?/alloc", "signer-spark?/alloc",
-    "signer-fil?/alloc", "signer-ton?/alloc", "signer-sui?/alloc",
-    "signer-xrpl?/alloc",
-    "signer-aptos?/alloc",
-    "signer-nostr?/alloc", "signer-casper?/alloc",
-]
-getrandom = [
-    "signer-btc?/getrandom", "signer-evm?/getrandom", "signer-svm?/getrandom",
-    "signer-cosmos?/getrandom", "signer-tron?/getrandom", "signer-spark?/getrandom",
-    "signer-fil?/getrandom", "signer-ton?/getrandom", "signer-sui?/getrandom",
-    "signer-xrpl?/getrandom",
-    "signer-aptos?/getrandom",
-    "signer-nostr?/getrandom", "signer-casper?/getrandom",
-]
-btc = ["dep:signer-btc"]
-evm = ["dep:signer-evm"]
-svm = ["dep:signer-svm"]
-cosmos = ["dep:signer-cosmos"]
-tron = ["dep:signer-tron"]
-spark = ["dep:signer-spark"]
-fil = ["dep:signer-fil"]
-ton = ["dep:signer-ton"]
-sui = ["dep:signer-sui"]
-xrpl = ["dep:signer-xrpl"]
-aptos = ["dep:signer-aptos"]
-nostr = ["dep:signer-nostr"]
-casper = ["dep:signer-casper"]
-all-chains = ["btc", "evm", "svm", "cosmos", "tron", "spark", "fil", "ton", "sui", "xrpl", "aptos", "nostr", "casper"]
-kobe = [
-    "signer-btc?/kobe", "signer-evm?/kobe", "signer-svm?/kobe",
-    "signer-cosmos?/kobe", "signer-tron?/kobe", "signer-spark?/kobe",
-    "signer-fil?/kobe", "signer-ton?/kobe", "signer-sui?/kobe",
-    "signer-xrpl?/kobe",
-    "signer-aptos?/kobe",
-    "signer-nostr?/kobe", "signer-casper?/kobe",
-]
+# Preset: every chain crate.
+all-chains = ["aptos", "btc", "evm", "svm", "cosmos", "tron", "spark", "fil", "ton", "sui", "nostr", "xrpl", "casper"]
+kobe       = ["signer-btc?/kobe", "signer-evm?/kobe", "signer-svm?/kobe", "signer-cosmos?/kobe", "signer-tron?/kobe", "signer-spark?/kobe", "signer-fil?/kobe", "signer-ton?/kobe", "signer-sui?/kobe", "signer-xrpl?/kobe", "signer-aptos?/kobe", "signer-nostr?/kobe", "signer-casper?/kobe"]
+
+[dependencies]
+signer-primitives = { workspace = true }
+signer-btc        = { workspace = true, optional = true }
+signer-evm        = { workspace = true, optional = true }
+signer-svm        = { workspace = true, optional = true }
+signer-cosmos     = { workspace = true, optional = true }
+signer-tron       = { workspace = true, optional = true }
+signer-spark      = { workspace = true, optional = true }
+signer-fil        = { workspace = true, optional = true }
+signer-ton        = { workspace = true, optional = true }
+signer-sui        = { workspace = true, optional = true }
+signer-xrpl       = { workspace = true, optional = true }
+signer-aptos      = { workspace = true, optional = true }
+signer-nostr      = { workspace = true, optional = true }
+signer-casper     = { workspace = true, optional = true }
 
 [package.metadata.docs.rs]
 all-features = true
