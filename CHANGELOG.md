@@ -4,7 +4,7 @@ All notable changes to this workspace are documented in this file. The format is
 
 ## [Unreleased]
 
-## [3.0.0] - 2026-08-08
+## [3.0.0] - 2026-08-09
 
 ### Breaking
 
