@@ -1297,7 +1297,7 @@ dependencies = [
 
 [[package]]
 name = "signer"
-version = "3.0.0"
+version = "3.1.0"
 dependencies = [
  "signer-aptos",
  "signer-btc",
@@ -1317,7 +1317,7 @@ dependencies = [
 
 [[package]]
 name = "signer-aptos"
-version = "3.0.0"
+version = "3.1.0"
 dependencies = [
  "ed25519-dalek",
  "hex",
@@ -1328,7 +1328,7 @@ dependencies = [
 
 [[package]]
 name = "signer-btc"
-version = "3.0.0"
+version = "3.1.0"
 dependencies = [
  "bs58",
  "hex",
@@ -1341,7 +1341,7 @@ dependencies = [
 
 [[package]]
 name = "signer-casper"
-version = "3.0.0"
+version = "3.1.0"
 dependencies = [
  "hex",
  "kobe-casper",
@@ -1350,7 +1350,7 @@ dependencies = [
 
 [[package]]
 name = "signer-cli"
-version = "3.0.0"
+version = "3.1.0"
 dependencies = [
  "clap",
  "colored",
@@ -1375,7 +1375,7 @@ dependencies = [
 
 [[package]]
 name = "signer-cosmos"
-version = "3.0.0"
+version = "3.1.0"
 dependencies = [
  "bech32",
  "hex",
@@ -1387,7 +1387,7 @@ dependencies = [
 
 [[package]]
 name = "signer-evm"
-version = "3.0.0"
+version = "3.1.0"
 dependencies = [
  "hex",
  "k256 0.14.0",
@@ -1400,7 +1400,7 @@ dependencies = [
 
 [[package]]
 name = "signer-fil"
-version = "3.0.0"
+version = "3.1.0"
 dependencies = [
  "blake2",
  "hex",
@@ -1410,7 +1410,7 @@ dependencies = [
 
 [[package]]
 name = "signer-nostr"
-version = "3.0.0"
+version = "3.1.0"
 dependencies = [
  "bech32",
  "hex",
@@ -1422,7 +1422,7 @@ dependencies = [
 
 [[package]]
 name = "signer-primitives"
-version = "3.0.0"
+version = "3.1.0"
 dependencies = [
  "ed25519-dalek",
  "getrandom",
@@ -1435,7 +1435,7 @@ dependencies = [
 
 [[package]]
 name = "signer-spark"
-version = "3.0.0"
+version = "3.1.0"
 dependencies = [
  "bech32",
  "hex",
@@ -1448,7 +1448,7 @@ dependencies = [
 
 [[package]]
 name = "signer-sui"
-version = "3.0.0"
+version = "3.1.0"
 dependencies = [
  "blake2",
  "ed25519-dalek",
@@ -1459,7 +1459,7 @@ dependencies = [
 
 [[package]]
 name = "signer-svm"
-version = "3.0.0"
+version = "3.1.0"
 dependencies = [
  "bs58",
  "ed25519-dalek",
@@ -1471,7 +1471,7 @@ dependencies = [
 
 [[package]]
 name = "signer-ton"
-version = "3.0.0"
+version = "3.1.0"
 dependencies = [
  "ed25519-dalek",
  "kobe-ton",
@@ -1480,7 +1480,7 @@ dependencies = [
 
 [[package]]
 name = "signer-tron"
-version = "3.0.0"
+version = "3.1.0"
 dependencies = [
  "bs58",
  "hex",
@@ -1493,7 +1493,7 @@ dependencies = [
 
 [[package]]
 name = "signer-xrpl"
-version = "3.0.0"
+version = "3.1.0"
 dependencies = [
  "bs58",
  "hex",

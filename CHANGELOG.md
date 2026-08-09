@@ -4,6 +4,8 @@ All notable changes to this workspace are documented in this file. The format is
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-08-09
+
 ### Added
 
 - CLI `signer upgrade` / `signer update` — self-upgrade via the official
