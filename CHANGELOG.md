@@ -4,6 +4,12 @@ All notable changes to this workspace are documented in this file. The format is
 
 ## [Unreleased]
 
+### Added
+
+- CLI `signer upgrade` / `signer update` — self-upgrade via the official
+  `sh.qntx.fun/signer` installer (`--check`, `--force`, `--json`); cargo
+  installs are not overwritten (hint: `cargo install signer-cli --force`).
+
 ## [3.0.0] - 2026-08-09
 
 ### Breaking

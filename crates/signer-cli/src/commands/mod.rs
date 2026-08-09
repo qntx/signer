@@ -13,6 +13,7 @@ mod sui;
 mod svm;
 mod ton;
 mod tron;
+mod update;
 mod xrpl;
 
 pub(crate) use aptos::AptosCommand;
@@ -28,6 +29,7 @@ pub(crate) use sui::SuiCommand;
 pub(crate) use svm::SvmCommand;
 pub(crate) use ton::TonCommand;
 pub(crate) use tron::TronCommand;
+pub(crate) use update::UpdateCommand;
 pub(crate) use xrpl::XrplCommand;
 
 /// Parse a hex string (with optional 0x prefix) into a 32-byte array.
@@ -113,4 +115,26 @@ pub(crate) enum Commands {
     /// Casper Network signing operations.
     #[command(name = "casper", alias = "cspr")]
     Casper(CasperCommand),
+
+    /// Upgrade this CLI via the official sh.qntx.fun installer.
+    ///
+    /// Primary name is `upgrade` (install a newer release of the binary).
+    /// `update` is kept as an alias for familiarity.
+    #[command(name = "upgrade", alias = "update")]
+    Upgrade(UpdateCommand),
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::CommandFactory;
+
+    use super::Cli;
+
+    /// `clap`'s built-in self-consistency check. Catches conflicting short
+    /// flags, duplicate subcommand names, and other structural mistakes at
+    /// `cargo test` time instead of at first CLI invocation.
+    #[test]
+    fn cli_structure_is_consistent() {
+        Cli::command().debug_assert();
+    }
 }
