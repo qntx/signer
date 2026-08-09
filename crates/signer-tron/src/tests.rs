@@ -109,7 +109,7 @@ fn sign_message_recovers_to_same_tron_address() {
     let recovered = VerifyingKey::recover_from_prehash(&digest, &sig, recovery).unwrap();
 
     // Re-derive the TRON address (`Base58Check(0x41 || Keccak-256(uncompressed[1..])[12..])`).
-    let uncompressed = recovered.to_encoded_point(false);
+    let uncompressed = recovered.to_sec1_point(false);
     let body = &uncompressed.as_bytes()[1..];
     let hash = Keccak256::digest(body);
     let mut payload = Vec::with_capacity(25);

@@ -4,6 +4,44 @@ All notable changes to this workspace are documented in this file. The format is
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-08-08
+
+### Breaking
+
+- Workspace version **3.0.0**; MSRV **1.85**.
+- Kobe bridge targets **kobe 3.2+** (was 2.x).
+- `Signer::from_derived` moved to trait [`FromDerived`] (import `use signer_primitives::FromDerived` or chain re-export).
+- New [`FromSecretKey`] / [`parse_secret_hex`] shared secret loading.
+- Secp256k1 primitive stores `Zeroizing` secret bytes alongside `SigningKey`.
+- Added **Casper** (`signer-casper`, dual-curve digest/message signing).
+- CLI `--key` accepts `-` (stdin) and `@path` (file) in addition to hex.
+- CLI digest subcommand: **`sign-digest`** only (no `sign-hash`).
+- JSON sign output includes **`scheme`** (`ecdsa_recoverable`, `ed25519`, …).
+- Umbrella default features: `std` + `mainstream` (`btc`,`evm`,`svm`).
+- `SignError` is `#[non_exhaustive]`.
+- Crypto stack: **k256 0.14** (was 0.13).
+- **`Sign` / `sign_hash` → `SignDigest` / `sign_digest(&[u8; 32])`** (scheme-honest naming; CLI verb is `sign-digest` (no `sign-hash` alias)).
+- Traits return concrete [`SignError`] (no associated `Error` type).
+- [`SignOutput`] is `#[non_exhaustive]`; adds [`SignatureScheme`] via `scheme()`.
+- Pubkeys: compressed secp `[u8;33]`, uncompressed `[u8;65]`, Ed25519/x-only `[u8;32]`.
+- Secret export: `SchnorrSigner` / `Ed25519Signer` `to_bytes()` → `Zeroizing<[u8;32]>`.
+- ECDSA message `v` offsets via [`v_encoding`] (no magic `27`/`31` in chain code).
+
+### Added
+
+- `signer-casper` with `KeyAlgo::{Secp256k1,Ed25519}`, tagged public-key hex, deploy-hash helpers.
+- CI `cargo-deny` job; no_std check for casper.
+- `CONTRIBUTING.md`; dependabot `github-actions`; CI `actions/checkout@v7`.
+- [`Digest32`], [`SecretKey32`], [`v_encoding`] module; three-layer architecture docs.
+
+### Changed
+
+- Docs / `skills/signer/SKILL.md` / `crates/README.md`: full **13-chain** Casper coverage + L0/L1/L2 positioning.
+- LICENSE-MIT copyright **QuantX**; nightly `fmt` import grouping (kobe-aligned).
+- Dependencies: thiserror 2.0.20, getrandom 0.4.3; `Cargo.lock` refresh.
+- Uniform zeroize policy on all three curve engines.
+
+
 Consistency, redundancy, and API-symmetry pass on top of v2.0. Every item was motivated by a point in the internal design audit — see the audit report for the full rationale.
 
 ### Changed

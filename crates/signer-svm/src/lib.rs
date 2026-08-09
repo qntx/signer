@@ -8,11 +8,16 @@
 
 extern crate alloc;
 
-use alloc::{format, string::String, vec::Vec};
+use alloc::format;
+use alloc::string::String;
+use alloc::vec::Vec;
 
 pub use ed25519_dalek::Signature;
+#[cfg(feature = "kobe")]
+use kobe_svm as _;
 pub use signer_primitives::{
-    self, EncodeSignedTransaction, ExtractSignableBytes, Sign, SignError, SignMessage, SignOutput,
+    self, EncodeSignedTransaction, ExtractSignableBytes, SignDigest, SignError, SignMessage,
+    SignOutput,
 };
 use signer_primitives::{Ed25519Signer, delegate_ed25519_ctors};
 use zeroize::Zeroizing;
@@ -56,7 +61,8 @@ impl Signer {
         Ok(signer)
     }
 
-    /// Solana address (Base58-encoded 32-byte public key).
+    /// **Identity (not HD):** pure function of this private key only.
+    /// Multi-path / multi-network addresses → [`kobe`](https://github.com/qntx/kobe).
     #[must_use]
     pub fn address(&self) -> String {
         bs58::encode(self.0.public_key_bytes()).into_string()
@@ -64,7 +70,7 @@ impl Signer {
 
     /// Public key bytes (32 bytes).
     #[must_use]
-    pub fn public_key_bytes(&self) -> Vec<u8> {
+    pub fn public_key_bytes(&self) -> [u8; 32] {
         self.0.public_key_bytes()
     }
 
@@ -216,11 +222,9 @@ impl Signer {
     }
 }
 
-impl Sign for Signer {
-    type Error = SignError;
-
-    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-        Ok(self.0.sign_output(hash))
+impl SignDigest for Signer {
+    fn sign_digest(&self, digest: &[u8; 32]) -> Result<SignOutput, SignError> {
+        Ok(self.0.sign_output(digest))
     }
 }
 
@@ -253,16 +257,9 @@ impl EncodeSignedTransaction for Signer {
 }
 
 #[cfg(feature = "kobe")]
-impl Signer {
-    /// Create from a [`kobe_svm::SvmAccount`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the private key is invalid.
-    pub fn from_derived(account: &kobe_svm::SvmAccount) -> Result<Self, SignError> {
-        Self::from_bytes(account.private_key_bytes())
-    }
-}
+pub use signer_primitives::FromDerived;
+
+signer_primitives::impl_from_secret_key!();
 
 fn decode_compact_u16(data: &[u8]) -> Result<(usize, usize), SignError> {
     let mut value: usize = 0;

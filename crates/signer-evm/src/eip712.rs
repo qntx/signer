@@ -3,9 +3,11 @@
 #[cfg(not(feature = "std"))]
 use alloc::borrow::ToOwned;
 use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::string::String;
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
-use alloc::{format, string::String, vec, vec::Vec};
+use alloc::vec::Vec;
+use alloc::{format, vec};
 
 use sha3::{Digest, Keccak256};
 
@@ -367,7 +369,10 @@ fn parse_int_width(ty: &str, bits_str: &str) -> Result<usize, SignError> {
     let bits: usize = bits_str
         .parse()
         .map_err(|_| SignError::InvalidMessage(format!("invalid type: {ty}")))?;
-    if bits == 0 || bits > 256 || !bits.is_multiple_of(8) {
+    // `u32::is_multiple_of` is not usable under MSRV 1.85 without unstable.
+    #[allow(clippy::manual_is_multiple_of, reason = "MSRV 1.85 compatibility")]
+    let not_byte_aligned = bits % 8 != 0;
+    if bits == 0 || bits > 256 || not_byte_aligned {
         return Err(SignError::InvalidMessage(format!(
             "{ty}: bad integer width {bits}"
         )));

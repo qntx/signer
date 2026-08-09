@@ -1,17 +1,17 @@
 ---
 name: signer
 description: >-
-  Multi-chain transaction signing CLI tool for 12 chains: Ethereum, Bitcoin,
-  Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, Aptos, and
-  Nostr. Use when the user asks to sign messages, sign hashes, sign
-  transactions, sign Nostr events, or look up addresses / public keys /
-  NIP-19 npub / nsec from private keys. Supports JSON output via --json
-  flag for programmatic/agent consumption.
+  Multi-chain transaction signing CLI tool for 13 chains: Ethereum, Bitcoin,
+  Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, Aptos, Nostr,
+  and Casper. Use when the user asks to sign messages, sign hashes, sign
+  transactions, sign Nostr events, Casper deploy digests, or look up addresses
+  / public keys / NIP-19 npub / nsec from private keys. Supports JSON output
+  via --json flag for programmatic/agent consumption.
 ---
 
 # Signer CLI — Multi-Chain Transaction Signing Tool
 
-`signer` is a single binary CLI for cryptographic signing operations across **12 chains**: Ethereum, Bitcoin, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, Aptos, and Nostr. It uses lightweight, battle-tested cryptographic libraries (k256 for secp256k1 ECDSA and BIP-340 Schnorr, ed25519-dalek, sha2, sha3, blake2, bech32).
+`signer` is a single binary CLI for cryptographic signing operations across **13 chains**: Ethereum, Bitcoin, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, Aptos, Nostr, and Casper. It uses lightweight, battle-tested cryptographic libraries (k256 for secp256k1 ECDSA and BIP-340 Schnorr, ed25519-dalek, sha2, sha3, blake2, bech32).
 
 ## Installation
 
@@ -65,6 +65,7 @@ The `--json` flag is **global** and must appear **before** the chain subcommand.
 | XRP Ledger | `xrpl`   | `xrp`, `ripple`   |
 | Aptos      | `aptos`  | `apt`             |
 | Nostr      | `nostr`  | —                 |
+| Casper     | `casper` | `cspr`            |
 
 ### Subcommands per chain
 
@@ -72,7 +73,7 @@ The `--json` flag is **global** and must appear **before** the chain subcommand.
 
 | Subcommand     | Description                                     |
 | -------------- | ----------------------------------------------- |
-| `sign-hash`    | Sign a raw 32-byte hash                         |
+| `sign-digest`    | Sign a raw 32-byte hash                         |
 | `sign-message` | Sign a message (chain-specific preprocessing)   |
 | `sign-tx`      | Sign transaction bytes (chain-specific hashing) |
 | `address`      | Show address and/or public key                  |
@@ -81,7 +82,7 @@ The `--json` flag is **global** and must appear **before** the chain subcommand.
 
 | Subcommand  | Description                                                                  |
 | ----------- | ---------------------------------------------------------------------------- |
-| `sign-hash` | Sign a raw 32-byte hash                                                      |
+| `sign-digest` | Sign a raw 32-byte hash                                                      |
 | `sign-tx`   | Sign transaction bytes (Cosmos: `SignDoc` / ADR-036; XRPL: `STX\0` + SHA-512-half; Filecoin: Blake2b-256 of CID bytes) |
 | `address`   | Show address and/or public key                                               |
 
@@ -108,7 +109,7 @@ TON has no canonical personal-message envelope (TON Connect / `ton_proof` / wall
 
 | Subcommand     | Description                                                           |
 | -------------- | --------------------------------------------------------------------- |
-| `sign-hash`    | Sign a 32-byte NIP-01 `event.id` (use `-x` / `--event-id` / `--hash`) |
+| `sign-digest`    | Sign a 32-byte NIP-01 `event.id` (use `-x` / `--event-id` / `--hash`) |
 | `sign-message` | Sign arbitrary UTF-8 text (raw BIP-340 Schnorr — no implicit hashing) |
 | `sign-tx`      | Sign a serialized NIP-01 event (computes `sha256(event)` then signs)  |
 | `address`      | Show the NIP-19 `npub1…` address and x-only public key                |
@@ -120,8 +121,8 @@ TON has no canonical personal-message envelope (TON Connect / `ton_proof` / wall
 | `--json`     |       | Global             | JSON output (must come before chain subcommand)                        |
 | `--key`      | `-k`  | All                | Private key in hex (0x-prefixed or plain); Nostr also accepts `nsec1…` |
 | `--message`  | `-m`  | sign-message       | Message to sign                                                        |
-| `--hash`     | `-x`  | sign-hash          | 32-byte hash in hex (Nostr also accepts `--event-id`)                  |
-| `--event-id` | `-x`  | nostr sign-hash    | Alias for `--hash` — the 32-byte NIP-01 event id                       |
+| `--hash`     | `-x`  | sign-digest          | 32-byte hash in hex (Nostr also accepts `--event-id`)                  |
+| `--event-id` | `-x`  | nostr sign-digest    | Alias for `--hash` — the 32-byte NIP-01 event id                       |
 | `--tx`       | `-t`  | sign-tx            | Hex-encoded transaction bytes (Nostr: serialized NIP-01 event)         |
 
 ### Solana-specific flags
@@ -148,6 +149,17 @@ The `v` fragments below are wrapped in inline code to survive markdown table ren
 | XRP Ledger | _Not supported (no canonical message standard)_                                                | SHA-512-half + DER                   |
 | Aptos      | _Not supported — use `sign-tx` (applies the `APTOS::RawTransaction` SHA3-256 domain prefix)_   | SHA3-256 domain prefix + Ed25519     |
 | Nostr      | BIP-340 Schnorr (raw, no implicit hashing)                                                     | SHA-256 then BIP-340 Schnorr         |
+| Casper     | secp: 32-byte digest only; ed25519: raw message bytes                                          | _use `sign-digest` for deploy digests_ |
+
+#### Casper (dual-curve)
+
+| Subcommand     | Description                                                                 |
+| -------------- | --------------------------------------------------------------------------- |
+| `sign-digest`    | Sign a 32-byte deploy digest (`-x`); choose curve with `--algo`             |
+| `sign-message` | secp: requires 32-byte digest message; ed25519: signs full message bytes  |
+| `address`      | Show algorithm-tagged public key hex                                        |
+
+`--algo` values: `secp256k1` (default; aliases `secp`, `ecdsa`) or `ed25519` (aliases `ed`, `eddsa`). Caller owns deploy serialization; this CLI only signs digests / raw bytes.
 
 ## Usage Examples
 
@@ -158,7 +170,7 @@ The `v` fragments below are wrapped in inline code to survive markdown table ren
 signer evm sign-message -k "0x4c0883a6..." -m "Hello, Ethereum!"
 
 # Sign a raw 32-byte hash
-signer evm sign-hash -k "0x4c0883a6..." -x "0xabcdef..."
+signer evm sign-digest -k "0x4c0883a6..." -x "0xabcdef..."
 
 # Sign transaction bytes
 signer evm sign-tx -k "0x4c0883a6..." -t "0x02f8..."
@@ -177,7 +189,7 @@ signer --json evm sign-message -k "0x4c0883a6..." -m "test"
 signer btc sign-message -k "4c0883a6..." -m "Hello, Bitcoin!"
 
 # Sign a raw hash
-signer btc sign-hash -k "4c0883a6..." -x "abcdef..."
+signer btc sign-digest -k "4c0883a6..." -x "abcdef..."
 
 # Sign transaction bytes
 signer btc sign-tx -k "4c0883a6..." -t "0200000001..."
@@ -219,7 +231,7 @@ signer spark sign-tx -k "4c0883a6..." -t "deadbeef..."
 ```bash
 # Filecoin has no personal-message scheme; `sign-tx` Blake2b-256 hashes
 # whatever you feed it and signs the digest.
-signer fil sign-hash -k "4c0883a6..." -x "abcdef..."
+signer fil sign-digest -k "4c0883a6..." -x "abcdef..."
 signer fil sign-tx   -k "4c0883a6..." -t "<hex of CID bytes or any preimage>"
 signer fil address   -k "4c0883a6..."
 ```
@@ -230,7 +242,7 @@ signer fil address   -k "4c0883a6..."
 # Cosmos signs canonical SignDoc bytes. For off-chain messages, build an
 # ADR-036 StdSignDoc externally (or via `kobe cosmos adr036-doc`) and pipe
 # its bytes into sign-tx.
-signer cosmos sign-hash -k "4c0883a6..." -x "abcdef..."
+signer cosmos sign-digest -k "4c0883a6..." -x "abcdef..."
 signer cosmos sign-tx   -k "4c0883a6..." -t "<hex of canonical StdSignDoc bytes>"
 signer cosmos address   -k "4c0883a6..."
 ```
@@ -238,7 +250,7 @@ signer cosmos address   -k "4c0883a6..."
 ### XRP Ledger (no `sign-message`)
 
 ```bash
-signer xrpl sign-hash -k "4c0883a6..." -x "abcdef..."
+signer xrpl sign-digest -k "4c0883a6..." -x "abcdef..."
 signer xrpl sign-tx   -k "4c0883a6..." -t "535458..."
 signer xrpl address   -k "4c0883a6..."
 ```
@@ -276,6 +288,23 @@ signer aptos sign-tx -k "9d61b19d..." -t "0000..."
 signer aptos address -k "9d61b19d..."
 ```
 
+### Casper
+
+Casper supports **secp256k1** and **Ed25519**. Keys are plain 32-byte hex; the
+curve is selected with `--algo` (not inferred from the key).
+
+```bash
+# Deploy hash (BLAKE2b-256 digest you computed elsewhere)
+echo "$KEY" | signer casper sign-digest -k - -x "<32-byte digest hex>" --algo secp256k1
+signer casper sign-digest -k "$KEY" -x "<digest>" --algo ed25519
+
+# Message / raw bytes
+signer casper sign-message -k "$KEY" -m "hello" --algo ed25519
+
+# Tagged public key
+signer casper address -k "$KEY" --algo secp256k1
+```
+
 ### Nostr
 
 Nostr uses **BIP-340 Taproot Schnorr** signatures over secp256k1 (NIP-01).
@@ -288,7 +317,7 @@ signer nostr address -k "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe86
 signer nostr address -k "nsec10allq0gjx7fddtzef0ax00mdps9t2kmtrldkyjfs8l5xruwvh2dq0lhhkp"
 
 # Sign a NIP-01 event.id (32-byte SHA-256 of the canonical event serialization)
-signer nostr sign-hash -k "nsec10allq0g..." -x "5e6ea04f9e5c8a5e38b9a8d99e41dbd5c43c9a8abba4e3bda91a5b1f34c3a7d1"
+signer nostr sign-digest -k "nsec10allq0g..." -x "5e6ea04f9e5c8a5e38b9a8d99e41dbd5c43c9a8abba4e3bda91a5b1f34c3a7d1"
 
 # Sign a serialized event (hex of the NIP-01 JSON array `[0,pubkey,created_at,kind,tags,content]`)
 # The CLI computes sha256(event) then BIP-340 Schnorr signs it.
@@ -298,7 +327,7 @@ signer nostr sign-tx -k "nsec10allq0g..." -t "5b302c2237652e2e2e225d"
 signer nostr sign-message -k "7f7ff03d..." -m "off-chain authentication challenge"
 
 # JSON output
-signer --json nostr sign-hash -k "nsec10allq0g..." -x "5e6ea04f..."
+signer --json nostr sign-digest -k "nsec10allq0g..." -x "5e6ea04f..."
 ```
 
 ## JSON Output Schemas
@@ -321,7 +350,7 @@ Always use `--json` for programmatic consumption.
 Fields `address`, `v`, `public_key`, and `message` are optional and omitted when not applicable.
 
 - **secp256k1 ECDSA signatures**: 130-char hex (65 bytes: `r[32] || s[32] || v[1]`), `v` field present. Values:
-  - `0 | 1` for `sign-hash` / `sign-tx` (raw parity)
+  - `0 | 1` for `sign-digest` / `sign-tx` (raw parity)
   - `27 | 28` for `sign-message` on EVM (EIP-191) and Tron
   - `31 | 32` for `sign-message` on BTC and Spark (BIP-137 compressed P2PKH)
 - **Ed25519 signatures**: 128-char hex (64 bytes), no `v`
@@ -359,6 +388,9 @@ All errors in JSON mode return exit code 1 with:
 | SUI, TON, Aptos         | 64-char hex (Ed25519 secret key)                        |
 | XRP Ledger              | 64-char hex (32 bytes secp256k1 key)                    |
 | Nostr                   | 64-char hex _or_ NIP-19 `nsec1…` bech32 (auto-detected) |
+| Casper                  | 64-char hex + `--algo secp256k1\|ed25519`               |
+
+All chains accept `-k -` (stdin) or `-k @path` in addition to inline hex.
 
 ## Agent Best Practices
 
@@ -369,9 +401,9 @@ All errors in JSON mode return exit code 1 with:
 5. **Solana keys** accept both hex and base58 keypair formats — the CLI auto-detects.
 6. **Nostr keys** accept both 64-char hex and NIP-19 `nsec1…` bech32 — the CLI auto-detects.
 7. **Signature length discriminator**: `v` present ⇒ secp256k1 ECDSA (65-byte sig); `public_key` present with no `v` and 64-byte sig ⇒ Ed25519 (SUI/Nostr/Aptos wire) or BIP-340 Schnorr (Nostr). Use the `chain` field to disambiguate. The `v` byte is:
-   - `0` or `1` for raw signing (`sign-hash`, `sign-tx`);
+   - `0` or `1` for raw signing (`sign-digest`, `sign-tx`);
    - `27` or `28` for EIP-191 `sign-message` on EVM / Tron;
    - `31` or `32` for BIP-137 `sign-message` on BTC / Spark (compressed P2PKH).
-8. **Nostr `sign-message` does NOT hash** the input — it passes bytes straight into BIP-340. For NIP-01 events, compute `sha256(serialized_event)` first (or use `sign-tx` which does it for you) and feed the 32-byte result to `sign-hash`.
+8. **Nostr `sign-message` does NOT hash** the input — it passes bytes straight into BIP-340. For NIP-01 events, compute `sha256(serialized_event)` first (or use `sign-tx` which does it for you) and feed the 32-byte result to `sign-digest`.
 9. **Address derivation** is limited: use `kobe` CLI for full HD wallet derivation with mnemonics (Nostr uses NIP-06 path `m/44'/1237'/<account>'/0/0`).
 10. **Pair with `kobe` for mnemonic-based flows**: `kobe <chain> new --json` outputs `accounts[].private_key` as hex (plus `nsec` for Nostr); pipe it into `signer <chain> sign-* -k <hex>` to sign. The `kobe` library crate can also be wired in at the code level via the `kobe` feature of each `signer-X` crate (`Signer::from_derived(&kobe_X::DerivedAccount)`).

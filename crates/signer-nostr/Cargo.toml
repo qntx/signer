@@ -1,31 +1,32 @@
 [package]
-name = "signer-nostr"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-repository.workspace = true
-readme = "../../README.md"
-description = "Nostr transaction signer — BIP-340 Schnorr signing, NIP-01/NIP-19 bech32."
-keywords = ["crypto", "signer", "nostr", "schnorr", "bip340"]
-categories = ["cryptography::cryptocurrencies", "no-std"]
+name                   = "signer-nostr"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+readme                 = "../../README.md"
+description            = "Nostr transaction signer — BIP-340 Schnorr signing, NIP-01/NIP-19 bech32."
+keywords               = ["crypto", "signer", "nostr", "schnorr", "bip340"]
+categories             = ["cryptography::cryptocurrencies", "no-std"]
 
 [features]
-default = ["std"]
-std = ["alloc", "signer-primitives/std", "zeroize/std", "bech32/std"]
-alloc = ["signer-primitives/alloc", "zeroize/alloc"]
+default   = ["std"]
+std       = ["alloc", "signer-primitives/std", "zeroize/std", "bech32/std"]
+alloc     = ["signer-primitives/alloc", "zeroize/alloc"]
 getrandom = ["signer-primitives/getrandom"]
-kobe = ["dep:kobe-nostr"]
+kobe      = ["dep:kobe-nostr", "signer-primitives/kobe"]
 
 [dependencies]
 signer-primitives = { workspace = true, features = ["schnorr"] }
-bech32.workspace = true
-sha2.workspace = true
+bech32.workspace  = true
+sha2.workspace    = true
 zeroize.workspace = true
 
 kobe-nostr = { workspace = true, optional = true }
 
 [dev-dependencies]
-hex.workspace = true
+hex.workspace     = true
 signer-primitives = { workspace = true, features = ["testing"] }
 
 [lints]

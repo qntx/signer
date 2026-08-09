@@ -23,11 +23,15 @@
 
 extern crate alloc;
 
-use alloc::{format, string::String, vec::Vec};
+use alloc::format;
+use alloc::string::String;
+use alloc::vec::Vec;
 
 use blake2::digest::consts::{U4, U20, U32};
 use blake2::{Blake2b, Digest};
-pub use signer_primitives::{self, Sign, SignError, SignOutput};
+#[cfg(feature = "kobe")]
+use kobe_fil as _;
+pub use signer_primitives::{self, SignDigest, SignError, SignOutput};
 use signer_primitives::{Secp256k1Signer, delegate_secp256k1_ctors};
 
 type Blake2b256 = Blake2b<U32>;
@@ -43,18 +47,12 @@ pub struct Signer(Secp256k1Signer);
 impl Signer {
     delegate_secp256k1_ctors!();
 
-    /// Filecoin protocol-1 (secp256k1) address (`f1…`).
-    ///
-    /// Computed as `"f1" + base32_lower(BLAKE2b-160(uncompressed_pubkey) || BLAKE2b-4(0x01 || payload))`.
-    ///
-    /// Only produces `f1` (protocol 1, secp256k1) addresses. For other
-    /// Filecoin address protocols (`f0` ID, `f2` actor, `f3` BLS,
-    /// `f4` delegated / EAM), use `kobe-fil` which covers the full address
-    /// taxonomy.
+    /// **Identity (not HD):** pure function of this private key only.
+    /// Multi-path / multi-network addresses → [`kobe`](https://github.com/qntx/kobe).
     #[must_use]
     pub fn address(&self) -> String {
         let uncompressed = self.0.uncompressed_public_key();
-        let payload = Blake2b160::digest(&uncompressed);
+        let payload = Blake2b160::digest(uncompressed);
         let mut checksum_input = Vec::with_capacity(1 + payload.len());
         checksum_input.push(0x01); // protocol 1
         checksum_input.extend_from_slice(&payload);
@@ -68,7 +66,7 @@ impl Signer {
 
     /// Compressed public key (33 bytes).
     #[must_use]
-    pub fn public_key_bytes(&self) -> Vec<u8> {
+    pub fn public_key_bytes(&self) -> [u8; 33] {
         self.0.compressed_public_key()
     }
 
@@ -108,25 +106,16 @@ impl Signer {
     }
 }
 
-impl Sign for Signer {
-    type Error = SignError;
-
-    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-        self.0.sign_prehash_recoverable(hash)
+impl SignDigest for Signer {
+    fn sign_digest(&self, digest: &[u8; 32]) -> Result<SignOutput, SignError> {
+        self.0.sign_prehash_recoverable(digest)
     }
 }
 
 #[cfg(feature = "kobe")]
-impl Signer {
-    /// Create from a [`kobe_fil::DerivedAccount`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the private key is invalid.
-    pub fn from_derived(account: &kobe_fil::DerivedAccount) -> Result<Self, SignError> {
-        Self::from_bytes(account.private_key_bytes())
-    }
-}
+pub use signer_primitives::FromDerived;
+
+signer_primitives::impl_from_secret_key!();
 
 /// RFC 4648 base32 lowercase encoding without padding.
 #[allow(

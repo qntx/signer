@@ -581,7 +581,7 @@ mod schnorr_bip340 {
         let aux_bytes = hex::decode(aux_hex).unwrap();
         let msg = hex::decode(msg_hex).unwrap();
 
-        let key = SigningKey::from_bytes(&sk_bytes).unwrap();
+        let key = SigningKey::from_slice(&sk_bytes).unwrap();
         let aux: [u8; 32] = aux_bytes.try_into().unwrap();
         key.sign_raw(&msg, &aux).unwrap().to_bytes()
     }
@@ -677,7 +677,7 @@ mod schnorr_bip340 {
         let pubkey_hex = "eefdea4cdb677750a420fee807eacf21eb9898ae79b9768766e4faa04a2d4a34";
         let pk_bytes = hex::decode(pubkey_hex).unwrap();
         assert!(
-            VerifyingKey::from_bytes(&pk_bytes).is_err(),
+            VerifyingKey::from_slice(&pk_bytes).is_err(),
             "x-only pubkey off-curve must be rejected by k256",
         );
     }
@@ -694,7 +694,7 @@ mod schnorr_bip340 {
         let sig_hex = "fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a14602975563cc27944640ac607cd107ae10923d9ef7a73c643e166be5ebeafa34b1ac553e2";
 
         let pk_bytes = hex::decode(pubkey_hex).unwrap();
-        let vk = VerifyingKey::from_bytes(&pk_bytes).unwrap();
+        let vk = VerifyingKey::from_slice(&pk_bytes).unwrap();
         let sig = K256Sig::try_from(hex::decode(sig_hex).unwrap().as_slice()).unwrap();
         let msg = hex::decode(msg_hex).unwrap();
         assert!(

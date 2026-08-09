@@ -23,7 +23,8 @@
     reason = "test module: panics are acceptable and assertions self-describe"
 )]
 
-use blake2::{Blake2b, Digest, digest::consts::U32};
+use blake2::digest::consts::U32;
+use blake2::{Blake2b, Digest};
 
 use super::Signer;
 

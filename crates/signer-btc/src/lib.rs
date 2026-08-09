@@ -20,10 +20,10 @@
 //! # Examples
 //!
 //! ```
-//! use signer_btc::{Sign as _, Signer};
+//! use signer_btc::{SignDigest as _, Signer};
 //!
 //! let signer = Signer::random();
-//! let out = signer.sign_hash(&[0u8; 32]).unwrap();
+//! let out = signer.sign_digest(&[0u8; 32]).unwrap();
 //! assert_eq!(out.to_bytes().len(), 65); // r(32) + s(32) + v(1)
 //! ```
 
@@ -31,11 +31,14 @@
 
 extern crate alloc;
 
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
+use alloc::vec::Vec;
 
+#[cfg(feature = "kobe")]
+use kobe_btc as _;
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha256};
-pub use signer_primitives::{self, Sign, SignError, SignMessage, SignOutput};
+pub use signer_primitives::{self, SignDigest, SignError, SignMessage, SignOutput};
 use signer_primitives::{Secp256k1Signer, delegate_secp256k1_ctors};
 
 /// Bitcoin address type selector for [BIP-137](https://github.com/bitcoin/bips/blob/master/bip-0137.mediawiki)
@@ -66,10 +69,10 @@ impl BitcoinMessageAddressType {
     #[must_use]
     pub const fn header_offset(self) -> u8 {
         match self {
-            Self::P2pkhUncompressed => 27,
-            Self::P2pkhCompressed => 31,
-            Self::SegwitP2sh => 35,
-            Self::SegwitBech32 => 39,
+            Self::P2pkhUncompressed => signer_primitives::v_encoding::BIP137_P2PKH_UNCOMPRESSED,
+            Self::P2pkhCompressed => signer_primitives::v_encoding::BIP137_P2PKH_COMPRESSED,
+            Self::SegwitP2sh => signer_primitives::v_encoding::BIP137_SEGWIT_P2SH,
+            Self::SegwitBech32 => signer_primitives::v_encoding::BIP137_SEGWIT_BECH32,
         }
     }
 }
@@ -86,6 +89,7 @@ impl Signer {
     /// Bitcoin P2PKH address (legacy, starts with `1`).
     ///
     /// Computed as `Base58Check(0x00 || RIPEMD160(SHA256(compressed_pubkey)))`.
+    /// **Identity (not HD):** pure function of this key only; multi-path/network → kobe.
     #[must_use]
     #[allow(
         clippy::indexing_slicing,
@@ -93,7 +97,7 @@ impl Signer {
     )]
     pub fn address(&self) -> String {
         let pubkey = self.0.compressed_public_key();
-        let sha = Sha256::digest(&pubkey);
+        let sha = Sha256::digest(pubkey);
         let hash160 = Ripemd160::digest(sha);
         let mut payload = Vec::with_capacity(25);
         payload.push(0x00);
@@ -105,7 +109,7 @@ impl Signer {
 
     /// Compressed public key (33 bytes).
     #[must_use]
-    pub fn public_key_bytes(&self) -> Vec<u8> {
+    pub fn public_key_bytes(&self) -> [u8; 33] {
         self.0.compressed_public_key()
     }
 
@@ -174,11 +178,9 @@ impl Signer {
     }
 }
 
-impl Sign for Signer {
-    type Error = SignError;
-
-    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-        self.0.sign_prehash_recoverable(hash)
+impl SignDigest for Signer {
+    fn sign_digest(&self, digest: &[u8; 32]) -> Result<SignOutput, SignError> {
+        self.0.sign_prehash_recoverable(digest)
     }
 }
 
@@ -196,16 +198,9 @@ impl SignMessage for Signer {
 }
 
 #[cfg(feature = "kobe")]
-impl Signer {
-    /// Create from a [`kobe_btc::BtcAccount`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the private key is invalid.
-    pub fn from_derived(account: &kobe_btc::BtcAccount) -> Result<Self, SignError> {
-        Self::from_bytes(account.private_key_bytes())
-    }
-}
+pub use signer_primitives::FromDerived;
+
+signer_primitives::impl_from_secret_key!();
 
 #[allow(
     clippy::cast_possible_truncation,

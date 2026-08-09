@@ -1,32 +1,33 @@
 [package]
-name = "signer-tron"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-repository.workspace = true
-readme = "../../README.md"
-description = "TRON transaction signer — secp256k1 ECDSA + Keccak-256."
-keywords = ["crypto", "signer", "tron", "secp256k1", "keccak"]
-categories = ["cryptography::cryptocurrencies", "no-std"]
+name                   = "signer-tron"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+readme                 = "../../README.md"
+description            = "TRON transaction signer — secp256k1 ECDSA + Keccak-256."
+keywords               = ["crypto", "signer", "tron", "secp256k1", "keccak"]
+categories             = ["cryptography::cryptocurrencies", "no-std"]
 
 [features]
-default = ["std"]
-std = ["alloc", "signer-primitives/std"]
-alloc = ["signer-primitives/alloc"]
+default   = ["std"]
+std       = ["alloc", "signer-primitives/std"]
+alloc     = ["signer-primitives/alloc"]
 getrandom = ["signer-primitives/getrandom"]
-kobe = ["dep:kobe-tron"]
+kobe      = ["dep:kobe-tron", "signer-primitives/kobe"]
 
 [dependencies]
 signer-primitives = { workspace = true, features = ["secp256k1"] }
-hex.workspace = true
-sha2.workspace = true
-sha3.workspace = true
-bs58.workspace = true
+hex.workspace     = true
+sha2.workspace    = true
+sha3.workspace    = true
+bs58.workspace    = true
 
 kobe-tron = { workspace = true, optional = true }
 
 [dev-dependencies]
-hex.workspace = true
+hex.workspace     = true
 signer-primitives = { workspace = true, features = ["testing"] }
 # Dev-only: lets the `ecrecover` round-trip test derive the signer's
 # address from a wire signature without leaking `k256` into the

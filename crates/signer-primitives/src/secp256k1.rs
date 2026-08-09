@@ -6,14 +6,15 @@
 //! this into their own `Signer` newtype and layer chain-specific address
 //! derivation and message/transaction signing on top.
 
+use alloc::format;
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
-use alloc::{format, vec::Vec};
 
 use k256::ecdsa::signature::hazmat::{PrehashSigner, PrehashVerifier};
 use k256::ecdsa::{Signature, SigningKey, VerifyingKey};
-use zeroize::ZeroizeOnDrop;
+use zeroize::{ZeroizeOnDrop, Zeroizing};
 
+use crate::secret::{FromSecretKey, parse_secret_hex};
 use crate::{SignError, SignOutput};
 
 /// Digest length (all chains sign 32-byte hashes).
@@ -41,6 +42,9 @@ pub(crate) const DIGEST_LEN: usize = 32;
 /// ```
 pub struct Secp256k1Signer {
     key: SigningKey,
+    /// Canonical secret bytes (zeroized on drop). Kept so drop is not solely
+    /// dependent on `k256::SigningKey`'s internal zeroize behavior.
+    secret: Zeroizing<[u8; 32]>,
 }
 
 impl core::fmt::Debug for Secp256k1Signer {
@@ -53,6 +57,12 @@ impl core::fmt::Debug for Secp256k1Signer {
 
 impl ZeroizeOnDrop for Secp256k1Signer {}
 
+impl FromSecretKey for Secp256k1Signer {
+    fn from_secret_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
+        Self::from_bytes(bytes)
+    }
+}
+
 impl Secp256k1Signer {
     /// Create from a raw 32-byte private key.
     ///
@@ -63,7 +73,10 @@ impl Secp256k1Signer {
     pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
         let key =
             SigningKey::from_slice(bytes).map_err(|e| SignError::InvalidKey(e.to_string()))?;
-        Ok(Self { key })
+        Ok(Self {
+            key,
+            secret: Zeroizing::new(*bytes),
+        })
     }
 
     /// Create from a hex-encoded private key (with or without `0x`).
@@ -73,11 +86,7 @@ impl Secp256k1Signer {
     /// Returns [`SignError::InvalidKey`] if the hex is malformed, not 32
     /// bytes long, or not a valid secp256k1 scalar.
     pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
-        let stripped = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-        let decoded = hex::decode(stripped).map_err(|e| SignError::InvalidKey(e.to_string()))?;
-        let bytes: [u8; 32] = decoded.try_into().map_err(|v: Vec<u8>| {
-            SignError::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
-        })?;
+        let bytes = parse_secret_hex(hex_str)?;
         Self::from_bytes(&bytes)
     }
 
@@ -94,15 +103,10 @@ impl Secp256k1Signer {
     /// the curve order (probability ≈ 2⁻¹²⁸, cryptographically negligible).
     #[cfg(feature = "getrandom")]
     pub fn try_random() -> Result<Self, SignError> {
-        use zeroize::Zeroize as _;
-        let mut bytes = [0u8; 32];
-        let result = getrandom::fill(&mut bytes)
-            .map_err(|e| SignError::SigningFailed(e.to_string()))
-            .and_then(|()| {
-                SigningKey::from_slice(&bytes).map_err(|e| SignError::InvalidKey(e.to_string()))
-            });
-        bytes.zeroize();
-        result.map(|key| Self { key })
+        let mut bytes = Zeroizing::new([0u8; 32]);
+        getrandom::fill(bytes.as_mut_slice())
+            .map_err(|e| SignError::SigningFailed(e.to_string()))?;
+        Self::from_bytes(&bytes)
     }
 
     /// Generate a random signer, panicking on entropy failure.
@@ -125,6 +129,12 @@ impl Secp256k1Signer {
         Self::try_random().expect("Secp256k1Signer::random: entropy source failed")
     }
 
+    /// 32-byte secret key (zeroizing view). Prefer not logging this.
+    #[must_use]
+    pub fn to_bytes(&self) -> Zeroizing<[u8; 32]> {
+        Zeroizing::new(*self.secret)
+    }
+
     /// Expose the inner [`SigningKey`].
     #[must_use]
     pub const fn signing_key(&self) -> &SigningKey {
@@ -139,22 +149,32 @@ impl Secp256k1Signer {
 
     /// Compressed SEC1-encoded public key (33 bytes, leading `0x02` or `0x03`).
     #[must_use]
-    pub fn compressed_public_key(&self) -> Vec<u8> {
-        self.key
-            .verifying_key()
-            .to_encoded_point(true)
-            .as_bytes()
-            .to_vec()
+    #[allow(
+        clippy::expect_used,
+        clippy::indexing_slicing,
+        reason = "SEC1 compressed encoding is always exactly 33 bytes"
+    )]
+    pub fn compressed_public_key(&self) -> [u8; 33] {
+        let point = self.key.verifying_key().to_sec1_point(true);
+        let bytes = point.as_bytes();
+        let mut out = [0u8; 33];
+        out.copy_from_slice(bytes);
+        out
     }
 
     /// Uncompressed SEC1-encoded public key (65 bytes, leading `0x04`).
     #[must_use]
-    pub fn uncompressed_public_key(&self) -> Vec<u8> {
-        self.key
-            .verifying_key()
-            .to_encoded_point(false)
-            .as_bytes()
-            .to_vec()
+    #[allow(
+        clippy::expect_used,
+        clippy::indexing_slicing,
+        reason = "SEC1 uncompressed encoding is always exactly 65 bytes"
+    )]
+    pub fn uncompressed_public_key(&self) -> [u8; 65] {
+        let point = self.key.verifying_key().to_sec1_point(false);
+        let bytes = point.as_bytes();
+        let mut out = [0u8; 65];
+        out.copy_from_slice(bytes);
+        out
     }
 
     /// Sign a 32-byte pre-hashed digest with recoverable ECDSA.
@@ -164,15 +184,14 @@ impl Secp256k1Signer {
     ///
     /// # Errors
     ///
-    /// Returns [`SignError::SigningFailed`] if the signing primitive fails.
+    /// Infallible with current `k256` 0.14 (`sign_prehash_recoverable` returns a
+    /// tuple). Signature remains `Result` for API stability across chain
+    /// crates that `?` the output.
     pub fn sign_prehash_recoverable(
         &self,
         hash: &[u8; DIGEST_LEN],
     ) -> Result<SignOutput, SignError> {
-        let (sig, rid) = self
-            .key
-            .sign_prehash_recoverable(hash)
-            .map_err(|e| SignError::SigningFailed(e.to_string()))?;
+        let (sig, rid) = self.key.sign_prehash_recoverable(hash);
         let sig_bytes = sig.to_bytes();
         let mut signature = [0u8; 64];
         signature.copy_from_slice(&sig_bytes);

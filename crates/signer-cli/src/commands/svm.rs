@@ -3,6 +3,7 @@
 use clap::{Args, Subcommand};
 use signer_svm::{SignMessage, Signer};
 
+use super::key::load_secret_key;
 use super::parse_hex;
 use crate::output::{self, CliResult};
 
@@ -47,7 +48,7 @@ enum SvmSubcommand {
 }
 
 fn load_signer(key: &str) -> Result<Signer, Box<dyn std::error::Error>> {
-    Signer::from_hex(key)
+    Signer::from_bytes(&load_secret_key(key)?)
         .or_else(|_| Signer::from_keypair_base58(key))
         .map_err(|e| format!("invalid private key: {e}").into())
 }

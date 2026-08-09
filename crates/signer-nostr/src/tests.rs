@@ -12,7 +12,7 @@
 //!   `npub1…` bech32 encoding. These ground our implementation against
 //!   the public specification rather than against our own past output.
 //! - **HRP rejection**: `from_nsec` refuses an `npub1…` payload.
-//! - **`sign_transaction` = `sign_hash(SHA-256(event))`**: the NIP-01
+//! - **`sign_transaction` = `sign_digest(SHA-256(event))`**: the NIP-01
 //!   event-id pipeline has two equivalent entry points; their outputs
 //!   must be byte-identical.
 //! - **Full NIP-01 event signing**: build a real event per the NIP-01
@@ -26,7 +26,7 @@
     reason = "test module: panics are acceptable and assertions self-describe"
 )]
 
-use sha2::{Digest as _, Sha256};
+use sha2::Sha256;
 
 use super::*;
 
@@ -97,19 +97,19 @@ fn from_nsec_rejects_wrong_hrp_and_malformed_bech32() {
 // NIP-01 event signing pipeline
 // ============================================================================
 
-/// `sign_transaction(event)` must equal `sign_hash(sha256(event))`: the
+/// `sign_transaction(event)` must equal `sign_digest(sha256(event))`: the
 /// two entry points are supposed to converge on the NIP-01 event-id
 /// pipeline. This test catches any divergence between them without
 /// pinning a signature byte value (which is already covered by the
 /// BIP-340 CSV KATs in primitives).
 #[test]
-fn sign_transaction_equals_sign_hash_of_sha256() {
+fn sign_transaction_equals_sign_digest_of_sha256() {
     let s = tv1_signer();
     let event_json =
         br#"[0,"17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917",1700000000,1,[],"hi"]"#;
     let direct = s.sign_transaction(event_json).unwrap();
     let event_id: [u8; 32] = Sha256::digest(event_json).into();
-    let via_hash = s.sign_hash(&event_id).unwrap();
+    let via_hash = s.sign_digest(&event_id).unwrap();
     assert_eq!(direct.to_bytes(), via_hash.to_bytes());
 
     // Verify round-trip through the public `Signer::verify` API.
@@ -182,6 +182,7 @@ mod kobe_integration {
 
     #[test]
     fn from_derived_matches_nip06_tv1_kat() {
+        use signer_primitives::FromDerived;
         let acct = tv1_derived_account();
         let via_derived = Signer::from_derived(&acct).unwrap();
         let via_hex = Signer::from_hex(acct.private_key_hex().as_str()).unwrap();

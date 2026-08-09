@@ -1,32 +1,33 @@
 [package]
-name = "signer-evm"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-repository.workspace = true
-readme = "../../README.md"
-description = "EVM transaction signer — EIP-191, EIP-712, typed transaction signing."
-keywords = ["crypto", "signer", "ethereum", "eip712", "eip191"]
-categories = ["cryptography::cryptocurrencies", "no-std"]
+name                   = "signer-evm"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+readme                 = "../../README.md"
+description            = "EVM transaction signer — EIP-191, EIP-712, typed transaction signing."
+keywords               = ["crypto", "signer", "ethereum", "eip712", "eip191"]
+categories             = ["cryptography::cryptocurrencies", "no-std"]
 
 [features]
-default = ["std"]
-std = ["alloc", "signer-primitives/std"]
-alloc = ["signer-primitives/alloc"]
+default   = ["std"]
+std       = ["alloc", "signer-primitives/std"]
+alloc     = ["signer-primitives/alloc"]
 getrandom = ["signer-primitives/getrandom"]
-kobe = ["dep:kobe-evm"]
+kobe      = ["dep:kobe-evm", "signer-primitives/kobe"]
 
 [dependencies]
-signer-primitives = { workspace = true, features = ["secp256k1"] }
-hex.workspace = true
-sha3.workspace = true
+signer-primitives    = { workspace = true, features = ["secp256k1"] }
+hex.workspace        = true
+sha3.workspace       = true
 serde_json.workspace = true
 
 kobe-evm = { workspace = true, optional = true }
 
 [dev-dependencies]
 signer-primitives = { workspace = true, features = ["testing"] }
-hex.workspace = true
+hex.workspace     = true
 zeroize.workspace = true
 # Used to verify round-trips through `ecrecover` in the test suite. The
 # production surface exposes verification via `Signer::verify_hash`, so

@@ -14,7 +14,7 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt, clippy
@@ -28,7 +28,7 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Build
@@ -36,11 +36,21 @@ jobs:
       - name: Test
         run: cargo test --workspace --all-features --verbose
 
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          # all-features is configured in deny.toml [graph], not as a CLI flag
+          command: check
+
   no-std:
     name: no_std
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: thumbv7m-none-eabi
@@ -75,6 +85,8 @@ jobs:
         run: cargo check -p signer-aptos --target thumbv7m-none-eabi --no-default-features --features alloc
       - name: signer-nostr (no_std)
         run: cargo check -p signer-nostr --target thumbv7m-none-eabi --no-default-features --features alloc
+      - name: signer-casper (no_std)
+        run: cargo check -p signer-casper --target thumbv7m-none-eabi --no-default-features --features alloc
       - name: signer (no_std)
         run: cargo check -p signer --target thumbv7m-none-eabi --no-default-features --features alloc
       - name: signer (no_std + all chains)

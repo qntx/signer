@@ -1,32 +1,33 @@
 [package]
-name = "signer-cosmos"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-repository.workspace = true
-readme = "../../README.md"
-description = "Cosmos transaction signer — secp256k1 ECDSA + SHA-256."
-keywords = ["crypto", "signer", "cosmos", "secp256k1", "wallet"]
-categories = ["cryptography::cryptocurrencies", "no-std"]
+name                   = "signer-cosmos"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+readme                 = "../../README.md"
+description            = "Cosmos transaction signer — secp256k1 ECDSA + SHA-256."
+keywords               = ["crypto", "signer", "cosmos", "secp256k1", "wallet"]
+categories             = ["cryptography::cryptocurrencies", "no-std"]
 
 [features]
-default = ["std"]
-std = ["alloc", "signer-primitives/std"]
-alloc = ["signer-primitives/alloc"]
+default   = ["std"]
+std       = ["alloc", "signer-primitives/std"]
+alloc     = ["signer-primitives/alloc"]
 getrandom = ["signer-primitives/getrandom"]
-kobe = ["dep:kobe-cosmos"]
+kobe      = ["dep:kobe-cosmos", "signer-primitives/kobe"]
 
 [dependencies]
 signer-primitives = { workspace = true, features = ["secp256k1"] }
-hex.workspace = true
-sha2.workspace = true
-ripemd.workspace = true
-bech32.workspace = true
+hex.workspace     = true
+sha2.workspace    = true
+ripemd.workspace  = true
+bech32.workspace  = true
 
 kobe-cosmos = { workspace = true, optional = true }
 
 [dev-dependencies]
-hex.workspace = true
+hex.workspace     = true
 signer-primitives = { workspace = true, features = ["testing"] }
 
 [lints]

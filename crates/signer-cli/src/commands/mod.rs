@@ -2,9 +2,11 @@
 
 mod aptos;
 mod btc;
+mod casper;
 mod cosmos;
 mod evm;
 mod fil;
+mod key;
 mod nostr;
 mod spark;
 mod sui;
@@ -15,6 +17,7 @@ mod xrpl;
 
 pub(crate) use aptos::AptosCommand;
 pub(crate) use btc::BtcCommand;
+pub(crate) use casper::CasperCommand;
 use clap::{Parser, Subcommand};
 pub(crate) use cosmos::CosmosCommand;
 pub(crate) use evm::EvmCommand;
@@ -106,4 +109,8 @@ pub(crate) enum Commands {
     /// Nostr signing operations (BIP-340 Schnorr, NIP-01/NIP-19).
     #[command(name = "nostr")]
     Nostr(NostrCommand),
+
+    /// Casper Network signing operations.
+    #[command(name = "casper", alias = "cspr")]
+    Casper(CasperCommand),
 }

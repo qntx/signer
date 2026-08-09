@@ -1,26 +1,27 @@
 [package]
-name = "signer-svm"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-repository.workspace = true
-readme = "../../README.md"
-description = "Solana transaction signer — Ed25519 signing, compact-u16 tx encoding."
-keywords = ["crypto", "signer", "solana", "ed25519", "wallet"]
-categories = ["cryptography::cryptocurrencies", "no-std"]
+name                   = "signer-svm"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+readme                 = "../../README.md"
+description            = "Solana transaction signer — Ed25519 signing, compact-u16 tx encoding."
+keywords               = ["crypto", "signer", "solana", "ed25519", "wallet"]
+categories             = ["cryptography::cryptocurrencies", "no-std"]
 
 [features]
-default = ["std"]
-std = ["alloc", "signer-primitives/std", "zeroize/std"]
-alloc = ["signer-primitives/alloc", "zeroize/alloc"]
+default   = ["std"]
+std       = ["alloc", "signer-primitives/std", "zeroize/std"]
+alloc     = ["signer-primitives/alloc", "zeroize/alloc"]
 getrandom = ["signer-primitives/getrandom"]
-kobe = ["dep:kobe-svm"]
+kobe      = ["dep:kobe-svm", "signer-primitives/kobe"]
 
 [dependencies]
-signer-primitives = { workspace = true, features = ["ed25519"] }
-bs58.workspace = true
+signer-primitives       = { workspace = true, features = ["ed25519"] }
+bs58.workspace          = true
 ed25519-dalek.workspace = true
-zeroize.workspace = true
+zeroize.workspace       = true
 
 kobe-svm = { workspace = true, optional = true }
 

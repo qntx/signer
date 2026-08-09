@@ -6,17 +6,18 @@
 //! newtype and layer chain-specific address derivation and intent/domain
 //! prefixing on top.
 //!
-//! Unlike [`Secp256k1Signer`](crate::Secp256k1Signer), Ed25519 key material
-//! is already zeroized on drop by `ed25519-dalek` itself, so no additional
-//! [`ZeroizeOnDrop`](zeroize::ZeroizeOnDrop) impl is required.
+//! The inner `ed25519-dalek` key zeroizes on drop; we also keep a
+//! [`Zeroizing`] seed copy for a uniform secret-export policy with secp/schnorr.
 
+use alloc::format;
 use alloc::string::String;
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
-use alloc::{format, vec::Vec};
 
 use ed25519_dalek::{Signature, Signer as _, SigningKey, Verifier as _, VerifyingKey};
+use zeroize::{ZeroizeOnDrop, Zeroizing};
 
+use crate::secret::{FromSecretKey, parse_secret_hex};
 use crate::{SignError, SignOutput};
 
 /// Shared Ed25519 signer.
@@ -45,6 +46,7 @@ use crate::{SignError, SignOutput};
 /// ```
 pub struct Ed25519Signer {
     key: SigningKey,
+    secret: Zeroizing<[u8; 32]>,
 }
 
 impl core::fmt::Debug for Ed25519Signer {
@@ -52,6 +54,14 @@ impl core::fmt::Debug for Ed25519Signer {
         f.debug_struct("Ed25519Signer")
             .field("key", &"[REDACTED]")
             .finish()
+    }
+}
+
+impl ZeroizeOnDrop for Ed25519Signer {}
+
+impl FromSecretKey for Ed25519Signer {
+    fn from_secret_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
+        Self::from_bytes(bytes)
     }
 }
 
@@ -70,7 +80,14 @@ impl Ed25519Signer {
     pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
         Ok(Self {
             key: SigningKey::from_bytes(bytes),
+            secret: Zeroizing::new(*bytes),
         })
+    }
+
+    /// 32-byte secret seed (zeroizing copy).
+    #[must_use]
+    pub fn to_bytes(&self) -> Zeroizing<[u8; 32]> {
+        Zeroizing::new(*self.secret)
     }
 
     /// Create from a hex-encoded 32-byte secret key (with or without `0x`).
@@ -80,11 +97,7 @@ impl Ed25519Signer {
     /// Returns [`SignError::InvalidKey`] if the hex is malformed or not
     /// exactly 32 bytes.
     pub fn from_hex(hex_str: &str) -> Result<Self, SignError> {
-        let stripped = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-        let decoded = hex::decode(stripped).map_err(|e| SignError::InvalidKey(e.to_string()))?;
-        let bytes: [u8; 32] = decoded.try_into().map_err(|v: Vec<u8>| {
-            SignError::InvalidKey(format!("expected 32 bytes, got {}", v.len()))
-        })?;
+        let bytes = parse_secret_hex(hex_str)?;
         Self::from_bytes(&bytes)
     }
 
@@ -141,14 +154,14 @@ impl Ed25519Signer {
 
     /// Public-key bytes (32 bytes, raw Ed25519 point encoding).
     #[must_use]
-    pub fn public_key_bytes(&self) -> Vec<u8> {
-        self.key.verifying_key().as_bytes().to_vec()
+    pub fn public_key_bytes(&self) -> [u8; 32] {
+        self.key.verifying_key().to_bytes()
     }
 
     /// Public key in hex (64 characters, no `0x` prefix).
     #[must_use]
     pub fn public_key_hex(&self) -> String {
-        hex::encode(self.key.verifying_key().as_bytes())
+        hex::encode(self.public_key_bytes())
     }
 
     /// Sign arbitrary bytes with raw Ed25519 (no prefix or hashing).
@@ -160,7 +173,7 @@ impl Ed25519Signer {
     /// Produce a [`SignOutput::Ed25519`] over `message`.
     ///
     /// Convenience wrapper over [`sign_raw`](Self::sign_raw) that packages
-    /// the signature into the unified enum used by the [`Sign`](crate::Sign)
+    /// the signature into the unified enum used by [`SignDigest`](crate::SignDigest)
     /// trait.
     #[must_use]
     pub fn sign_output(&self, message: &[u8]) -> SignOutput {

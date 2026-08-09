@@ -1,8 +1,9 @@
 //! Nostr signing CLI commands (BIP-340 Schnorr, NIP-01/NIP-19).
 
 use clap::{Args, Subcommand};
-use signer_nostr::{Sign, SignError, SignMessage, Signer};
+use signer_nostr::{SignDigest, SignMessage, Signer};
 
+use super::key::load_secret_key;
 use super::parse_hex;
 use crate::output::{self, CliResult};
 
@@ -18,7 +19,8 @@ pub(crate) struct NostrCommand {
 #[derive(Subcommand)]
 enum NostrSubcommand {
     /// Sign a 32-byte NIP-01 `event.id` (hex).
-    SignHash {
+    #[command(name = "sign-digest")]
+    Digest {
         /// Private key in hex or `nsec1…` bech32.
         #[arg(short, long)]
         key: String,
@@ -58,10 +60,10 @@ enum NostrSubcommand {
 impl NostrCommand {
     pub(crate) fn execute(self, json: bool) -> CliResult {
         match self.command {
-            NostrSubcommand::SignHash { key, event_id } => {
+            NostrSubcommand::Digest { key, event_id } => {
                 let signer = load_signer(&key)?;
                 let digest = super::parse_hex32(&event_id)?;
-                let out = signer.sign_hash(&digest)?;
+                let out = signer.sign_digest(&digest)?;
                 output::sign(CHAIN, "event id (BIP-340 Schnorr)")
                     .address(signer.address())
                     .from_output(&out)
@@ -98,10 +100,10 @@ impl NostrCommand {
 }
 
 /// Accept either a hex-encoded private key or an `nsec1…` bech32 string.
-fn load_signer(key: &str) -> Result<Signer, SignError> {
+fn load_signer(key: &str) -> Result<Signer, Box<dyn std::error::Error>> {
     if key.starts_with("nsec1") {
-        Signer::from_nsec(key)
+        Ok(Signer::from_nsec(key)?)
     } else {
-        Signer::from_hex(key)
+        Ok(Signer::from_bytes(&load_secret_key(key)?)?)
     }
 }
