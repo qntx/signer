@@ -6,7 +6,7 @@
 default: all
 
 # Run the most common checks (includes tests; mirrors CI coverage locally).
-all: fmt clippy-fix check-no-std deny test
+all: fmt clippy-fix check-no-std deny check-names test
 
 # List available recipes
 list:
@@ -78,12 +78,16 @@ clippy-fix:
         -- -D warnings
 
 # Format the code using rustfmt (nightly provides import grouping).
+# Prerequisites: `rustup toolchain install nightly --component rustfmt`
 fmt:
-    cargo +nightly fmt --all
+    cargo +nightly fmt --all -- \
+        --config unstable_features=true,group_imports=StdExternalCrate,imports_granularity=Module
 
 # Check formatting without writing
 fmt-check:
-    cargo +nightly fmt --all -- --check
+    cargo +nightly fmt --all -- \
+        --check \
+        --config unstable_features=true,group_imports=StdExternalCrate,imports_granularity=Module
 
 # Generate documentation for all crates and open it in the browser.
 doc:
@@ -93,6 +97,21 @@ doc:
 # `all-features` is set in deny.toml [graph]; the CLI has no --all-features flag.
 deny:
     cargo deny check
+
+
+# Fail if forbidden dual-name / legacy tokens reappear in library/CLI sources.
+check-names:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if rg -n --glob '!CHANGELOG.md' --glob '!**/target/**' -e 'sign-hash' -e '\bsign_hash\b' -e 'SignHash' crates skills README.md; then
+      echo 'forbidden name found' >&2
+      exit 1
+    fi
+    if rg -n -e 'impl Sign for' -e 'trait Sign[^A-Za-z]' crates --glob '*.rs'; then
+      echo 'legacy Sign trait usage' >&2
+      exit 1
+    fi
+    echo 'check-names ok'
 
 # Clean build artifacts
 clean:

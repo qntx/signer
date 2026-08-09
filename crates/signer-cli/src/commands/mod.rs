@@ -1,12 +1,12 @@
 //! CLI command definitions and handlers.
 
 mod aptos;
-mod key;
 mod btc;
 mod casper;
 mod cosmos;
 mod evm;
 mod fil;
+mod key;
 mod nostr;
 mod spark;
 mod sui;
@@ -17,8 +17,8 @@ mod xrpl;
 
 pub(crate) use aptos::AptosCommand;
 pub(crate) use btc::BtcCommand;
-use clap::{Parser, Subcommand};
 pub(crate) use casper::CasperCommand;
+use clap::{Parser, Subcommand};
 pub(crate) use cosmos::CosmosCommand;
 pub(crate) use evm::EvmCommand;
 pub(crate) use fil::FilCommand;

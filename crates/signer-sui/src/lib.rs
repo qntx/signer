@@ -10,15 +10,16 @@
 
 extern crate alloc;
 
-#[cfg(feature = "kobe")]
-use kobe_sui as _;
-
-use alloc::{format, string::String, vec::Vec};
+use alloc::format;
+use alloc::string::String;
+use alloc::vec::Vec;
 
 use blake2::Blake2bVar;
 use blake2::digest::{Update, VariableOutput};
 pub use ed25519_dalek::Signature;
-pub use signer_primitives::{self, Sign, SignError, SignMessage, SignOutput};
+#[cfg(feature = "kobe")]
+use kobe_sui as _;
+pub use signer_primitives::{self, SignDigest, SignError, SignMessage, SignOutput};
 use signer_primitives::{Ed25519Signer, delegate_ed25519_ctors};
 
 /// Ed25519 signature scheme flag used by Sui.
@@ -40,7 +41,8 @@ pub struct Signer(Ed25519Signer);
 impl Signer {
     delegate_ed25519_ctors!();
 
-    /// Sui address: `0x` + hex(BLAKE2b-256(`0x00` || pubkey)).
+    /// **Identity (not HD):** pure function of this private key only.
+    /// Multi-path / multi-network addresses → [`kobe`](https://github.com/qntx/kobe).
     #[must_use]
     pub fn address(&self) -> String {
         let mut buf = Vec::with_capacity(33);
@@ -52,7 +54,7 @@ impl Signer {
 
     /// Public key bytes (32 bytes).
     #[must_use]
-    pub fn public_key_bytes(&self) -> Vec<u8> {
+    pub fn public_key_bytes(&self) -> [u8; 32] {
         self.0.public_key_bytes()
     }
 
@@ -107,19 +109,17 @@ impl Signer {
     }
 }
 
-impl Sign for Signer {
-    type Error = SignError;
-
+impl SignDigest for Signer {
     /// Sign a 32-byte value with raw Ed25519 (no intent framing).
     ///
     /// ⚠️ **WARNING**: the resulting signature is **NOT on-chain verifiable**
     /// on Sui. Sui's validators require intent / BCS framing around the
     /// payload (`BLAKE2b-256(intent_prefix || bcs_tx)`). For on-chain
     /// correctness use [`Signer::sign_transaction`] or
-    /// [`SignMessage::sign_message`]; `sign_hash` is exposed only as a
+    /// [`SignMessage::sign_message`]; `sign_digest` is exposed only as a
     /// low-level off-chain primitive.
-    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-        Ok(self.0.sign_output_with_pubkey(hash))
+    fn sign_digest(&self, digest: &[u8; 32]) -> Result<SignOutput, SignError> {
+        Ok(self.0.sign_output_with_pubkey(digest))
     }
 }
 

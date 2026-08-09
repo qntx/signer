@@ -19,21 +19,21 @@
 //! XRPL has no canonical off-chain message signing standard (no EIP-191
 //! equivalent), so this crate deliberately does **not** implement
 //! [`SignMessage`](signer_primitives::SignMessage). Users who need a custom
-//! scheme should hash their own preimage and call [`Sign::sign_hash`]
+//! scheme should hash their own preimage and call [`SignDigest::sign_digest`]
 //! directly.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
+use alloc::string::String;
+use alloc::vec::Vec;
+
 #[cfg(feature = "kobe")]
 use kobe_xrpl as _;
-
-use alloc::{string::String, vec::Vec};
-
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha256, Sha512};
-pub use signer_primitives::{self, Sign, SignError, SignOutput};
+pub use signer_primitives::{self, SignDigest, SignError, SignOutput};
 use signer_primitives::{Secp256k1Signer, delegate_secp256k1_ctors};
 
 /// XRPL single-signing hash prefix: `STX\0` (`0x53545800`).
@@ -50,7 +50,8 @@ pub struct Signer(Secp256k1Signer);
 impl Signer {
     delegate_secp256k1_ctors!();
 
-    /// Derive the XRPL classic `r`-address from the signing key.
+    /// **Identity (not HD):** pure function of this private key only.
+    /// Multi-path / multi-network addresses → [`kobe`](https://github.com/qntx/kobe).
     #[must_use]
     pub fn address(&self) -> String {
         let pubkey = self.0.compressed_public_key();
@@ -59,7 +60,7 @@ impl Signer {
 
     /// Compressed public key (33 bytes).
     #[must_use]
-    pub fn public_key_bytes(&self) -> Vec<u8> {
+    pub fn public_key_bytes(&self) -> [u8; 33] {
         self.0.compressed_public_key()
     }
 
@@ -72,7 +73,7 @@ impl Signer {
     /// Verify a DER-encoded ECDSA signature against a 32-byte pre-hashed
     /// digest.
     ///
-    /// Matches the DER output of [`Sign::sign_hash`] and
+    /// Matches the DER output of [`SignDigest::sign_digest`] and
     /// [`Signer::sign_transaction`]. Callers that produced a signature via
     /// this signer can round-trip it through `verify_hash_der` unchanged.
     ///
@@ -114,15 +115,13 @@ impl Signer {
     }
 }
 
-impl Sign for Signer {
-    type Error = SignError;
-
+impl SignDigest for Signer {
     /// Sign a 32-byte pre-hashed digest with secp256k1.
     ///
     /// Returns a [`SignOutput::EcdsaDer`] (variable length, typically 70–72
     /// bytes). Recovery id is not included — XRPL does not use it.
-    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-        self.0.sign_prehash_der(hash)
+    fn sign_digest(&self, digest: &[u8; 32]) -> Result<SignOutput, SignError> {
+        self.0.sign_prehash_der(digest)
     }
 }
 

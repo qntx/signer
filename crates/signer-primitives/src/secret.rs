@@ -3,7 +3,51 @@
 use alloc::format;
 use alloc::string::ToString;
 
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
+
 use crate::SignError;
+
+/// Owned 32-byte secret key material (zeroized on drop).
+#[derive(Clone, Zeroize, ZeroizeOnDrop)]
+pub struct SecretKey32(Zeroizing<[u8; 32]>);
+
+impl SecretKey32 {
+    /// Wrap raw secret bytes.
+    #[must_use]
+    pub fn new(bytes: [u8; 32]) -> Self {
+        Self(Zeroizing::new(bytes))
+    }
+
+    /// Borrow the inner 32 bytes.
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+
+    /// Copy out a zeroizing clone of the secret.
+    #[must_use]
+    pub fn to_zeroizing(&self) -> Zeroizing<[u8; 32]> {
+        Zeroizing::new(*self.0)
+    }
+}
+
+impl core::fmt::Debug for SecretKey32 {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("SecretKey32([REDACTED])")
+    }
+}
+
+impl AsRef<[u8; 32]> for SecretKey32 {
+    fn as_ref(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
+impl From<[u8; 32]> for SecretKey32 {
+    fn from(bytes: [u8; 32]) -> Self {
+        Self::new(bytes)
+    }
+}
 
 /// Parse a 32-byte secret from hex (optional `0x` prefix).
 ///
@@ -22,6 +66,15 @@ pub fn parse_secret_hex(hex_str: &str) -> Result<[u8; 32], SignError> {
     })
 }
 
+/// Parse hex into a [`SecretKey32`].
+///
+/// # Errors
+///
+/// See [`parse_secret_hex`].
+pub fn parse_secret_key(hex_str: &str) -> Result<SecretKey32, SignError> {
+    Ok(SecretKey32::new(parse_secret_hex(hex_str)?))
+}
+
 /// Construct a signer from raw secret-key material.
 ///
 /// Implemented by every chain `Signer` and by the three curve primitives.
@@ -36,6 +89,15 @@ pub trait FromSecretKey: Sized {
     /// the underlying curve (e.g. secp256k1 scalar out of range). Ed25519
     /// accepts every 32-byte string.
     fn from_secret_bytes(bytes: &[u8; 32]) -> Result<Self, SignError>;
+
+    /// Build from an owned [`SecretKey32`].
+    ///
+    /// # Errors
+    ///
+    /// See [`from_secret_bytes`](Self::from_secret_bytes).
+    fn from_secret_key(key: &SecretKey32) -> Result<Self, SignError> {
+        Self::from_secret_bytes(key.as_bytes())
+    }
 
     /// Build from hex (optional `0x` prefix).
     ///

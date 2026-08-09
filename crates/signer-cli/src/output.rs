@@ -19,6 +19,8 @@ pub type CliResult = Result<(), Box<dyn std::error::Error>>;
 pub struct SignOutput {
     pub chain: &'static str,
     pub operation: &'static str,
+    /// Wire scheme token (`ecdsa_recoverable`, `ed25519`, `schnorr`, …).
+    pub scheme: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub address: Option<String>,
     /// Signer identity (used by TON, whose on-chain address requires extra
@@ -58,6 +60,7 @@ pub const fn sign(chain: &'static str, operation: &'static str) -> SignBuilder {
     SignBuilder {
         chain,
         operation,
+        scheme: "unknown",
         address: None,
         identity: None,
         signature: String::new(),
@@ -83,6 +86,7 @@ pub fn address(chain: &'static str, public_key_bytes: &[u8]) -> AddressBuilder {
 pub struct SignBuilder {
     chain: &'static str,
     operation: &'static str,
+    scheme: &'static str,
     address: Option<String>,
     identity: Option<String>,
     signature: String,
@@ -132,6 +136,7 @@ impl SignBuilder {
     pub fn from_output(mut self, out: &signer_primitives::SignOutput) -> Self {
         self.signature = out.to_hex();
         self.v = out.v();
+        self.scheme = out.scheme().as_str();
         if let Some(pk) = out.public_key() {
             self.public_key = Some(hex::encode(pk));
         }
@@ -147,6 +152,7 @@ impl SignBuilder {
         let out = SignOutput {
             chain: self.chain,
             operation: self.operation,
+            scheme: self.scheme,
             address: self.address,
             identity: self.identity,
             signature: self.signature,
@@ -204,6 +210,7 @@ fn render_sign(out: &SignOutput, json: bool) -> CliResult {
     println!();
     println!("      {}       {}", "Chain".cyan().bold(), out.chain);
     println!("      {}   {}", "Operation".cyan().bold(), out.operation);
+    println!("      {}      {}", "Scheme".cyan().bold(), out.scheme);
     if let Some(ref addr) = out.address {
         println!("      {}     {}", "Address".cyan().bold(), addr.green());
     }

@@ -28,13 +28,12 @@
 
 extern crate alloc;
 
-#[cfg(feature = "kobe")]
-use kobe_ton as _;
-
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
 
 pub use ed25519_dalek::Signature;
-pub use signer_primitives::{self, Sign, SignError, SignOutput};
+#[cfg(feature = "kobe")]
+use kobe_ton as _;
+pub use signer_primitives::{self, SignDigest, SignError, SignOutput};
 use signer_primitives::{Ed25519Signer, delegate_ed25519_ctors};
 
 /// TON transaction signer.
@@ -61,7 +60,7 @@ impl Signer {
 
     /// Public key bytes (32 bytes).
     #[must_use]
-    pub fn public_key_bytes(&self) -> Vec<u8> {
+    pub fn public_key_bytes(&self) -> [u8; 32] {
         self.0.public_key_bytes()
     }
 
@@ -105,11 +104,9 @@ impl Signer {
     }
 }
 
-impl Sign for Signer {
-    type Error = SignError;
-
-    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-        Ok(self.0.sign_output(hash))
+impl SignDigest for Signer {
+    fn sign_digest(&self, digest: &[u8; 32]) -> Result<SignOutput, SignError> {
+        Ok(self.0.sign_output(digest))
     }
 }
 

@@ -25,7 +25,7 @@
 use k256::ecdsa::{RecoveryId, Signature as K256Sig, VerifyingKey};
 use sha3::{Digest, Keccak256};
 
-use super::{Sign, SignMessage, Signer};
+use super::{SignDigest, SignMessage, Signer};
 
 const PRIV_KEY_HEX: &str = "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318";
 const TX_HEX: &str = "deadbeef00010203";
@@ -169,7 +169,7 @@ fn verify_hash_accepts_self_signed_output() {
             .unwrap()
             .try_into()
             .unwrap();
-    let out = signer.sign_hash(&digest_bytes).unwrap();
+    let out = signer.sign_digest(&digest_bytes).unwrap();
     signer.verify_hash(&digest_bytes, &out.to_bytes()).unwrap();
 }
 
@@ -216,7 +216,7 @@ fn encode_signed_transaction_matches_rlp_envelope_and_recovers() {
 /// Re-derive the EIP-55 address from any secp256k1 public key. Local
 /// helper so we don't depend on the `Signer::address` path under test.
 fn pubkey_to_eip55(pk: &VerifyingKey) -> String {
-    let uncompressed = pk.to_encoded_point(false);
+    let uncompressed = pk.to_sec1_point(false);
     let body = &uncompressed.as_bytes()[1..];
     let hash = Keccak256::digest(body);
     let addr_hex = hex::encode(&hash[12..]);
@@ -262,10 +262,10 @@ mod kobe_integration {
             sk.as_mut_slice(),
         )
         .unwrap();
-        let signing_key = SigningKey::from_bytes(sk.as_slice().into()).unwrap();
+        let signing_key = SigningKey::from_slice(sk.as_slice()).unwrap();
         let uncompressed: [u8; 65] = signing_key
             .verifying_key()
-            .to_encoded_point(false)
+            .to_sec1_point(false)
             .as_bytes()
             .try_into()
             .unwrap();

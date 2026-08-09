@@ -9,7 +9,7 @@
 //!
 //! **v1 scope:** sign digests / raw bytes only. Full Deploy serialization is
 //! caller-owned (casper-types / casper-client). Feed the `BLAKE2b`-256 deploy
-//! hash into [`Sign::sign_hash`] (secp) or [`Signer::sign_bytes`] (either).
+//! hash into [`SignDigest::sign_digest`] (secp) or [`Signer::sign_bytes`] (either).
 //!
 //! Address / `AccountHash` derivation lives in kobe; this crate is signing only.
 
@@ -23,8 +23,8 @@ use alloc::vec::Vec;
 use core::fmt;
 use core::str::FromStr;
 
-pub use signer_primitives::{Sign, SignError, SignOutput};
 use signer_primitives::{Ed25519Signer, FromSecretKey, Secp256k1Signer};
+pub use signer_primitives::{SignDigest, SignError, SignOutput};
 
 /// Signature algorithm for Casper keys (mirrors kobe-casper `KeyAlgo`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -130,18 +130,22 @@ impl Signer {
         self.algo
     }
 
-    /// Compressed secp or raw ed25519 public key bytes.
+    /// Compressed secp (33 B) or raw ed25519 (32 B) public key bytes.
     #[must_use]
     pub fn public_key_bytes(&self) -> Vec<u8> {
         match self.algo {
             KeyAlgo::Secp256k1 => self
                 .secp
                 .as_ref()
-                .map_or_else(Vec::new, Secp256k1Signer::compressed_public_key),
+                .map(Secp256k1Signer::compressed_public_key)
+                .map(|b| b.to_vec())
+                .unwrap_or_default(),
             KeyAlgo::Ed25519 => self
                 .ed
                 .as_ref()
-                .map_or_else(Vec::new, Ed25519Signer::public_key_bytes),
+                .map(Ed25519Signer::public_key_bytes)
+                .map(|b| b.to_vec())
+                .unwrap_or_default(),
         }
     }
 
@@ -161,13 +165,13 @@ impl Signer {
     /// Sign arbitrary bytes for the active curve.
     ///
     /// - secp: Keccak is **not** applied — pass a 32-byte digest (`BLAKE2b` deploy
-    ///   hash, etc.) via [`Sign::sign_hash`] for `ECDSA` prehash.
+    ///   hash, etc.) via [`SignDigest::sign_digest`] for `ECDSA` prehash.
     /// - ed25519: signs `message` with `RFC 8032` (full message, not prehash).
     ///
     /// # Errors
     ///
     /// Signing primitive failures; secp path rejects non-32-byte messages
-    /// (use [`Sign::sign_hash`] for digests).
+    /// (use [`SignDigest::sign_digest`] for digests).
     pub fn sign_bytes(&self, message: &[u8]) -> Result<SignOutput, SignError> {
         match self.algo {
             KeyAlgo::Secp256k1 => {
@@ -177,7 +181,7 @@ impl Signer {
                         message.len()
                     ))
                 })?;
-                self.sign_hash(hash)
+                self.sign_digest(hash)
             }
             KeyAlgo::Ed25519 => Ok(self
                 .ed
@@ -191,32 +195,30 @@ impl Signer {
     ///
     /// # Errors
     ///
-    /// Same as [`Sign::sign_hash`] / [`Self::sign_bytes`].
+    /// Same as [`SignDigest::sign_digest`] / [`Self::sign_bytes`].
     pub fn sign_deploy_hash(&self, digest: &[u8; 32]) -> Result<SignOutput, SignError> {
         match self.algo {
-            KeyAlgo::Secp256k1 => self.sign_hash(digest),
+            KeyAlgo::Secp256k1 => self.sign_digest(digest),
             KeyAlgo::Ed25519 => self.sign_bytes(digest.as_slice()),
         }
     }
 }
 
-impl Sign for Signer {
-    type Error = SignError;
-
+impl SignDigest for Signer {
     /// Secp: recoverable `ECDSA` over the 32-byte prehash (`v = 0|1`).
     /// Ed25519: signs the 32 bytes as the **entire message** (`RFC 8032`).
-    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
+    fn sign_digest(&self, digest: &[u8; 32]) -> Result<SignOutput, SignError> {
         match self.algo {
             KeyAlgo::Secp256k1 => self
                 .secp
                 .as_ref()
                 .ok_or_else(|| SignError::InvalidKey("missing secp256k1 key".into()))?
-                .sign_prehash_recoverable(hash),
+                .sign_prehash_recoverable(digest),
             KeyAlgo::Ed25519 => Ok(self
                 .ed
                 .as_ref()
                 .ok_or_else(|| SignError::InvalidKey("missing ed25519 key".into()))?
-                .sign_output(hash.as_slice())),
+                .sign_output(digest)),
         }
     }
 }
@@ -257,7 +259,7 @@ mod tests {
         assert_eq!(s.algo(), KeyAlgo::Secp256k1);
         assert!(s.tagged_public_key_hex().starts_with("02"));
         let dig = [0x42u8; 32];
-        let out = s.sign_hash(&dig).unwrap();
+        let out = s.sign_digest(&dig).unwrap();
         assert!(matches!(out, SignOutput::Ecdsa { v: 0 | 1, .. }));
     }
 

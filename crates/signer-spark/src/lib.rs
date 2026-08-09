@@ -23,20 +23,16 @@
 
 extern crate alloc;
 
-#[cfg(feature = "kobe")]
-use kobe_spark as _;
-
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
 
 use bech32::{Bech32m, Hrp};
+#[cfg(feature = "kobe")]
+use kobe_spark as _;
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha256};
 use signer_btc::bitcoin_message_digest;
-pub use signer_primitives::{self, Sign, SignError, SignMessage, SignOutput};
+pub use signer_primitives::{self, SignDigest, SignError, SignMessage, SignOutput};
 use signer_primitives::{Secp256k1Signer, delegate_secp256k1_ctors};
-
-/// BIP-137 header offset for a compressed P2PKH address (`27 + 4`).
-const BIP137_COMPRESSED_P2PKH_OFFSET: u8 = 31;
 
 /// Spark bech32m address HRP.
 const SPARK_HRP: &str = "spark";
@@ -50,18 +46,16 @@ pub struct Signer(Secp256k1Signer);
 impl Signer {
     delegate_secp256k1_ctors!();
 
-    /// Spark bech32m address (`spark1…`).
-    ///
-    /// Derivation: `bech32m(hrp="spark", RIPEMD160(SHA256(compressed_pubkey)))`.
+    /// **Identity (not HD):** pure function of this private key only.
+    /// Multi-path / multi-network addresses → [`kobe`](https://github.com/qntx/kobe).
     ///
     /// # Panics
     ///
-    /// Panics only if bech32m encoding of a fixed 20-byte payload fails,
-    /// which is impossible given the hard-coded HRP and payload length.
+    /// Never panics in practice: HRP and 20-byte hash160 are always valid bech32m inputs.
     #[must_use]
     pub fn address(&self) -> String {
         let pubkey = self.0.compressed_public_key();
-        let hash160 = Ripemd160::digest(Sha256::digest(&pubkey));
+        let hash160 = Ripemd160::digest(Sha256::digest(pubkey));
         let hrp = Hrp::parse_unchecked(SPARK_HRP);
         #[allow(
             clippy::expect_used,
@@ -72,7 +66,7 @@ impl Signer {
 
     /// Compressed public key (33 bytes).
     #[must_use]
-    pub fn public_key_bytes(&self) -> Vec<u8> {
+    pub fn public_key_bytes(&self) -> [u8; 33] {
         self.0.compressed_public_key()
     }
 
@@ -109,11 +103,9 @@ impl Signer {
     }
 }
 
-impl Sign for Signer {
-    type Error = SignError;
-
-    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-        self.0.sign_prehash_recoverable(hash)
+impl SignDigest for Signer {
+    fn sign_digest(&self, digest: &[u8; 32]) -> Result<SignOutput, SignError> {
+        self.0.sign_prehash_recoverable(digest)
     }
 }
 
@@ -129,7 +121,7 @@ impl SignMessage for Signer {
         Ok(self
             .0
             .sign_prehash_recoverable(&digest)?
-            .with_v_offset(BIP137_COMPRESSED_P2PKH_OFFSET))
+            .with_v_offset(signer_primitives::v_encoding::BIP137_P2PKH_COMPRESSED))
     }
 }
 

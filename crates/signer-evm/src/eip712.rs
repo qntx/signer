@@ -3,9 +3,11 @@
 #[cfg(not(feature = "std"))]
 use alloc::borrow::ToOwned;
 use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::string::String;
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
-use alloc::{format, string::String, vec, vec::Vec};
+use alloc::vec::Vec;
+use alloc::{format, vec};
 
 use sha3::{Digest, Keccak256};
 

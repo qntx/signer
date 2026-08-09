@@ -8,14 +8,16 @@
 
 extern crate alloc;
 
-#[cfg(feature = "kobe")]
-use kobe_svm as _;
-
-use alloc::{format, string::String, vec::Vec};
+use alloc::format;
+use alloc::string::String;
+use alloc::vec::Vec;
 
 pub use ed25519_dalek::Signature;
+#[cfg(feature = "kobe")]
+use kobe_svm as _;
 pub use signer_primitives::{
-    self, EncodeSignedTransaction, ExtractSignableBytes, Sign, SignError, SignMessage, SignOutput,
+    self, EncodeSignedTransaction, ExtractSignableBytes, SignDigest, SignError, SignMessage,
+    SignOutput,
 };
 use signer_primitives::{Ed25519Signer, delegate_ed25519_ctors};
 use zeroize::Zeroizing;
@@ -59,7 +61,8 @@ impl Signer {
         Ok(signer)
     }
 
-    /// Solana address (Base58-encoded 32-byte public key).
+    /// **Identity (not HD):** pure function of this private key only.
+    /// Multi-path / multi-network addresses → [`kobe`](https://github.com/qntx/kobe).
     #[must_use]
     pub fn address(&self) -> String {
         bs58::encode(self.0.public_key_bytes()).into_string()
@@ -67,7 +70,7 @@ impl Signer {
 
     /// Public key bytes (32 bytes).
     #[must_use]
-    pub fn public_key_bytes(&self) -> Vec<u8> {
+    pub fn public_key_bytes(&self) -> [u8; 32] {
         self.0.public_key_bytes()
     }
 
@@ -219,11 +222,9 @@ impl Signer {
     }
 }
 
-impl Sign for Signer {
-    type Error = SignError;
-
-    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-        Ok(self.0.sign_output(hash))
+impl SignDigest for Signer {
+    fn sign_digest(&self, digest: &[u8; 32]) -> Result<SignOutput, SignError> {
+        Ok(self.0.sign_output(digest))
     }
 }
 

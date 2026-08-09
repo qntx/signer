@@ -3,7 +3,8 @@
 //! Only the subset needed to append `(v, r, s)` to an unsigned
 //! EIP-1559 / EIP-2930 transaction list.
 
-use alloc::{vec, vec::Vec};
+use alloc::vec;
+use alloc::vec::Vec;
 
 /// RLP-encode a byte string.
 #[must_use]

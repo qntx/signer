@@ -54,10 +54,13 @@ clippy-fix:
 	cargo +nightly clippy --workspace --fix --all-targets --all-features --allow-dirty --allow-staged -- -D warnings
 
 fmt:
-	cargo +nightly fmt --all
+	cargo +nightly fmt --all -- \
+		--config unstable_features=true,group_imports=StdExternalCrate,imports_granularity=Module
 
 fmt-check:
-	cargo +nightly fmt --all -- --check
+	cargo +nightly fmt --all -- \
+		--check \
+		--config unstable_features=true,group_imports=StdExternalCrate,imports_granularity=Module
 
 doc:
 	cargo doc --workspace --all-features --open

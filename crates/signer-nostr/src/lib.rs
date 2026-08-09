@@ -11,7 +11,7 @@
 //! # Examples
 //!
 //! ```
-//! use signer_nostr::{Sign as _, Signer};
+//! use signer_nostr::{SignDigest as _, Signer};
 //!
 //! // NIP-06 test vector 1.
 //! let signer = Signer::from_hex(
@@ -22,7 +22,7 @@
 //!
 //! // Sign a NIP-01 event id (32-byte SHA-256 of the canonical serialization).
 //! let event_id = [0u8; 32];
-//! let out = signer.sign_hash(&event_id).unwrap();
+//! let out = signer.sign_digest(&event_id).unwrap();
 //! assert_eq!(out.to_bytes().len(), 64); // BIP-340 Schnorr
 //! ```
 
@@ -30,15 +30,14 @@
 
 extern crate alloc;
 
-#[cfg(feature = "kobe")]
-use kobe_nostr as _;
-
 use alloc::string::String;
 use alloc::vec::Vec;
 
 use bech32::{Bech32, Hrp};
+#[cfg(feature = "kobe")]
+use kobe_nostr as _;
 use sha2::{Digest as _, Sha256};
-pub use signer_primitives::{self, Sign, SignError, SignMessage, SignOutput};
+pub use signer_primitives::{self, SignDigest, SignError, SignMessage, SignOutput};
 use signer_primitives::{SchnorrSigner, delegate_schnorr_ctors};
 use zeroize::Zeroizing;
 
@@ -72,7 +71,8 @@ impl Signer {
 
     /// NIP-19 `npub1…` bech32-encoded x-only public key.
     ///
-    /// This is the canonical on-wire address format for a Nostr account.
+    /// **Identity (not HD):** pure function of this private key only.
+    /// Multi-path / multi-network addresses → [`kobe`](https://github.com/qntx/kobe).
     #[must_use]
     pub fn address(&self) -> String {
         encode_bech32(NPUB_HRP, &self.0.xonly_public_key())
@@ -89,13 +89,13 @@ impl Signer {
     /// Handle with the same care as the raw private key.
     #[must_use]
     pub fn nsec(&self) -> Zeroizing<String> {
-        Zeroizing::new(encode_bech32(NSEC_HRP, &self.0.to_bytes()))
+        Zeroizing::new(encode_bech32(NSEC_HRP, self.0.to_bytes().as_ref()))
     }
 
     /// 32-byte x-only public key (NIP-01 wire format).
     #[must_use]
-    pub fn public_key_bytes(&self) -> Vec<u8> {
-        self.0.xonly_public_key().to_vec()
+    pub fn public_key_bytes(&self) -> [u8; 32] {
+        self.0.xonly_public_key()
     }
 
     /// Hex-encoded 32-byte x-only public key (64 lowercase characters).
@@ -128,13 +128,11 @@ impl Signer {
     /// primitive fails (practically unreachable for well-formed inputs).
     pub fn sign_transaction(&self, serialized_event: &[u8]) -> Result<SignOutput, SignError> {
         let event_id: [u8; 32] = Sha256::digest(serialized_event).into();
-        self.sign_hash(&event_id)
+        self.sign_digest(&event_id)
     }
 }
 
-impl Sign for Signer {
-    type Error = SignError;
-
+impl SignDigest for Signer {
     /// Sign a NIP-01 event id (32-byte SHA-256 of the canonical serialization).
     ///
     /// This is the canonical Nostr signing entry point: callers serialize the
@@ -143,8 +141,8 @@ impl Sign for Signer {
     ///
     /// Returns a 64-byte BIP-340 Schnorr signature with the signer's x-only
     /// public key attached.
-    fn sign_hash(&self, event_id: &[u8; 32]) -> Result<SignOutput, SignError> {
-        self.0.sign_prehash(event_id)
+    fn sign_digest(&self, digest: &[u8; 32]) -> Result<SignOutput, SignError> {
+        self.0.sign_prehash(digest)
     }
 }
 
@@ -155,7 +153,7 @@ impl SignMessage for Signer {
     ///
     /// For on-protocol Nostr events, always prefer:
     ///
-    /// - [`Sign::sign_hash`] with the NIP-01 `event.id`
+    /// - [`SignDigest::sign_digest`] with the NIP-01 `event.id`
     ///   (32-byte SHA-256 of the canonical serialization), or
     /// - [`Signer::sign_transaction`] with the serialized event JSON — it
     ///   computes `sha256(event)` for you.

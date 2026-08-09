@@ -31,15 +31,15 @@
 
 extern crate alloc;
 
-#[cfg(feature = "kobe")]
-use kobe_cosmos as _;
-
-use alloc::{format, string::String, vec::Vec};
+use alloc::format;
+use alloc::string::String;
 
 use bech32::{Bech32, Hrp};
+#[cfg(feature = "kobe")]
+use kobe_cosmos as _;
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha256};
-pub use signer_primitives::{self, Sign, SignError, SignOutput};
+pub use signer_primitives::{self, SignDigest, SignError, SignOutput};
 use signer_primitives::{Secp256k1Signer, delegate_secp256k1_ctors};
 
 /// Cosmos transaction signer.
@@ -51,17 +51,12 @@ pub struct Signer(Secp256k1Signer);
 impl Signer {
     delegate_secp256k1_ctors!();
 
-    /// Cosmos Hub address (`cosmos1…`).
-    ///
-    /// Computed as `bech32(hrp="cosmos", RIPEMD160(SHA256(compressed_pubkey)))`.
-    /// Convenience alias for [`address_with_hrp`](Self::address_with_hrp)
-    /// with `"cosmos"` as the HRP; for other Cosmos-SDK chains
-    /// (`osmo`, `juno`, `terra`, `secret`, `kava`, …) use `address_with_hrp`.
+    /// **Identity (not HD):** pure function of this private key only.
+    /// Multi-path / multi-network addresses → [`kobe`](https://github.com/qntx/kobe).
     ///
     /// # Panics
     ///
-    /// Never panics in practice — `"cosmos"` is a valid HRP and the 20-byte
-    /// hash160 payload is always encodable as bech32.
+    /// Never panics in practice: the HRP `"cosmos"` is fixed and valid for bech32.
     #[must_use]
     pub fn address(&self) -> String {
         #[allow(
@@ -95,7 +90,7 @@ impl Signer {
     /// human-readable part (empty, too long, or contains invalid characters).
     pub fn address_with_hrp(&self, hrp: &str) -> Result<String, SignError> {
         let pubkey = self.0.compressed_public_key();
-        let sha = Sha256::digest(&pubkey);
+        let sha = Sha256::digest(pubkey);
         let hash160 = Ripemd160::digest(sha);
         let parsed = Hrp::parse(hrp).map_err(|e| SignError::InvalidMessage(format!("hrp: {e}")))?;
         bech32::encode::<Bech32>(parsed, &hash160)
@@ -104,7 +99,7 @@ impl Signer {
 
     /// Compressed public key (33 bytes).
     #[must_use]
-    pub fn public_key_bytes(&self) -> Vec<u8> {
+    pub fn public_key_bytes(&self) -> [u8; 33] {
         self.0.compressed_public_key()
     }
 
@@ -144,11 +139,9 @@ impl Signer {
     }
 }
 
-impl Sign for Signer {
-    type Error = SignError;
-
-    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-        self.0.sign_prehash_recoverable(hash)
+impl SignDigest for Signer {
+    fn sign_digest(&self, digest: &[u8; 32]) -> Result<SignOutput, SignError> {
+        self.0.sign_prehash_recoverable(digest)
     }
 }
 

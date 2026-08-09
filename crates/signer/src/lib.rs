@@ -1,18 +1,20 @@
-//! Multi-chain transaction signer.
+//! Multi-chain transaction signer (umbrella).
 //!
-//! Umbrella crate re-exporting chain-specific signer crates.
-//! Each chain is feature-gated and enabled by default.
+//! # Layers
 //!
-//! Wallet creation and HD key derivation are handled by
-//! [`kobe`](https://github.com/qntx/kobe). This crate is **signing only**.
+//! ```text
+//! L0  signer-primitives   curves + SignDigest / SignOutput
+//! L1  signer-{chain}      protocol preimage + wire (this crate re-exports)
+//! L2  signer-cli          ops UX
+//! ──  kobe                HD only — use feature `kobe` + FromDerived
+//! ```
 //!
-//! Enable the `kobe` feature to activate bridge constructors
-//! (e.g. `signer::evm::Signer::from_derived(&kobe_evm_account)`).
+//! Schemes: secp256k1 ECDSA, BIP-340 Schnorr, Ed25519. Framing (EIP-191,
+//! BIP-137, …) stays in chain crates — this is not a “hash-only” strip.
 //!
 //! # Usage
 //!
 //! ```rust,no_run
-//! // Direct usage with a hex private key.
 //! use signer::{SignMessage, evm};
 //!
 //! let s = evm::Signer::from_hex("0x...").unwrap();
@@ -36,12 +38,12 @@ pub use signer_fil as fil;
 #[cfg(feature = "nostr")]
 pub use signer_nostr as nostr;
 pub use signer_primitives as primitives;
-pub use signer_primitives::{
-    EncodeSignedTransaction, ExtractSignableBytes, FromSecretKey, Sign, SignError, SignMessage,
-    SignOutput,
-};
 #[cfg(feature = "kobe")]
 pub use signer_primitives::FromDerived;
+pub use signer_primitives::{
+    Digest32, EncodeSignedTransaction, ExtractSignableBytes, FromSecretKey, SecretKey32,
+    SignDigest, SignError, SignMessage, SignOutput, SignatureScheme, v_encoding,
+};
 #[cfg(feature = "spark")]
 pub use signer_spark as spark;
 #[cfg(feature = "sui")]
@@ -63,6 +65,7 @@ pub use signer_xrpl as xrpl;
 /// ```
 pub mod prelude {
     pub use signer_primitives::{
-        EncodeSignedTransaction, ExtractSignableBytes, Sign, SignError, SignMessage, SignOutput,
+        Digest32, EncodeSignedTransaction, ExtractSignableBytes, SignDigest, SignError,
+        SignMessage, SignOutput, SignatureScheme,
     };
 }

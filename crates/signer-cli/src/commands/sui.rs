@@ -3,8 +3,8 @@
 use clap::{Args, Subcommand};
 use signer_sui::{SignMessage, Signer};
 
-use super::parse_hex;
 use super::key::load_secret_key;
+use super::parse_hex;
 use crate::output::{self, CliResult};
 
 const CHAIN: &str = "sui";

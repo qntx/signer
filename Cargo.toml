@@ -32,7 +32,7 @@ signer-nostr      = { version = "3.0", path = "crates/signer-nostr",       defau
 signer-casper     = { version = "3.0", path = "crates/signer-casper",      default-features = false }
 
 # Cryptography (versions aligned with kobe)
-k256          = { version = "0.13.4", default-features = false, features = ["ecdsa", "arithmetic"] }
+k256          = { version = "0.14", default-features = false, features = ["ecdsa", "arithmetic"] }
 ed25519-dalek = { version = "3.0.0", default-features = false }
 sha2          = { version = "0.11.0", default-features = false }
 sha3          = { version = "0.12.0", default-features = false }
@@ -51,11 +51,11 @@ colored = "3.1.1"
 serde   = { version = "1.0.229", features = ["derive"] }
 
 # Random
-getrandom = { version = "0.4", default-features = false }
+getrandom = { version = "0.4.3", default-features = false }
 
 # Utilities
 zeroize   = { version = "1.9.0", default-features = false, features = ["derive"] }
-thiserror = { version = "2.0.19", default-features = false }
+thiserror = { version = "2.0.20", default-features = false }
 
 # Kobe (optional bridge) — 3.2+ (Casper, unified DerivedAccount newtypes).
 kobe-primitives = { version = "3.2", default-features = false, features = ["std"] }

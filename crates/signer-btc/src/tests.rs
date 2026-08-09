@@ -189,7 +189,7 @@ fn sign_message_bip137_recovers_to_same_p2pkh_address() {
     let recovered = VerifyingKey::recover_from_prehash(&digest, &sig, recovery).unwrap();
 
     // Derive the compressed-P2PKH address from the recovered pubkey.
-    let compressed = recovered.to_encoded_point(true);
+    let compressed = recovered.to_sec1_point(true);
     let sha = Sha256::digest(compressed.as_bytes());
     let hash160 = Ripemd160::digest(sha);
     let mut payload = Vec::with_capacity(25);

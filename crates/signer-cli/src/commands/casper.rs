@@ -37,7 +37,8 @@ impl From<CliKeyAlgo> for KeyAlgo {
 #[derive(Subcommand)]
 enum CasperSubcommand {
     /// Sign a 32-byte digest (e.g. BLAKE2b-256 of a serialized deploy).
-    SignHash {
+    #[command(name = "sign-digest")]
+    Digest {
         /// Private key: hex, `-` for stdin, or `@path`.
         #[arg(short, long)]
         key: String,
@@ -74,7 +75,7 @@ enum CasperSubcommand {
 impl CasperCommand {
     pub(crate) fn execute(self, json: bool) -> CliResult {
         match self.command {
-            CasperSubcommand::SignHash { key, hash, algo } => {
+            CasperSubcommand::Digest { key, hash, algo } => {
                 let signer = load_signer(&key, algo.into())?;
                 let digest = parse_hex32(&hash)?;
                 let out = signer.sign_deploy_hash(&digest)?;
@@ -104,8 +105,5 @@ impl CasperCommand {
 }
 
 fn load_signer(key: &str, algo: KeyAlgo) -> Result<Signer, Box<dyn std::error::Error>> {
-    Ok(Signer::from_bytes_with_algo(
-        &load_secret_key(key)?,
-        algo,
-    )?)
+    Ok(Signer::from_bytes_with_algo(&load_secret_key(key)?, algo)?)
 }

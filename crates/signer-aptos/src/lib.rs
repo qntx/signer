@@ -10,14 +10,15 @@
 
 extern crate alloc;
 
-#[cfg(feature = "kobe")]
-use kobe_aptos as _;
-
-use alloc::{format, string::String, vec::Vec};
+use alloc::format;
+use alloc::string::String;
+use alloc::vec::Vec;
 
 pub use ed25519_dalek::Signature;
+#[cfg(feature = "kobe")]
+use kobe_aptos as _;
 use sha3::Digest as _;
-pub use signer_primitives::{self, Sign, SignError, SignOutput};
+pub use signer_primitives::{self, SignDigest, SignError, SignOutput};
 use signer_primitives::{Ed25519Signer, delegate_ed25519_ctors};
 
 /// Ed25519 single-key authentication scheme byte used by Aptos.
@@ -36,18 +37,21 @@ pub struct Signer(Ed25519Signer);
 impl Signer {
     delegate_ed25519_ctors!();
 
-    /// Aptos account address: `0x` + hex(`SHA3-256(pubkey || 0x00)`).
+    /// **Identity (not HD):** pure function of this private key only.
+    /// Multi-path / multi-network addresses → [`kobe`](https://github.com/qntx/kobe).
     #[must_use]
     pub fn address(&self) -> String {
-        let mut buf = self.0.public_key_bytes();
-        buf.push(ED25519_SCHEME);
+        let pk = self.0.public_key_bytes();
+        let mut buf = [0u8; 33];
+        buf[..32].copy_from_slice(&pk);
+        buf[32] = ED25519_SCHEME;
         let hash = sha3_256(&buf);
         format!("0x{}", hex::encode(hash))
     }
 
     /// Public key bytes (32 bytes).
     #[must_use]
-    pub fn public_key_bytes(&self) -> Vec<u8> {
+    pub fn public_key_bytes(&self) -> [u8; 32] {
         self.0.public_key_bytes()
     }
 
@@ -94,18 +98,16 @@ impl Signer {
     }
 }
 
-impl Sign for Signer {
-    type Error = SignError;
-
+impl SignDigest for Signer {
     /// Sign a 32-byte value with raw Ed25519 (no Aptos domain prefix).
     ///
     /// ⚠️ **WARNING**: the resulting signature is **NOT on-chain verifiable**
     /// on Aptos. Aptos's signing message requires the SHA3-256 domain prefix
     /// `SHA3-256("APTOS::RawTransaction") || bcs_raw_tx`. For on-chain
-    /// correctness use [`Signer::sign_transaction`]; `sign_hash` is exposed
+    /// correctness use [`Signer::sign_transaction`]; `sign_digest` is exposed
     /// only as a low-level off-chain primitive.
-    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-        Ok(self.0.sign_output_with_pubkey(hash))
+    fn sign_digest(&self, digest: &[u8; 32]) -> Result<SignOutput, SignError> {
+        Ok(self.0.sign_output_with_pubkey(digest))
     }
 }
 

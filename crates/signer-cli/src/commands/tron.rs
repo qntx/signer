@@ -1,7 +1,7 @@
 //! Tron signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_tron::{Sign, SignMessage, Signer};
+use signer_tron::{SignDigest, SignMessage, Signer};
 
 use super::key::load_secret_key;
 use super::{parse_hex, parse_hex32};
@@ -19,7 +19,8 @@ pub(crate) struct TronCommand {
 #[derive(Subcommand)]
 enum TronSubcommand {
     /// Sign a raw 32-byte hash.
-    SignHash {
+    #[command(name = "sign-digest")]
+    Digest {
         /// Private key: hex, `-` for stdin, or `@path` (optional 0x).
         #[arg(short, long)]
         key: String,
@@ -56,9 +57,9 @@ enum TronSubcommand {
 impl TronCommand {
     pub(crate) fn execute(self, json: bool) -> CliResult {
         match self.command {
-            TronSubcommand::SignHash { key, hash } => {
+            TronSubcommand::Digest { key, hash } => {
                 let signer = Signer::from_bytes(&load_secret_key(&key)?)?;
-                let out = signer.sign_hash(&parse_hex32(&hash)?)?;
+                let out = signer.sign_digest(&parse_hex32(&hash)?)?;
                 output::sign(CHAIN, "raw hash")
                     .address(signer.address())
                     .from_output(&out)

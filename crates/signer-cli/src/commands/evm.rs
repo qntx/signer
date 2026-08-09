@@ -1,7 +1,7 @@
 //! EVM signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_evm::{Sign, SignMessage, Signer};
+use signer_evm::{SignDigest, SignMessage, Signer};
 
 use super::key::load_secret_key;
 use super::{parse_hex, parse_hex32};
@@ -28,7 +28,8 @@ enum EvmSubcommand {
         message: String,
     },
     /// Sign a raw 32-byte hash.
-    SignHash {
+    #[command(name = "sign-digest")]
+    Digest {
         /// Private key: hex, `-` for stdin, or `@path`.
         #[arg(short, long)]
         key: String,
@@ -65,9 +66,9 @@ impl EvmCommand {
                     .message(message)
                     .render(json)
             }
-            EvmSubcommand::SignHash { key, hash } => {
+            EvmSubcommand::Digest { key, hash } => {
                 let signer = Signer::from_bytes(&load_secret_key(&key)?)?;
-                let out = signer.sign_hash(&parse_hex32(&hash)?)?;
+                let out = signer.sign_digest(&parse_hex32(&hash)?)?;
                 output::sign(CHAIN, "raw hash")
                     .address(signer.address())
                     .from_output(&out)

@@ -18,7 +18,7 @@
     reason = "test module: panics are acceptable and assertions self-describe"
 )]
 
-use super::{EncodeSignedTransaction, Sign, SignError, SignMessage, SignOutput, Signer};
+use super::{EncodeSignedTransaction, SignDigest, SignError, SignMessage, SignOutput, Signer};
 
 /// RFC 8032 Test Vector 1.
 const PRIV_KEY_HEX: &str = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
@@ -43,7 +43,7 @@ fn address_base58_matches_scure_base_kat() {
     assert_eq!(s.address(), ADDRESS);
 }
 
-/// `sign_message`, `sign_transaction`, and `sign_hash` are all raw
+/// `sign_message`, `sign_transaction`, and `sign_digest` are all raw
 /// Ed25519 over their byte inputs. Rather than pin three identical KATs
 /// (which would duplicate the RFC 8032 coverage in primitives), we
 /// assert that each path's output round-trips back through `verify`
@@ -60,9 +60,9 @@ fn every_entry_point_self_verifies() {
 
     for (label, payload, sig) in [
         (
-            "sign_hash",
+            "sign_digest",
             &digest_bytes[..],
-            s.sign_hash(&digest_bytes).unwrap(),
+            s.sign_digest(&digest_bytes).unwrap(),
         ),
         (
             "sign_message",

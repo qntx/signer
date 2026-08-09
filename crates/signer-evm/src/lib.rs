@@ -19,17 +19,19 @@
 
 extern crate alloc;
 
+use alloc::format;
+use alloc::string::String;
+use alloc::vec::Vec;
+
 #[cfg(feature = "kobe")]
 use kobe_evm as _;
-
-use alloc::{format, string::String, vec::Vec};
 
 mod eip712;
 mod rlp;
 
 use sha3::{Digest, Keccak256};
 pub use signer_primitives::{
-    self, EncodeSignedTransaction, Sign, SignError, SignMessage, SignOutput,
+    self, EncodeSignedTransaction, SignDigest, SignError, SignMessage, SignOutput,
 };
 use signer_primitives::{Secp256k1Signer, delegate_secp256k1_ctors};
 
@@ -43,6 +45,7 @@ impl Signer {
     delegate_secp256k1_ctors!();
 
     /// Ethereum address derived from this signing key (EIP-55 checksummed).
+    /// **Identity (not HD):** pure function of this key only; multi-path/network → kobe.
     #[must_use]
     #[allow(
         clippy::indexing_slicing,
@@ -56,7 +59,7 @@ impl Signer {
 
     /// Compressed public key (33 bytes).
     #[must_use]
-    pub fn public_key_bytes(&self) -> Vec<u8> {
+    pub fn public_key_bytes(&self) -> [u8; 33] {
         self.0.compressed_public_key()
     }
 
@@ -102,7 +105,10 @@ impl Signer {
     /// Returns an error if the JSON is malformed or signing fails.
     pub fn sign_typed_data(&self, typed_data_json: &str) -> Result<SignOutput, SignError> {
         let digest = eip712::hash_typed_data_json(typed_data_json)?;
-        Ok(self.0.sign_prehash_recoverable(&digest)?.with_v_offset(27))
+        Ok(self
+            .0
+            .sign_prehash_recoverable(&digest)?
+            .with_v_offset(signer_primitives::v_encoding::EIP191_OFFSET))
     }
 
     /// Encode a signed typed transaction: `type || RLP([…fields, v, r, s])`.
@@ -135,11 +141,9 @@ impl Signer {
     }
 }
 
-impl Sign for Signer {
-    type Error = SignError;
-
-    fn sign_hash(&self, hash: &[u8; 32]) -> Result<SignOutput, SignError> {
-        self.0.sign_prehash_recoverable(hash)
+impl SignDigest for Signer {
+    fn sign_digest(&self, digest: &[u8; 32]) -> Result<SignOutput, SignError> {
+        self.0.sign_prehash_recoverable(digest)
     }
 }
 
@@ -154,7 +158,10 @@ impl SignMessage for Signer {
         data.extend_from_slice(prefix.as_bytes());
         data.extend_from_slice(message);
         let digest: [u8; 32] = Keccak256::digest(&data).into();
-        Ok(self.0.sign_prehash_recoverable(&digest)?.with_v_offset(27))
+        Ok(self
+            .0
+            .sign_prehash_recoverable(&digest)?
+            .with_v_offset(signer_primitives::v_encoding::EIP191_OFFSET))
     }
 }
 

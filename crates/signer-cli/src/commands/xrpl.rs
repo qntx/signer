@@ -1,7 +1,7 @@
 //! XRPL signing CLI commands.
 
 use clap::{Args, Subcommand};
-use signer_xrpl::{Sign, Signer};
+use signer_xrpl::{SignDigest, Signer};
 
 use super::key::load_secret_key;
 use super::{parse_hex, parse_hex32};
@@ -19,7 +19,8 @@ pub(crate) struct XrplCommand {
 #[derive(Subcommand)]
 enum XrplSubcommand {
     /// Sign a raw 32-byte hash (DER-encoded output).
-    SignHash {
+    #[command(name = "sign-digest")]
+    Digest {
         /// Private key: hex, `-` for stdin, or `@path` (optional 0x).
         #[arg(short, long)]
         key: String,
@@ -47,9 +48,9 @@ enum XrplSubcommand {
 impl XrplCommand {
     pub(crate) fn execute(self, json: bool) -> CliResult {
         match self.command {
-            XrplSubcommand::SignHash { key, hash } => {
+            XrplSubcommand::Digest { key, hash } => {
                 let signer = Signer::from_bytes(&load_secret_key(&key)?)?;
-                let out = signer.sign_hash(&parse_hex32(&hash)?)?;
+                let out = signer.sign_digest(&parse_hex32(&hash)?)?;
                 output::sign(CHAIN, "raw hash (DER)")
                     .address(signer.address())
                     .from_output(&out)

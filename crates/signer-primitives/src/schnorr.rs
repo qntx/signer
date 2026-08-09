@@ -6,9 +6,10 @@
 //! compose this into their own `Signer` newtype and layer the chain-specific
 //! address encoding and transaction semantics on top.
 
+use alloc::format;
+use alloc::string::String;
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
-use alloc::{format, string::String};
 
 use k256::schnorr::{Signature, SigningKey, VerifyingKey};
 use zeroize::{ZeroizeOnDrop, Zeroizing};
@@ -86,7 +87,7 @@ impl SchnorrSigner {
     /// Returns [`SignError::InvalidKey`] if the bytes are not a valid
     /// secp256k1 scalar (zero or ≥ curve order).
     pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self, SignError> {
-        let key = SigningKey::from_bytes(bytes.as_slice())
+        let key = SigningKey::from_slice(bytes.as_slice())
             .map_err(|e| SignError::InvalidKey(e.to_string()))?;
         Ok(Self {
             key,
@@ -119,7 +120,7 @@ impl SchnorrSigner {
     pub fn try_random() -> Result<Self, SignError> {
         let mut bytes = Zeroizing::new([0u8; 32]);
         getrandom::fill(&mut *bytes).map_err(|e| SignError::SigningFailed(e.to_string()))?;
-        let key = SigningKey::from_bytes(bytes.as_slice())
+        let key = SigningKey::from_slice(bytes.as_slice())
             .map_err(|e| SignError::InvalidKey(e.to_string()))?;
         Ok(Self {
             key,
@@ -164,11 +165,10 @@ impl SchnorrSigner {
     /// internal negation. This matches [NIP-06](https://nips.nostr.com/6)
     /// and the `nsec` bech32 encoding expectation.
     ///
-    /// Callers that intend to drop the returned value should wrap it in
-    /// [`zeroize::Zeroizing`] to scrub the secret material.
+    /// Returns a zeroizing copy of the original secret bytes.
     #[must_use]
-    pub fn to_bytes(&self) -> [u8; 32] {
-        *self.raw_bytes
+    pub fn to_bytes(&self) -> Zeroizing<[u8; 32]> {
+        Zeroizing::new(*self.raw_bytes)
     }
 
     /// 32-byte BIP-340 x-only public key (parity byte stripped).
