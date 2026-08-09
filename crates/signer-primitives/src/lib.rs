@@ -260,9 +260,12 @@ impl SignOutput {
 /// # Example
 ///
 /// ```
-/// use signer_primitives::{Digest32, SignDigest, SignOutput};
+/// use signer_primitives::{SignDigest, SignOutput};
 ///
-/// fn sign_generic<S: SignDigest>(signer: &S, d: Digest32) -> Result<SignOutput, signer_primitives::SignError> {
+/// fn sign_generic<S: SignDigest>(
+///     signer: &S,
+///     d: &[u8; 32],
+/// ) -> Result<SignOutput, signer_primitives::SignError> {
 ///     signer.sign_digest(d)
 /// }
 /// ```
