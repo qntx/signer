@@ -90,8 +90,9 @@ doc:
     cargo doc --workspace --all-features --open
 
 # cargo-deny (advisories / licenses / bans / sources)
+# `all-features` is set in deny.toml [graph]; the CLI has no --all-features flag.
 deny:
-    cargo deny check --all-features
+    cargo deny check
 
 # Clean build artifacts
 clean:

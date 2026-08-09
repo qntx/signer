@@ -62,8 +62,9 @@ fmt-check:
 doc:
 	cargo doc --workspace --all-features --open
 
+# all-features is set in deny.toml [graph]; the CLI has no --all-features flag.
 deny:
-	cargo deny check --all-features
+	cargo deny check
 
 clean:
 	cargo clean
