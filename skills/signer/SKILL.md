@@ -41,6 +41,20 @@ cargo install signer-cli
 signer --version
 ```
 
+### Self-upgrade
+
+For installs from `https://sh.qntx.fun/signer` (not cargo installs):
+
+```bash
+signer upgrade              # alias: signer update
+signer upgrade --check
+signer upgrade --force
+signer --json upgrade --check
+```
+
+Cargo installs under `.cargo/bin` are not overwritten; the command prints a
+`cargo install signer-cli --force` hint instead.
+
 ## CLI Structure
 
 ```text

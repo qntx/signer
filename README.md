@@ -68,11 +68,12 @@ signer --json evm sign-message -k - -m "test"
 
 # Self-upgrade (sh.qntx.fun install path; same as re-running the install script)
 signer upgrade              # install latest if newer (`update` is an alias)
-signer upgrade --check
-signer upgrade --force
+signer upgrade --check      # report only
+signer upgrade --force      # reinstall even when up to date
+signer --json upgrade --check
 ```
 
-CLI verbs match the library: **`sign-digest`**, **`sign-message`**, **`sign-tx`**, **`address`**. Chains without a canonical personal-message scheme omit `sign-message`. Private keys accept hex, `-` (stdin), or `@path`. JSON sign results include a stable `scheme` field (`ecdsa_recoverable`, `ed25519`, `schnorr`, …).
+CLI verbs match the library: **`sign-digest`**, **`sign-message`**, **`sign-tx`**, **`address`**. Chains without a canonical personal-message scheme omit `sign-message`. Private keys accept hex, `-` (stdin), or `@path`. JSON sign results include a stable `scheme` field (`ecdsa_recoverable`, `ed25519`, `schnorr`, …). Cargo installs under `.cargo/bin` are not overwritten; the command prints a `cargo install signer-cli --force` hint instead.
 
 ### Library Usage
 
