@@ -55,8 +55,10 @@ impl ArweaveCommand {
             ArweaveSubcommand::Digest { key, hash } => {
                 let signer = Signer::from_bytes(&load_secret_key(&key)?)?;
                 let out = signer.sign_digest(&parse_hex32(&hash)?)?;
+                // `message` is the caller-supplied digest hex (input), not a tx id.
                 output::sign(CHAIN, "raw digest (recoverable ECDSA)")
                     .address(signer.address())
+                    .public_key_bytes(&signer.public_key_bytes())
                     .from_output(&out)
                     .message(hash)
                     .render(json)
@@ -65,18 +67,22 @@ impl ArweaveCommand {
                 let signer = Signer::from_bytes(&load_secret_key(&key)?)?;
                 let msg = parse_hex(&data)?;
                 let out = signer.sign_payload(&msg)?;
-                let sig65 = Signer::signature_65(&out)?;
-                let txid = Signer::transaction_id(&sig65);
+                // Tx id = Base64URL(SHA-256(sig65)); deterministic from `signature`.
+                // Do not stuff it into `message` (that field is human input elsewhere).
+                // `identity` carries recovered-owner encoding (not the empty JSON owner).
                 output::sign(CHAIN, "payload SHA-256 + recoverable ECDSA")
                     .address(signer.address())
+                    .identity(signer.owner())
+                    .public_key_bytes(&signer.public_key_bytes())
                     .from_output(&out)
-                    .message(txid)
                     .render(json)
             }
             ArweaveSubcommand::Address { key } => {
                 let signer = Signer::from_bytes(&load_secret_key(&key)?)?;
+                // `address` = wallet id; `identity` = recovered-owner Base64URL(pk).
                 output::address(CHAIN, &signer.public_key_bytes())
                     .address(signer.address())
+                    .identity(signer.owner())
                     .render(json)
             }
         }

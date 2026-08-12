@@ -128,14 +128,31 @@ impl Signer {
     /// # Errors
     ///
     /// Returns [`SignError::InvalidSignature`] if the output is not recoverable ECDSA.
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "SIGNATURE_LEN is 65; r||s is 64 then v at index 64 by construction"
+    )]
     pub fn signature_65(out: &SignOutput) -> Result<[u8; SIGNATURE_LEN], SignError> {
-        let bytes = out.to_bytes();
-        <[u8; SIGNATURE_LEN]>::try_from(bytes.as_slice()).map_err(|_| {
-            SignError::InvalidSignature(alloc::format!(
-                "expected 65-byte recoverable ECDSA, got {} bytes",
-                bytes.len()
-            ))
-        })
+        match *out {
+            SignOutput::Ecdsa { signature, v } => {
+                let mut wire = [0u8; SIGNATURE_LEN];
+                wire[..64].copy_from_slice(&signature);
+                wire[64] = v;
+                Ok(wire)
+            }
+            _ => Err(SignError::InvalidSignature(
+                "expected recoverable ECDSA (Ecdsa) SignOutput".into(),
+            )),
+        }
+    }
+
+    /// Sign format=2 ECDSA fields: deep-hash → SHA-256 → recoverable ECDSA.
+    ///
+    /// # Errors
+    ///
+    /// Rejects `format != 2`; propagates signing failures.
+    pub fn sign_format2(&self, fields: &Format2EcdsaFields<'_>) -> Result<SignOutput, SignError> {
+        sign_format2_ecdsa(self, fields)
     }
 }
 
@@ -201,25 +218,25 @@ impl<'a> DeepHashItem<'a> {
 pub fn deep_hash(item: &DeepHashItem<'_>) -> [u8; DEEP_HASH_LEN] {
     match item {
         DeepHashItem::Blob(data) => deep_hash_blob(data),
-        DeepHashItem::List(items) => {
-            let tag = list_tag(items.len());
-            let mut acc = sha384_48(&tag);
-            for child in items {
-                let child_hash = deep_hash(child);
-                let mut pair = Vec::with_capacity(DEEP_HASH_LEN * 2);
-                pair.extend_from_slice(&acc);
-                pair.extend_from_slice(&child_hash);
-                acc = sha384_48(&pair);
-            }
-            acc
-        }
+        DeepHashItem::List(items) => deep_hash_list(items),
     }
 }
 
 /// Deep-hash a top-level list (common case for signature segments).
+///
+/// Avoids allocating a temporary [`DeepHashItem::List`] wrapper.
 #[must_use]
 pub fn deep_hash_list(items: &[DeepHashItem<'_>]) -> [u8; DEEP_HASH_LEN] {
-    deep_hash(&DeepHashItem::List(items.to_vec()))
+    let tag = list_tag(items.len());
+    let mut acc = sha384_48(&tag);
+    for child in items {
+        let child_hash = deep_hash(child);
+        let mut pair = Vec::with_capacity(DEEP_HASH_LEN * 2);
+        pair.extend_from_slice(&acc);
+        pair.extend_from_slice(&child_hash);
+        acc = sha384_48(&pair);
+    }
+    acc
 }
 
 fn deep_hash_blob(data: &[u8]) -> [u8; DEEP_HASH_LEN] {
@@ -233,14 +250,18 @@ fn deep_hash_blob(data: &[u8]) -> [u8; DEEP_HASH_LEN] {
 }
 
 fn blob_tag(len: usize) -> Vec<u8> {
-    let mut t = Vec::from(b"blob".as_slice());
-    t.extend_from_slice(len.to_string().as_bytes());
-    t
+    tagged_len_prefix(b"blob", len)
 }
 
 fn list_tag(len: usize) -> Vec<u8> {
-    let mut t = Vec::from(b"list".as_slice());
-    t.extend_from_slice(len.to_string().as_bytes());
+    tagged_len_prefix(b"list", len)
+}
+
+fn tagged_len_prefix(kind: &[u8], len: usize) -> Vec<u8> {
+    let digits = len.to_string();
+    let mut t = Vec::with_capacity(kind.len() + digits.len());
+    t.extend_from_slice(kind);
+    t.extend_from_slice(digits.as_bytes());
     t
 }
 

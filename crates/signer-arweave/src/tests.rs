@@ -146,3 +146,27 @@ fn from_secret_key_trait() {
     let s = Signer::from_secret_hex(ABANDON_0_SK).unwrap();
     assert_eq!(s.address(), ABANDON_0_ADDR);
 }
+
+#[test]
+fn sign_format2_method_matches_free_fn() {
+    let s = Signer::from_hex(SK_HEX).unwrap();
+    let fields = Format2EcdsaFields {
+        format: 2,
+        target: b"",
+        quantity: "0",
+        reward: "1",
+        last_tx: b"",
+        tags: &[],
+        data_size: 0,
+        data_root: b"",
+    };
+    let a = s.sign_format2(&fields).unwrap();
+    let b = sign_format2_ecdsa(&s, &fields).unwrap();
+    assert_eq!(a.to_bytes().get(..64), b.to_bytes().get(..64));
+}
+
+#[test]
+fn signature_65_rejects_non_ecdsa() {
+    let wrong = SignOutput::Ed25519([0u8; 64]);
+    assert!(Signer::signature_65(&wrong).is_err());
+}
