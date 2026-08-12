@@ -61,6 +61,8 @@ echo "$KEY" | signer xrpl   sign-tx      -k - -t "<tx fields hex>"    # STX\0 + 
 echo "$KEY" | signer nostr  sign-digest  -k - -x "5e6ea04f..."        # NIP-01 event id
 echo "$KEY" | signer casper sign-digest  -k - -x "<32-byte deploy hash>" --algo secp256k1
 signer      casper sign-digest -k @./key.hex -x "<digest>" --algo ed25519
+echo "$KEY" | signer arweave sign-digest -k - -x "<32-byte SHA-256(deep-hash)>"
+signer      arweave sign-payload -k "$KEY" -d "<deep-hash hex>"
 signer      evm    address     -k @./key.hex                          # EIP-55 (this key only)
 
 # Agent-friendly JSON (global flag before the chain subcommand)
@@ -174,12 +176,13 @@ let sig = signer.sign_message(b"hello")?;
 | Aptos      | `signer-aptos`  | Ed25519               | SHA3-256 domain + BCS            | use `sign-tx` / `sign_raw`            |
 | Nostr      | `signer-nostr`  | Schnorr BIP-340       | SHA-256 (NIP-01 event id)        | raw BIP-340 (optional)                |
 | Casper     | `signer-casper` | secp256k1 / Ed25519   | deploy digest (caller BLAKE2b)   | dual-curve digest / raw bytes         |
+| Arweave    | `signer-arweave`| secp256k1 ECDSA       | deep-hash → SHA-256              | format=2 recoverable 65B; owner empty |
 
 \* Address helpers on chain crates are **identity of this key only** (not multi-path HD). Full derivation lives in kobe.
 
 ## Design
 
-- **13 chains** — Aptos, Bitcoin, Casper, Ethereum, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, Nostr
+- **14 chains** — Aptos, Bitcoin, Casper, Arweave (ECDSA), Ethereum, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, Nostr
 - **Mature crypto dependencies** — `k256` for secp256k1 ECDSA and BIP-340 Schnorr, `ed25519-dalek` for Ed25519; hashing via `sha2` / `sha3` / `blake2` / `ripemd`; encoding via `bech32` / `bs58`
 - **Capability-split traits** — mandatory `SignDigest::sign_digest` (`&[u8; 32]` → `SignOutput`); optional `SignMessage`, `ExtractSignableBytes`, `EncodeSignedTransaction`; protocol `sign_transaction` is inherent per chain (no false universal trait)
 - **Scheme-honest semantics** — ECDSA digests are prehashes; Ed25519 / BIP-340 treat 32-byte inputs as messages where applicable (documented on the trait)

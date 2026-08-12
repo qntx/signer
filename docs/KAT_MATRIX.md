@@ -28,5 +28,6 @@ This matrix is honesty-first: **smoke/shape is not gold**.
 | aptos | shape | — | shape | domain prefix on tx |
 | nostr | gold (event id path) | shape (raw schnorr) | shape | NIP-01 |
 | casper | shape | shape | none (no deploy builder) | dual-curve; deploy hash caller-owned |
+| arweave | shape | — | shape (`sign_payload` / format2 segment) | address **gold** vs kobe-arweave abandon; deep-hash empty-list gold; no SignMessage |
 
 New chains **must** add a row before merge (`CONTRIBUTING.md`).

@@ -8,6 +8,7 @@ jobs:
   publish:
     uses: qntx/workflows/.github/workflows/publish-crates.yml@main
     with:
-      packages: "signer-primitives signer-btc signer-evm signer-svm signer-cosmos signer-tron signer-spark signer-fil signer-ton signer-sui signer-xrpl signer-aptos signer-nostr signer-casper signer signer-cli"
+      # primitives → chains (incl. arweave) → umbrella → CLI
+      packages: "signer-primitives signer-aptos signer-arweave signer-btc signer-casper signer-cosmos signer-evm signer-fil signer-nostr signer-spark signer-sui signer-svm signer-ton signer-tron signer-xrpl signer signer-cli"
     secrets:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

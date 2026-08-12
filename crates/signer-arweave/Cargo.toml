@@ -1,0 +1,32 @@
+[package]
+name                   = "signer-arweave"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+readme                 = "../../README.md"
+description            = "Arweave ECDSA (secp256k1) signer — recoverable signatures over deep-hash preimages."
+keywords               = ["crypto", "signer", "arweave", "ecdsa", "no_std"]
+categories             = ["cryptography::cryptocurrencies", "no-std"]
+
+[features]
+default   = ["std"]
+std       = ["alloc", "signer-primitives/std"]
+alloc     = ["signer-primitives/alloc"]
+getrandom = ["signer-primitives/getrandom"]
+# FromDerived via kobe_primitives::DerivedAccount (no hard dep on kobe-arweave).
+kobe      = ["signer-primitives/kobe"]
+
+[dependencies]
+base64.workspace      = true
+hex.workspace         = true
+sha2.workspace        = true
+signer-primitives     = { workspace = true, features = ["secp256k1"] }
+
+[dev-dependencies]
+hex.workspace         = true
+signer-primitives     = { workspace = true, features = ["testing", "secp256k1"] }
+
+[lints]
+workspace = true

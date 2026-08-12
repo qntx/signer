@@ -25,6 +25,8 @@
 
 #[cfg(feature = "aptos")]
 pub use signer_aptos as aptos;
+#[cfg(feature = "arweave")]
+pub use signer_arweave as arweave;
 #[cfg(feature = "btc")]
 pub use signer_btc as btc;
 #[cfg(feature = "casper")]

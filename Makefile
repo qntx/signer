@@ -32,6 +32,7 @@ check-no-std:
 	cargo check -p signer-aptos --no-default-features --features alloc
 	cargo check -p signer-nostr --no-default-features --features alloc
 	cargo check -p signer-casper --no-default-features --features alloc
+	cargo check -p signer-arweave --no-default-features --features alloc
 	cargo check -p signer --no-default-features --features alloc
 	cargo check -p signer --no-default-features --features "alloc,all-chains"
 

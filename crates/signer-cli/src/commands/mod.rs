@@ -1,6 +1,7 @@
 //! CLI command definitions and handlers.
 
 mod aptos;
+mod arweave;
 mod btc;
 mod casper;
 mod cosmos;
@@ -17,6 +18,7 @@ mod update;
 mod xrpl;
 
 pub(crate) use aptos::AptosCommand;
+pub(crate) use arweave::ArweaveCommand;
 pub(crate) use btc::BtcCommand;
 pub(crate) use casper::CasperCommand;
 use clap::{Parser, Subcommand};
@@ -115,6 +117,10 @@ pub(crate) enum Commands {
     /// Casper Network signing operations.
     #[command(name = "casper", alias = "cspr")]
     Casper(CasperCommand),
+
+    /// Arweave ECDSA signing operations (format=2, recoverable secp256k1).
+    #[command(name = "arweave", alias = "ar")]
+    Arweave(ArweaveCommand),
 
     /// Upgrade this CLI via the official sh.qntx.fun installer.
     ///
