@@ -4,6 +4,21 @@ All notable changes to this workspace are documented in this file. The format is
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-08-12
+
+### Added
+
+- **Arweave ECDSA (`signer-arweave`)** — format=2 offline signing:
+  - Address / owner: same as kobe-arweave (compressed pk → Base64URL)
+  - `SignDigest` + `sign_payload` (`SHA-256(msg)` then recoverable ECDSA, matching
+    `secp256k1_nif:sign/2`)
+  - Pure `deep_hash` (SHA-384) and `signature_data_segment_v2_ecdsa` (owner omitted)
+  - `sign_format2_ecdsa`, `transaction_id` = Base64URL(SHA-256(sig65))
+  - CLI: `signer arweave` / `ar` — `sign-digest`, `sign-payload`, `address`
+  - Umbrella feature `arweave` in `all-chains` (not `mainstream`)
+  - CI no_std + crates.io publish list; workspace **3.2.0**
+  - Non-goals: RSA, format=1, chunk/Merkle, HTTP, personal-message scheme
+
 ## [3.1.0] - 2026-08-09
 
 ### Added

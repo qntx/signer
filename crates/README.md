@@ -19,30 +19,32 @@
 | **[`signer-aptos`](signer-aptos/)** | [![crates.io][signer-aptos-crate]][signer-aptos-crate-url] [![docs.rs][signer-aptos-doc]][signer-aptos-doc-url] | Aptos — Ed25519 + SHA3-256 domain-separated signing |
 | **[`signer-nostr`](signer-nostr/)** | [![crates.io][signer-nostr-crate]][signer-nostr-crate-url] [![docs.rs][signer-nostr-doc]][signer-nostr-doc-url] | Nostr — BIP-340 Schnorr (NIP-01) + NIP-19 `nsec`/`npub` bech32 |
 | **[`signer-casper`](signer-casper/)** | [![crates.io][signer-casper-crate]][signer-casper-crate-url] [![docs.rs][signer-casper-doc]][signer-casper-doc-url] | Casper — dual-curve (secp256k1 + Ed25519) digest / message signing |
-| **[`signer-cli`](signer-cli/)** | [![crates.io][signer-cli-crate]][signer-cli-crate-url] | CLI — sign, inspect keys across all 13 chains |
+| **[`signer-arweave`](signer-arweave/)** | [![crates.io][signer-arweave-crate]][signer-arweave-crate-url] [![docs.rs][signer-arweave-doc]][signer-arweave-doc-url] | Arweave — ECDSA format=2, deep-hash + recoverable sig |
+| **[`signer-cli`](signer-cli/)** | [![crates.io][signer-cli-crate]][signer-cli-crate-url] | CLI — sign, inspect keys across all 14 chains |
 
 ## Dependency Graph
 
 ```text
 signer-cli
-  └── signer-{evm,btc,svm,cosmos,tron,sui,ton,fil,spark,xrpl,aptos,nostr,casper}
-        └── signer-primitives (Sign trait, SignOutput, FromSecretKey)
+  └── signer-{evm,btc,svm,cosmos,tron,sui,ton,fil,spark,xrpl,aptos,nostr,casper,arweave}
+        └── signer-primitives (SignDigest, SignOutput, FromSecretKey)
 
 signer (umbrella)
   ├── signer-primitives
-  ├── signer-evm    ── k256 (ECDSA)  + sha3  (Keccak-256)
-  ├── signer-btc    ── k256 (ECDSA)  + sha2  (double-SHA256)
-  ├── signer-svm    ── ed25519-dalek (Ed25519)
-  ├── signer-cosmos ── k256 (ECDSA)  + sha2
-  ├── signer-tron   ── k256 (ECDSA)  + sha3  + sha2
-  ├── signer-sui    ── ed25519-dalek + blake2 (BLAKE2b intent)
-  ├── signer-ton    ── ed25519-dalek
-  ├── signer-fil    ── k256 (ECDSA)  + blake2
-  ├── signer-spark  ── k256 (ECDSA)  + sha2
-  ├── signer-xrpl   ── k256 (ECDSA)  + sha2  (SHA-512-half)
-  ├── signer-aptos  ── ed25519-dalek + sha3  (SHA3-256)
-  ├── signer-nostr  ── k256 (BIP-340 Schnorr) + sha2 + bech32 (NIP-19)
-  └── signer-casper ── k256 (ECDSA) + ed25519-dalek (dual-curve)
+  ├── signer-evm     ── k256 (ECDSA)  + sha3  (Keccak-256)
+  ├── signer-btc     ── k256 (ECDSA)  + sha2  (double-SHA256)
+  ├── signer-svm     ── ed25519-dalek (Ed25519)
+  ├── signer-cosmos  ── k256 (ECDSA)  + sha2
+  ├── signer-tron    ── k256 (ECDSA)  + sha3  + sha2
+  ├── signer-sui     ── ed25519-dalek + blake2 (BLAKE2b intent)
+  ├── signer-ton     ── ed25519-dalek
+  ├── signer-fil     ── k256 (ECDSA)  + blake2
+  ├── signer-spark   ── k256 (ECDSA)  + sha2
+  ├── signer-xrpl    ── k256 (ECDSA)  + sha2  (SHA-512-half)
+  ├── signer-aptos   ── ed25519-dalek + sha3  (SHA3-256)
+  ├── signer-nostr   ── k256 (BIP-340 Schnorr) + sha2 + bech32 (NIP-19)
+  ├── signer-casper  ── k256 (ECDSA) + ed25519-dalek (dual-curve)
+  └── signer-arweave ── k256 (ECDSA recoverable) + sha2 (SHA-256 + SHA-384 deep-hash)
 ```
 
 ## Feature Flags
@@ -55,7 +57,7 @@ The umbrella `signer` crate provides fine-grained feature control:
 | `alloc` | | Enable `alloc` crate for `no_std` environments |
 | `getrandom` | | Enable `Signer::random()` via OS-provided CSPRNG |
 | `mainstream` | ✅ | Preset: `btc` + `evm` + `svm` (intentional; kobe defaults to `std` only) |
-| `all-chains` | | Enable all 13 chain signers |
+| `all-chains` | | Enable all 14 chain signers |
 | `btc` | via mainstream | Bitcoin signer |
 | `evm` | via mainstream | Ethereum signer |
 | `svm` | via mainstream | Solana signer |
@@ -69,6 +71,7 @@ The umbrella `signer` crate provides fine-grained feature control:
 | `aptos` | | Aptos signer |
 | `nostr` | | Nostr signer (BIP-340 Schnorr + NIP-19 bech32) |
 | `casper` | | Casper dual-curve signer |
+| `arweave` | | Arweave ECDSA format=2 signer |
 | `kobe` | | Enable [kobe](https://github.com/qntx/kobe) 3.2+ HD wallet bridging for all chains |
 
 Default is `std` + `mainstream` so a bare `signer` dependency compiles the three most common chains. Opt into more chains explicitly or via `all-chains`.
@@ -77,13 +80,13 @@ Default is `std` + `mainstream` so a bare `signer` dependency compiles the three
 
 | Curve / scheme | Library | Chains |
 | --- | --- | --- |
-| secp256k1 ECDSA | [k256](https://docs.rs/k256) 0.14 | EVM, BTC, Cosmos, Tron, Spark, Filecoin, XRPL, Casper |
+| secp256k1 ECDSA | [k256](https://docs.rs/k256) 0.14 | EVM, BTC, Cosmos, Tron, Spark, Filecoin, XRPL, Casper, Arweave |
 | secp256k1 BIP-340 Schnorr | [k256](https://docs.rs/k256) 0.14 (`schnorr` feature) | Nostr |
 | Ed25519 | [ed25519-dalek](https://docs.rs/ed25519-dalek) 3 | Solana, Sui, TON, Aptos, Casper |
 
 | Hash | Library | Chains |
 | --- | --- | --- |
-| SHA-256 / SHA-512 | [sha2](https://docs.rs/sha2) 0.11 | BTC, Cosmos, Tron, Spark, Sui, XRPL, Nostr |
+| SHA-256 / SHA-384 / SHA-512 | [sha2](https://docs.rs/sha2) 0.11 | BTC, Cosmos, Tron, Spark, Sui, XRPL, Nostr, Arweave |
 | Keccak-256 / SHA3-256 | [sha3](https://docs.rs/sha3) 0.12 | EVM, Tron, Aptos |
 | BLAKE2b-256 | [blake2](https://docs.rs/blake2) 0.10 | Filecoin, Sui, Casper digests |
 | bech32 (NIP-19) | [bech32](https://docs.rs/bech32) 0.12 | Cosmos, Nostr |
@@ -150,3 +153,7 @@ Default is `std` + `mainstream` so a bare `signer` dependency compiles the three
 [signer-casper-crate-url]: https://crates.io/crates/signer-casper
 [signer-casper-doc]: https://img.shields.io/docsrs/signer-casper.svg
 [signer-casper-doc-url]: https://docs.rs/signer-casper
+[signer-arweave-crate]: https://img.shields.io/crates/v/signer-arweave.svg
+[signer-arweave-crate-url]: https://crates.io/crates/signer-arweave
+[signer-arweave-doc]: https://img.shields.io/docsrs/signer-arweave.svg
+[signer-arweave-doc-url]: https://docs.rs/signer-arweave

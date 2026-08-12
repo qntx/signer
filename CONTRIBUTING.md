@@ -143,13 +143,15 @@ runtime “unsupported” error for a faked message scheme.
 ## Adding a chain
 
 1. Scaffold `crates/signer-<name>/` with `no_std` + `alloc`, workspace lints, and
-   `FromSecretKey` + `Sign` (plus optional traits as justified).
+   `FromSecretKey` + `SignDigest` (plus optional traits as justified).
 2. Wire features on the `signer` umbrella and `signer-cli` (subcommand + output).
 3. Add KATs against an independent reference implementation where claims exist.
-4. Extend CI no_std thumb checks for the new crate.
-5. Document the chain in `README.md`, `crates/README.md`, and
-   `skills/signer/SKILL.md`; update `CHANGELOG.md`.
-6. Keep `cargo deny` clean (no banned crates).
+4. Extend **CI** no_std thumb checks **and** `publish.yml` package list for the
+   new crate (omit either and the chain will not ship correctly).
+5. Extend local `Justfile` / `Makefile` `check-no-std` the same way.
+6. Document the chain in `README.md`, `crates/README.md`, and
+   `skills/signer/SKILL.md`; update `CHANGELOG.md` and `docs/KAT_MATRIX.md`.
+7. Keep `cargo deny` clean (no banned crates).
 
 ## ECDSA `v` offsets
 

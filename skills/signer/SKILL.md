@@ -1,17 +1,18 @@
 ---
 name: signer
 description: >-
-  Multi-chain transaction signing CLI tool for 13 chains: Ethereum, Bitcoin,
+  Multi-chain transaction signing CLI tool for 14 chains: Ethereum, Bitcoin,
   Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, Aptos, Nostr,
-  and Casper. Use when the user asks to sign messages, sign hashes, sign
-  transactions, sign Nostr events, Casper deploy digests, or look up addresses
-  / public keys / NIP-19 npub / nsec from private keys. Supports JSON output
-  via --json flag for programmatic/agent consumption.
+  Casper, and Arweave (ECDSA). Use when the user asks to sign messages, sign
+  hashes, sign transactions, sign Nostr events, Casper deploy digests, Arweave
+  deep-hash payloads, or look up addresses / public keys / NIP-19 npub / nsec
+  from private keys. Supports JSON output via --json flag for
+  programmatic/agent consumption.
 ---
 
 # Signer CLI — Multi-Chain Transaction Signing Tool
 
-`signer` is a single binary CLI for cryptographic signing operations across **13 chains**: Ethereum, Bitcoin, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, Aptos, Nostr, and Casper. It uses lightweight, battle-tested cryptographic libraries (k256 for secp256k1 ECDSA and BIP-340 Schnorr, ed25519-dalek, sha2, sha3, blake2, bech32).
+`signer` is a single binary CLI for cryptographic signing operations across **14 chains**: Ethereum, Bitcoin, Solana, Cosmos, Tron, Sui, TON, Filecoin, Spark, XRP Ledger, Aptos, Nostr, Casper, and Arweave (ECDSA). It uses lightweight, battle-tested cryptographic libraries (k256 for secp256k1 ECDSA and BIP-340 Schnorr, ed25519-dalek, sha2, sha3, blake2, bech32).
 
 ## Installation
 
@@ -80,6 +81,7 @@ The `--json` flag is **global** and must appear **before** the chain subcommand.
 | Aptos      | `aptos`  | `apt`             |
 | Nostr      | `nostr`  | —                 |
 | Casper     | `casper` | `cspr`            |
+| Arweave    | `arweave`| `ar`              |
 
 ### Subcommands per chain
 
@@ -92,15 +94,17 @@ The `--json` flag is **global** and must appear **before** the chain subcommand.
 | `sign-tx`      | Sign transaction bytes (chain-specific hashing) |
 | `address`      | Show address and/or public key                  |
 
-#### secp256k1 ECDSA chains without message signing (cosmos, xrpl, fil)
+#### secp256k1 ECDSA chains without message signing (cosmos, xrpl, fil, arweave)
 
 | Subcommand  | Description                                                                  |
 | ----------- | ---------------------------------------------------------------------------- |
 | `sign-digest` | Sign a raw 32-byte hash                                                      |
-| `sign-tx`   | Sign transaction bytes (Cosmos: `SignDoc` / ADR-036; XRPL: `STX\0` + SHA-512-half; Filecoin: Blake2b-256 of CID bytes) |
+| `sign-tx` / `sign-payload` | Chain-specific (Cosmos/XRPL/FIL: `sign-tx`; Arweave: `sign-payload`) |
 | `address`   | Show address and/or public key                                               |
 
 Cosmos has no single-argument `sign-message`: for off-chain signing build the ADR-036 `StdSignDoc` externally (or via `kobe cosmos`) and feed its canonical bytes into `sign-tx`. XRPL has no canonical message standard. Filecoin has no separate personal-message scheme either — `sign-tx` doubles as the message-signing entry point (it Blake2b-256 hashes whatever you feed it).
+
+Arweave ECDSA (format=2 only): `owner` field empty; preimage is deep-hash (SHA-384) of fields without owner; CLI `sign-payload` does `SHA-256(msg)` then recoverable ECDSA (65B). `sign-digest` is for when you already have the 32-byte `SHA-256(deep-hash)`.
 
 #### Ed25519 chains with message signing (svm, sui)
 
@@ -164,6 +168,7 @@ The `v` fragments below are wrapped in inline code to survive markdown table ren
 | Aptos      | _Not supported — use `sign-tx` (applies the `APTOS::RawTransaction` SHA3-256 domain prefix)_   | SHA3-256 domain prefix + Ed25519     |
 | Nostr      | BIP-340 Schnorr (raw, no implicit hashing)                                                     | SHA-256 then BIP-340 Schnorr         |
 | Casper     | secp: 32-byte digest only; ed25519: raw message bytes                                          | _use `sign-digest` for deploy digests_ |
+| Arweave    | _Not supported_                                                                                | `sign-payload`: SHA-256(deep-hash) + recoverable ECDSA |
 
 #### Casper (dual-curve)
 
@@ -319,6 +324,20 @@ signer casper sign-message -k "$KEY" -m "hello" --algo ed25519
 signer casper address -k "$KEY" --algo secp256k1
 ```
 
+### Arweave (ECDSA format=2)
+
+```bash
+# Address = Base64URL(SHA-256(compressed pk)); not an Ethereum address
+signer arweave address -k "$KEY"
+
+# Digest already SHA-256(deep-hash output)
+echo "$KEY" | signer arweave sign-digest -k - -x "<32-byte hex>"
+
+# Deep-hash preimage (typically 48-byte SHA-384 tree root as hex)
+signer arweave sign-payload -k "$KEY" -d "<deep-hash hex>"
+# JSON message field carries Base64URL(SHA-256(sig65)) as the would-be tx id
+```
+
 ### Nostr
 
 Nostr uses **BIP-340 Taproot Schnorr** signatures over secp256k1 (NIP-01).
@@ -403,6 +422,7 @@ All errors in JSON mode return exit code 1 with:
 | XRP Ledger              | 64-char hex (32 bytes secp256k1 key)                    |
 | Nostr                   | 64-char hex _or_ NIP-19 `nsec1…` bech32 (auto-detected) |
 | Casper                  | 64-char hex + `--algo secp256k1\|ed25519`               |
+| Arweave                 | 64-char hex (secp256k1); address is Base64URL 43 chars  |
 
 All chains accept `-k -` (stdin) or `-k @path` in addition to inline hex.
 
