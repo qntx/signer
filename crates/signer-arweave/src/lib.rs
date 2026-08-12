@@ -171,8 +171,6 @@ pub use signer_primitives::FromDerived;
 
 signer_primitives::impl_from_secret_key!();
 
-// ── Address / owner ──────────────────────────────────────────────────────────
-
 /// Protocol address: `Base64URL_nopad(SHA-256(compressed_pk))`.
 #[must_use]
 pub fn address_from_compressed_pubkey(pk: &[u8; 33]) -> String {
@@ -184,8 +182,6 @@ pub fn address_from_compressed_pubkey(pk: &[u8; 33]) -> String {
 pub fn owner_from_compressed_pubkey(pk: &[u8; 33]) -> String {
     base64url_nopad(pk)
 }
-
-// ── Deep-hash (SHA-384) ──────────────────────────────────────────────────────
 
 /// A leaf blob or nested list for Arweave deep-hash.
 #[derive(Debug, Clone)]
@@ -265,8 +261,6 @@ fn tagged_len_prefix(kind: &[u8], len: usize) -> Vec<u8> {
     t
 }
 
-// ── format=2 ECDSA signature data segment ────────────────────────────────────
-
 /// Fields for format=2 **ECDSA** signature preimage (owner omitted).
 ///
 /// Matches `signature_data_segment_v2_no_public_key` without denomination.
@@ -336,8 +330,6 @@ pub fn sign_format2_ecdsa(
     let preimage = signature_data_segment_v2_ecdsa(fields);
     signer.sign_payload(&preimage)
 }
-
-// ── helpers ──────────────────────────────────────────────────────────────────
 
 fn sha256_32(data: &[u8]) -> [u8; 32] {
     Sha256::digest(data).into()

@@ -46,10 +46,6 @@ fn tv1_signer() -> Signer {
     Signer::from_hex(TV1_PRIV_HEX).unwrap()
 }
 
-// ============================================================================
-// NIP-06 bech32 and x-only public key KATs
-// ============================================================================
-
 #[test]
 fn nip06_tv1_xonly_pubkey_matches_kat() {
     let s = tv1_signer();
@@ -92,10 +88,6 @@ fn from_nsec_rejects_wrong_hrp_and_malformed_bech32() {
         Err(SignError::InvalidKey(_))
     ));
 }
-
-// ============================================================================
-// NIP-01 event signing pipeline
-// ============================================================================
 
 /// `sign_transaction(event)` must equal `sign_digest(sha256(event))`: the
 /// two entry points are supposed to converge on the NIP-01 event-id
