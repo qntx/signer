@@ -743,9 +743,9 @@ dependencies = [
 
 [[package]]
 name = "kobe-aptos"
-version = "3.2.0"
+version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46ce692edcb51a6399a833755360fde70ab94d8a74ac547629ac68a7498d6c82"
+checksum = "e6ad9ae7b4b8a330c0d64404a150441af70101a28e827a4de0fcf0fcede8240d"
 dependencies = [
  "hex",
  "kobe-primitives",
@@ -820,9 +820,9 @@ dependencies = [
 
 [[package]]
 name = "kobe-primitives"
-version = "3.2.0"
+version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7d32764bfe60f1dd92a0231561be8c3933c3d2c39a83d69323880f8573e3912"
+checksum = "59a9580ac9473a760adc27dcd6d94cad17a56b0413b57de255d6182d077f8b3d"
 dependencies = [
  "bip32",
  "bip39",
