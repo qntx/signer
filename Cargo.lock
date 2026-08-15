@@ -95,12 +95,6 @@ checksum = "fd307490d624467aa6f74b0eabb77633d1f758a7b25f12bceb0b22e08d9726f6"
 
 [[package]]
 name = "base64"
-version = "0.22.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
-
-[[package]]
-name = "base64"
 version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
@@ -876,7 +870,7 @@ version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6e316c75e270321008fd240b9aa42bdf2048f3c00e0ce2fef4ac65f342c31fa"
 dependencies = [
- "base64 0.23.1",
+ "base64",
  "kobe-primitives",
  "sha2 0.11.0",
  "zeroize",
@@ -1337,7 +1331,7 @@ dependencies = [
 name = "signer-arweave"
 version = "3.2.0"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "hex",
  "sha2 0.11.0",
  "signer-primitives",
