@@ -34,13 +34,13 @@ Signer turns 32-byte private keys into standards-compliant signatures for Aptos,
 **Shell** (macOS / Linux):
 
 ```bash
-curl -fsSL https://sh.qntx.fun/signer | sh
+curl -fsSL https://sh.qntx.org/signer | sh
 ```
 
 **PowerShell** (Windows):
 
 ```powershell
-irm https://sh.qntx.fun/signer/ps | iex
+irm https://sh.qntx.org/signer/ps | iex
 ```
 
 Or via Cargo:
@@ -68,7 +68,7 @@ signer      evm    address     -k @./key.hex                          # EIP-55 (
 # Agent-friendly JSON (global flag before the chain subcommand)
 signer --json evm sign-message -k - -m "test"
 
-# Self-upgrade (sh.qntx.fun install path; same as re-running the install script)
+# Self-upgrade (sh.qntx.org install path; same as re-running the install script)
 signer upgrade              # install latest if newer (`update` is an alias)
 signer upgrade --check      # report only
 signer upgrade --force      # reinstall even when up to date
@@ -227,9 +227,9 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 
 <div align="center">
 
-A **[QuantX](https://qntx.fun)** open-source project.
+A **[QuantX](https://qntx.org)** open-source project.
 
-<a href="https://qntx.fun"><img alt="QuantX" width="369" src="https://raw.githubusercontent.com/qntx/.github/main/profile/qntx.svg" /></a>
+<a href="https://qntx.org"><img alt="QuantX" width="369" src="https://raw.githubusercontent.com/qntx/.github/main/profile/qntx.svg" /></a>
 
 Code is law. We write both.
 
