@@ -4,9 +4,14 @@ on:
   push:
     tags: ["v*.*.*"]
 
+permissions:
+  contents: read
+
 jobs:
   publish:
-    uses: qntx/workflows/.github/workflows/publish-crates.yml@main
+    uses: qntx/workflows/.github/workflows/publish-crates.yml@v2.0.0
+    permissions:
+      contents: read
     with:
       # primitives → chains (incl. arweave) → umbrella → CLI
       packages: "signer-primitives signer-aptos signer-arweave signer-btc signer-casper signer-cosmos signer-evm signer-fil signer-nostr signer-spark signer-sui signer-svm signer-ton signer-tron signer-xrpl signer signer-cli"
