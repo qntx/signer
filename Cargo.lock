@@ -158,6 +158,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "blake2"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b5d4d889834ee8ecfc0f8426ad30faf7cdcb10f741a8e6d7224d95325479f6f"
+dependencies = [
+ "digest 0.11.3",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -766,7 +775,7 @@ version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8dc34761f3bbc9ae2ed5bddd1478556e1186fa31e5c5a017ba26ffae561829f"
 dependencies = [
- "blake2",
+ "blake2 0.10.6",
  "hex",
  "kobe-primitives",
 ]
@@ -797,7 +806,7 @@ version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "50690b0a073c90025142268f055aba9c07cdccd4d83b63749caf962048571755"
 dependencies = [
- "blake2",
+ "blake2 0.10.6",
  "kobe-primitives",
 ]
 
@@ -847,7 +856,7 @@ version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2f6418351a0dc5982b6043d23b031fffcf9d61523b1b9b6fa6b4468b179e7b0d"
 dependencies = [
- "blake2",
+ "blake2 0.10.6",
  "hex",
  "kobe-primitives",
  "zeroize",
@@ -1414,7 +1423,7 @@ dependencies = [
 name = "signer-fil"
 version = "3.2.0"
 dependencies = [
- "blake2",
+ "blake2 0.11.0",
  "hex",
  "kobe-fil",
  "signer-primitives",
@@ -1462,7 +1471,7 @@ dependencies = [
 name = "signer-sui"
 version = "3.2.0"
 dependencies = [
- "blake2",
+ "blake2 0.11.0",
  "ed25519-dalek",
  "hex",
  "kobe-sui",
