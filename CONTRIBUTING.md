@@ -150,7 +150,7 @@ runtime “unsupported” error for a faked message scheme.
    new crate (omit either and the chain will not ship correctly).
 5. Extend local `Justfile` / `Makefile` `check-no-std` the same way.
 6. Document the chain in `README.md`, `crates/README.md`, and
-   `skills/signer/SKILL.md`; update `CHANGELOG.md` and `docs/KAT_MATRIX.md`.
+   `skills/signer/SKILL.md`; update `CHANGELOG.md` and `notes/KAT_MATRIX.md`.
 7. Keep `cargo deny` clean (no banned crates).
 
 ## ECDSA `v` offsets
@@ -160,7 +160,7 @@ Do not hard-code `27` / `31` in new chain code.
 
 ## KAT strength
 
-Update [`docs/KAT_MATRIX.md`](docs/KAT_MATRIX.md) when adding chains or claims.
+Update [`notes/KAT_MATRIX.md`](notes/KAT_MATRIX.md) when adding chains or claims.
 
 ## CLI notes
 
