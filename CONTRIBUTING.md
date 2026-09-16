@@ -167,7 +167,7 @@ Update [`notes/KAT_MATRIX.md`](notes/KAT_MATRIX.md) when adding chains or claims
 - Global flag: `--json` (must appear before the chain subcommand).
 - Private key flag `-k` / `--key` accepts hex, `-` (stdin), or `@path` (file).
 - Prefer stdin / files over argv on shared hosts (shell history / process listings).
-- Self-upgrade for installs from `https://sh.qntx.fun/signer`:
+- Self-upgrade for installs from `https://sh.qntx.org/signer`:
 
   ```bash
   signer upgrade              # alias: signer update

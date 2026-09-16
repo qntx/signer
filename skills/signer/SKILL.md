@@ -21,13 +21,13 @@ description: >-
 **macOS / Linux:**
 
 ```sh
-curl -fsSL https://sh.qntx.fun/signer | sh
+curl -fsSL https://sh.qntx.org/signer | sh
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
-irm https://sh.qntx.fun/signer/ps | iex
+irm https://sh.qntx.org/signer/ps | iex
 ```
 
 ### Via Cargo
@@ -44,7 +44,7 @@ signer --version
 
 ### Self-upgrade
 
-For installs from `https://sh.qntx.fun/signer` (not cargo installs):
+For installs from `https://sh.qntx.org/signer` (not cargo installs):
 
 ```bash
 signer upgrade              # alias: signer update
