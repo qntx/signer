@@ -1,4 +1,4 @@
-//! Self-upgrade via the official sh.qntx.fun installer (`signer upgrade`).
+//! Self-upgrade via the official sh.qntx.org installer (`signer upgrade`).
 //!
 //! **Naming:** the primary subcommand is `upgrade` (replace this binary with a
 //! newer release). `update` is an alias. This matches tools like Deno/Bun
@@ -6,8 +6,8 @@
 //! `upgrade` (install packages).
 //!
 //! Reuses the same install path as:
-//! - `curl -fsSL https://sh.qntx.fun/signer | sh` (Unix)
-//! - `irm https://sh.qntx.fun/signer/ps | iex` (Windows)
+//! - `curl -fsSL https://sh.qntx.org/signer | sh` (Unix)
+//! - `irm https://sh.qntx.org/signer/ps | iex` (Windows)
 //!
 //! Cargo-installed binaries are not overwritten; users are directed to
 //! `cargo install signer-cli --force` instead.
@@ -23,10 +23,10 @@ use crate::output;
 const REPO: &str = "qntx/signer";
 /// Official install endpoint (Unix shell).
 #[cfg(not(windows))]
-const INSTALL_SH_URL: &str = "https://sh.qntx.fun/signer";
+const INSTALL_SH_URL: &str = "https://sh.qntx.org/signer";
 /// Official install endpoint (PowerShell).
 #[cfg(windows)]
-const INSTALL_PS_URL: &str = "https://sh.qntx.fun/signer/ps";
+const INSTALL_PS_URL: &str = "https://sh.qntx.org/signer/ps";
 
 /// Upgrade the `signer` CLI binary in place (`signer upgrade` / `signer update`).
 #[derive(Args, Debug)]
@@ -311,5 +311,46 @@ mod tests {
         assert!(is_newer("4.0.0", "3.0.9"));
         assert!(!is_newer("3.0.0", "3.0.0"));
         assert!(!is_newer("2.9.9", "3.0.0"));
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn installer_url_is_sh_qntx_org() {
+        assert_eq!(INSTALL_SH_URL, "https://sh.qntx.org/signer");
+        assert!(
+            !INSTALL_SH_URL.contains(".fun"),
+            "installer host is sh.qntx.org"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn installer_url_is_sh_qntx_org_ps() {
+        assert_eq!(INSTALL_PS_URL, "https://sh.qntx.org/signer/ps");
+        assert!(
+            !INSTALL_PS_URL.contains(".fun"),
+            "installer host is sh.qntx.org"
+        );
+    }
+
+    #[test]
+    fn production_source_does_not_advertise_fun() {
+        let src = include_str!("update.rs");
+        let production = src
+            .split("#[cfg(test)]")
+            .next()
+            .expect("production source before tests");
+        assert!(
+            !production.contains("sh.qntx.fun"),
+            "installer URL is sh.qntx.org, not .fun"
+        );
+        assert!(
+            production.contains("https://sh.qntx.org/signer"),
+            "unix installer must be sh.qntx.org/signer"
+        );
+        assert!(
+            production.contains("https://sh.qntx.org/signer/ps"),
+            "windows installer must be sh.qntx.org/signer/ps"
+        );
     }
 }
